@@ -716,6 +716,77 @@ h1, h2, h3 {
 }
 .st-qty input { flex: 1; min-width: 0; }
 .st-qty select { flex: 0 0 90px; }
+
+/* ============================================================
+   RECIPES
+   ============================================================ */
+#recipe-form { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.recipe-search { margin-bottom: 12px; }
+.recipe-search input[type="search"] {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-family: var(--font-body);
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+.recipe-filter-row { margin-bottom: 16px; }
+.recipe-card.cuisine-indian .edge { background: var(--color-accent); }
+.recipe-card.cuisine-anglo-indian .edge { background: var(--color-leftovers); }
+.recipe-card.cuisine-australian .edge { background: var(--color-fridge); }
+.recipe-card.cuisine-western .edge { background: var(--color-freezer); }
+.fav-star { color: var(--color-accent); }
+.tag.tag-protein { color: var(--color-fridge); }
+.recipe-stats { display: flex; gap: 8px; margin-bottom: 10px; }
+.recipe-stat {
+  flex: 1;
+  background: var(--color-paper);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  padding: 8px 6px;
+  text-align: center;
+}
+.recipe-stat .v { display: block; font-size: 15px; font-weight: 800; }
+.recipe-stat .l { display: block; font-size: 11px; color: var(--color-ink-soft); text-transform: uppercase; letter-spacing: 0.03em; }
+.recipe-muted { font-size: 13px; color: var(--color-ink-soft); }
+.recipe-notes { font-size: 14px; line-height: 1.5; margin: 0; white-space: pre-line; }
+.rating-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; }
+.rating-label { font-size: 14px; font-weight: 700; }
+.star-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  padding: 2px 3px;
+  color: var(--color-line);
+  cursor: pointer;
+}
+.star-btn.on { color: var(--color-accent); }
+.ingredient-list { list-style: none; padding: 0; margin: 0; }
+.ingredient-list li {
+  display: flex;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-line);
+  font-size: 14px;
+}
+.ingredient-list .ing-qty { flex: 0 0 72px; font-weight: 700; color: var(--color-ink-soft); }
+.ingredient-list .ing-note { color: var(--color-ink-soft); }
+.ingredient-list .ing-flag {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  padding: 0 6px;
+}
+.method-list { padding-left: 20px; margin: 0; }
+.method-list li { font-size: 14px; line-height: 1.5; margin-bottom: 8px; }
 </style>
  </head>
  <body>
@@ -1142,7 +1213,9 @@ const AppState = {
   route: 'home',
   inventory: [],
   activeLocationFilter: 'all',
-  editingItemId: null
+  editingItemId: null,
+  recipes: [],
+  recipeFilters: { search: '', cuisine: 'all', favourites: false, quick: false, highProtein: false, freezer: false }
 };
 
 /* ============================================================
@@ -1169,12 +1242,12 @@ async function renderRoute() {
   });
 
   const fab = document.getElementById('fab-btn');
-  fab.style.display = AppState.route === 'kitchen' ? 'flex' : 'none';
+  fab.style.display = (AppState.route === 'kitchen' || AppState.route === 'recipes') ? 'flex' : 'none';
 
   const titleMap = {
     home: ['Kitchen Companion', "Know what you've got"],
     planner: ['Meal Planner', 'Coming in Phase 2'],
-    recipes: ['Recipes', 'Coming in Phase 2'],
+    recipes: ['Recipes', 'Indian · Anglo-Indian · Australian · Western'],
     kitchen: ['Kitchen', 'Pantry · Fridge · Freezer · Leftovers'],
     shopping: ['Shopping', 'Coming in Phase 3'],
     settings: ['Settings', 'App data & preferences']
@@ -1190,7 +1263,7 @@ async function renderRoute() {
     case 'kitchen': content.innerHTML = await renderKitchenScreen(); attachKitchenListeners(); break;
     case 'settings': content.innerHTML = await renderSettingsScreen(); attachSettingsListeners(); break;
     case 'planner': content.innerHTML = renderPlaceholder('Meal Planner', 'Weekly breakfast, lunch and dinner planning — built around what\'s already in your kitchen, expiry dates, and your protein targets.'); break;
-    case 'recipes': content.innerHTML = renderPlaceholder('Recipes', 'A curated library of Indian, Anglo-Indian and Australian/Western recipes, with ingredient match scoring against your inventory.'); break;
+    case 'recipes': content.innerHTML = await renderRecipesScreen(); attachRecipesListeners(); break;
     case 'shopping': content.innerHTML = renderPlaceholder('Shopping', 'Budget tracking, purchase events, and shopping lists built from your meal plan.'); break;
   }
 }
@@ -1487,7 +1560,10 @@ function attachKitchenListeners() {
   });
 }
 
-document.getElementById('fab-btn').addEventListener('click', () => openItemForm(null));
+document.getElementById('fab-btn').addEventListener('click', () => {
+  if (AppState.route === 'recipes') openRecipeForm(null);
+  else openItemForm(null);
+});
 
 /* ---- Item Add/Edit Form ---- */
 function openItemForm(item, prefill) {
@@ -2124,6 +2200,613 @@ async function saveStocktake() {
 }
 
 /* ============================================================
+   RECIPES
+   ============================================================ */
+const RECIPE_SEED_URL = './recipes-seed.json';
+const RECIPE_CUISINES = ['Indian', 'Anglo-Indian', 'Australian', 'Western'];
+const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
+const LEVELS = ['Low', 'Medium', 'High'];
+const PRIMARY_PROTEINS = ['Chicken', 'Fish', 'Beef', 'Lamb', 'Pork', 'Eggs', 'Legumes', 'None'];
+const QUICK_RECIPE_MINUTES = 30;
+
+// Units the ingredient parser recognises; plurals and long forms map to the stored unit.
+const RECIPE_UNIT_ALIASES = {
+  g: 'g', gram: 'g', grams: 'g', kg: 'kg', ml: 'ml', l: 'L', litre: 'L', litres: 'L',
+  tsp: 'tsp', tsps: 'tsp', teaspoon: 'tsp', teaspoons: 'tsp',
+  tbsp: 'tbsp', tbsps: 'tbsp', tablespoon: 'tbsp', tablespoons: 'tbsp',
+  cup: 'cup', cups: 'cup', clove: 'clove', cloves: 'clove', bunch: 'bunch', bunches: 'bunch',
+  sprig: 'sprig', sprigs: 'sprig', pinch: 'pinch', pinches: 'pinch', can: 'can', cans: 'can', each: 'each'
+};
+const RECIPE_UNIT_PLURALS = { cup: 'cups', clove: 'cloves', bunch: 'bunches', sprig: 'sprigs', pinch: 'pinches', can: 'cans' };
+
+function toNumberOrNull(value) {
+  if (value === '' || value === null || value === undefined) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeRecipeIngredient(ing) {
+  const name = String(ing.name || '').trim();
+  const terms = Array.isArray(ing.matchTerms) && ing.matchTerms.length ? ing.matchTerms : [name];
+  return {
+    name,
+    quantity: toNumberOrNull(ing.quantity),
+    unit: ing.unit || '',
+    category: CATEGORIES.includes(ing.category) ? ing.category : 'Other',
+    matchTerms: terms.map((t) => String(t).toLowerCase().trim()).filter(Boolean),
+    optional: !!ing.optional,
+    assumedStaple: !!ing.assumedStaple,
+    prepNote: ing.prepNote || ''
+  };
+}
+
+// Fills defaults so seed recipes, user recipes and restored backups all have the same shape.
+function normalizeRecipe(r) {
+  const pick = (value, allowed, fallback) => (allowed.includes(value) ? value : fallback);
+  return {
+    name: String(r.name || '').trim(),
+    cuisine: pick(r.cuisine, RECIPE_CUISINES, 'Western'),
+    mealTypes: (Array.isArray(r.mealTypes) ? r.mealTypes : []).filter((m) => MEAL_TYPES.includes(m)),
+    servings: toNumberOrNull(r.servings),
+    prepMinutes: toNumberOrNull(r.prepMinutes),
+    cookMinutes: toNumberOrNull(r.cookMinutes),
+    difficulty: pick(r.difficulty, DIFFICULTIES, 'Easy'),
+    caloriesPerServing: toNumberOrNull(r.caloriesPerServing),
+    proteinGramsPerServing: toNumberOrNull(r.proteinGramsPerServing),
+    proteinLevel: pick(r.proteinLevel, LEVELS, 'Medium'),
+    fatLevel: pick(r.fatLevel, LEVELS, 'Medium'),
+    primaryProtein: pick(r.primaryProtein, PRIMARY_PROTEINS, 'None'),
+    freezerFriendly: !!r.freezerFriendly,
+    leftoverFriendly: !!r.leftoverFriendly,
+    ingredients: (Array.isArray(r.ingredients) ? r.ingredients : []).map(normalizeRecipeIngredient).filter((i) => i.name),
+    method: (Array.isArray(r.method) ? r.method : []).map((s) => String(s).trim()).filter(Boolean),
+    notes: r.notes || ''
+  };
+}
+
+function recipeTotalMinutes(r) {
+  return (r.prepMinutes || 0) + (r.cookMinutes || 0);
+}
+
+/* ---- Built-in recipe seed ----
+   recipes-seed.json carries a version number. When it goes up, new built-in recipes are added
+   and untouched ones are refreshed. Recipes the user has edited or deleted are left alone. */
+async function syncRecipeSeed() {
+  let seed;
+  try {
+    const res = await fetch(RECIPE_SEED_URL);
+    if (!res.ok) return false;
+    seed = await res.json();
+  } catch (err) {
+    return false; // e.g. opened from file:// — the app still works without built-in recipes
+  }
+  if (!seed || !Array.isArray(seed.recipes) || !seed.version) return false;
+
+  const meta = (await dbGet('settings', 'recipeSeed')) || { key: 'recipeSeed', version: 0, deletedSeedIds: [] };
+  if (meta.version >= seed.version) return false;
+
+  const existing = await dbGetAll('recipes');
+  const bySeedId = new Map(existing.filter((r) => r.seedId).map((r) => [r.seedId, r]));
+  const deleted = meta.deletedSeedIds || [];
+  const now = new Date().toISOString();
+
+  for (const s of seed.recipes) {
+    if (!s.seedId || deleted.includes(s.seedId)) continue;
+    const current = bySeedId.get(s.seedId);
+    if (current && current.userModified) continue;
+    const record = {
+      ...normalizeRecipe(s),
+      seedId: s.seedId,
+      source: 'built-in',
+      userModified: false,
+      userRating: current ? current.userRating : null,
+      partnerRating: current ? current.partnerRating : null,
+      isFavourite: current ? !!current.isFavourite : false,
+      createdAt: current ? current.createdAt : now,
+      updatedAt: now
+    };
+    if (current) record.id = current.id;
+    await dbPut('recipes', record);
+  }
+
+  await dbPut('settings', { ...meta, version: seed.version, deletedSeedIds: deleted });
+  return true;
+}
+
+/* ---- Recipes list screen ---- */
+function recipeMatchesFilters(r, f) {
+  if (f.cuisine !== 'all' && r.cuisine !== f.cuisine) return false;
+  if (f.favourites && !r.isFavourite) return false;
+  if (f.quick && !(recipeTotalMinutes(r) > 0 && recipeTotalMinutes(r) <= QUICK_RECIPE_MINUTES)) return false;
+  if (f.highProtein && r.proteinLevel !== 'High') return false;
+  if (f.freezer && !r.freezerFriendly) return false;
+  const q = f.search.trim().toLowerCase();
+  if (q) {
+    const haystack = [r.name, r.cuisine, r.primaryProtein, ...(r.ingredients || []).map((i) => i.name)].join(' ').toLowerCase();
+    if (!haystack.includes(q)) return false;
+  }
+  return true;
+}
+
+function renderRecipeList() {
+  const f = AppState.recipeFilters;
+  const recipes = (AppState.recipes || [])
+    .filter((r) => recipeMatchesFilters(r, f))
+    .sort((a, b) => (b.isFavourite ? 1 : 0) - (a.isFavourite ? 1 : 0) || a.name.localeCompare(b.name));
+
+  if (recipes.length === 0) {
+    const none = (AppState.recipes || []).length === 0;
+    return `
+      <div class="empty-state">
+        <div class="glyph">📖</div>
+        <h3>${none ? 'No recipes yet' : 'No recipes match'}</h3>
+        <p>${none ? 'Tap + to add your own. Built-in recipes load when the app is opened from its web address.' : 'Try clearing a filter or the search.'}</p>
+      </div>
+    `;
+  }
+
+  return recipes.map((r) => {
+    const total = recipeTotalMinutes(r);
+    const cuisineClass = 'cuisine-' + r.cuisine.toLowerCase().replace(/[^a-z]+/g, '-');
+    return `
+      <div class="item-card recipe-card ${cuisineClass}" data-recipe-id="${r.id}">
+        <div class="edge"></div>
+        <div class="body">
+          <div class="top-row">
+            <span class="name">${r.isFavourite ? '<span class="fav-star">★</span> ' : ''}${escapeHtml(r.name)}</span>
+            <span class="qty">${total ? `${total} min` : ''}</span>
+          </div>
+          <div class="meta-row">
+            <span class="tag">${escapeHtml(r.cuisine)}</span>
+            ${r.primaryProtein !== 'None' ? `<span class="tag">${escapeHtml(r.primaryProtein)}</span>` : ''}
+            ${r.proteinLevel === 'High' ? '<span class="tag tag-protein">High protein</span>' : ''}
+            ${r.freezerFriendly ? '<span class="tag state-frozen">Freezes well</span>' : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function renderRecipesScreen() {
+  AppState.recipes = await dbGetAll('recipes');
+  const f = AppState.recipeFilters;
+  const filterChip = (key, label) =>
+    `<button type="button" class="state-chip recipe-filter ${f[key] ? 'selected' : ''}" data-filter="${key}">${label}</button>`;
+
+  return `
+    <div class="field recipe-search">
+      <input type="search" id="recipe-search" placeholder="Search recipes or ingredients" value="${escapeHtml(f.search)}">
+    </div>
+    <div class="location-tabs">
+      ${['all', ...RECIPE_CUISINES].map((c) => `
+        <button class="loc-tab recipe-cuisine-tab ${f.cuisine === c ? 'active' : ''}" data-cuisine="${c}">${c === 'all' ? 'All' : c}</button>
+      `).join('')}
+    </div>
+    <div class="state-chip-grid recipe-filter-row">
+      ${filterChip('favourites', '★ Favourites')}
+      ${filterChip('quick', `≤ ${QUICK_RECIPE_MINUTES} min`)}
+      ${filterChip('highProtein', 'High protein')}
+      ${filterChip('freezer', 'Freezes well')}
+    </div>
+    <div id="recipe-list">${renderRecipeList()}</div>
+  `;
+}
+
+function attachRecipeCardListeners() {
+  document.querySelectorAll('.recipe-card').forEach((card) => {
+    card.addEventListener('click', () => openRecipeDetail(parseInt(card.dataset.recipeId, 10)));
+  });
+}
+
+function attachRecipesListeners() {
+  // Search only redraws the list so the input keeps focus while typing
+  document.getElementById('recipe-search').addEventListener('input', (e) => {
+    AppState.recipeFilters.search = e.target.value;
+    document.getElementById('recipe-list').innerHTML = renderRecipeList();
+    attachRecipeCardListeners();
+  });
+
+  document.querySelectorAll('.recipe-cuisine-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      AppState.recipeFilters.cuisine = tab.dataset.cuisine;
+      renderRoute();
+    });
+  });
+
+  document.querySelectorAll('.recipe-filter').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const key = chip.dataset.filter;
+      AppState.recipeFilters[key] = !AppState.recipeFilters[key];
+      renderRoute();
+    });
+  });
+
+  attachRecipeCardListeners();
+}
+
+/* ---- Recipe detail ---- */
+function formatIngredientQuantity(ing) {
+  if (ing.quantity === null) return '';
+  const qty = Number.isInteger(ing.quantity) ? String(ing.quantity) : String(Math.round(ing.quantity * 100) / 100);
+  if (!ing.unit || ing.unit === 'each') return qty;
+  const unit = ing.quantity > 1 && RECIPE_UNIT_PLURALS[ing.unit] ? RECIPE_UNIT_PLURALS[ing.unit] : ing.unit;
+  return `${qty} ${unit}`;
+}
+
+function starRowHtml(field, value) {
+  return [1, 2, 3, 4, 5].map((n) => `
+    <button type="button" class="star-btn ${value && n <= value ? 'on' : ''}" data-field="${field}" data-value="${n}" aria-label="${n} star${n === 1 ? '' : 's'}">★</button>
+  `).join('');
+}
+
+async function openRecipeDetail(id) {
+  const recipe = await dbGet('recipes', id);
+  if (!recipe) return;
+
+  const profiles = await dbGet('settings', 'profiles');
+  const partnerName = profiles && profiles.partnerProfile && profiles.partnerProfile.name ? profiles.partnerProfile.name : 'Partner';
+
+  const stat = (label, value) => (value ? `<div class="recipe-stat"><span class="v">${escapeHtml(value)}</span><span class="l">${label}</span></div>` : '');
+
+  const ingredientsHtml = recipe.ingredients.length === 0
+    ? '<p class="recipe-muted">No ingredients listed.</p>'
+    : `<ul class="ingredient-list">${recipe.ingredients.map((ing) => `
+        <li>
+          <span class="ing-qty">${escapeHtml(formatIngredientQuantity(ing))}</span>
+          <span class="ing-name">${escapeHtml(ing.name)}${ing.prepNote ? `<span class="ing-note">, ${escapeHtml(ing.prepNote)}</span>` : ''}
+            ${ing.optional ? '<span class="ing-flag">optional</span>' : ''}
+            ${ing.assumedStaple ? '<span class="ing-flag">staple</span>' : ''}
+          </span>
+        </li>`).join('')}</ul>`;
+
+  const methodHtml = recipe.method.length === 0
+    ? '<p class="recipe-muted">No method added.</p>'
+    : `<ol class="method-list">${recipe.method.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ol>`;
+
+  const nutrition = [
+    recipe.caloriesPerServing ? `~${recipe.caloriesPerServing} kcal` : '',
+    recipe.proteinGramsPerServing ? `~${recipe.proteinGramsPerServing} g protein` : '',
+    `${recipe.fatLevel} fat`
+  ].filter(Boolean).join(' · ');
+
+  const html = `
+    <div class="modal-title-row">
+      <h2>${escapeHtml(recipe.name)}</h2>
+      <button class="close-btn" id="modal-close">×</button>
+    </div>
+    <div class="modal-scroll-area">
+      <div class="field-row" style="margin-bottom:12px;flex-wrap:wrap;gap:6px;">
+        <span class="tag">${escapeHtml(recipe.cuisine)}</span>
+        ${recipe.mealTypes.map((m) => `<span class="tag">${escapeHtml(m)}</span>`).join('')}
+        ${recipe.proteinLevel === 'High' ? '<span class="tag tag-protein">High protein</span>' : ''}
+        ${recipe.freezerFriendly ? '<span class="tag state-frozen">Freezes well</span>' : ''}
+        ${recipe.leftoverFriendly ? '<span class="tag state-leftover">Good leftovers</span>' : ''}
+        ${recipe.source === 'built-in' ? '<span class="tag">Built-in</span>' : ''}
+      </div>
+
+      <div class="recipe-stats">
+        ${stat('Serves', recipe.servings)}
+        ${stat('Prep', recipe.prepMinutes ? recipe.prepMinutes + ' min' : '')}
+        ${stat('Cook', recipe.cookMinutes ? recipe.cookMinutes + ' min' : '')}
+        ${stat('Difficulty', recipe.difficulty)}
+      </div>
+      <p class="recipe-muted" style="margin:0 0 14px;">Per serving: ${escapeHtml(nutrition)} (approximate)</p>
+
+      <div class="rating-row">
+        <span class="rating-label">You</span>
+        <span class="stars">${starRowHtml('userRating', recipe.userRating)}</span>
+      </div>
+      <div class="rating-row">
+        <span class="rating-label">${escapeHtml(partnerName)}</span>
+        <span class="stars">${starRowHtml('partnerRating', recipe.partnerRating)}</span>
+      </div>
+      <button type="button" class="btn-secondary" id="recipe-fav-btn" style="margin:6px 0 4px;">
+        ${recipe.isFavourite ? '★ Favourite (tap to remove)' : '☆ Add to favourites'}
+      </button>
+
+      <div class="section-heading" style="margin-top:18px;"><h2>Ingredients</h2></div>
+      ${ingredientsHtml}
+
+      <div class="section-heading" style="margin-top:18px;"><h2>Method</h2></div>
+      ${methodHtml}
+
+      ${recipe.notes ? `<div class="section-heading" style="margin-top:18px;"><h2>Notes</h2></div><p class="recipe-notes">${escapeHtml(recipe.notes)}</p>` : ''}
+    </div>
+    <div class="modal-action-bar">
+      <button type="button" class="btn-primary" id="edit-recipe-btn">Edit recipe</button>
+      <button type="button" class="btn-danger" id="delete-recipe-btn">Delete recipe</button>
+    </div>
+  `;
+
+  openModal(html);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+
+  // Ratings and favourite save straight away; tapping the current rating again clears it
+  document.querySelectorAll('.star-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const field = btn.dataset.field;
+      const value = parseInt(btn.dataset.value, 10);
+      recipe[field] = recipe[field] === value ? null : value;
+      recipe.updatedAt = new Date().toISOString();
+      await dbPut('recipes', recipe);
+      openRecipeDetail(id);
+      renderRoute();
+    });
+  });
+
+  document.getElementById('recipe-fav-btn').addEventListener('click', async () => {
+    recipe.isFavourite = !recipe.isFavourite;
+    recipe.updatedAt = new Date().toISOString();
+    await dbPut('recipes', recipe);
+    showToast(recipe.isFavourite ? 'Added to favourites' : 'Removed from favourites');
+    openRecipeDetail(id);
+    renderRoute();
+  });
+
+  document.getElementById('edit-recipe-btn').addEventListener('click', () => openRecipeForm(recipe));
+  document.getElementById('delete-recipe-btn').addEventListener('click', () => deleteRecipe(recipe));
+}
+
+async function deleteRecipe(recipe) {
+  const builtInNote = recipe.source === 'built-in' ? ' It won\'t be added back by future updates.' : '';
+  if (!confirm(`Delete "${recipe.name}"?${builtInNote}`)) return;
+  await dbDelete('recipes', recipe.id);
+  if (recipe.seedId) {
+    const meta = (await dbGet('settings', 'recipeSeed')) || { key: 'recipeSeed', version: 0, deletedSeedIds: [] };
+    const deleted = meta.deletedSeedIds || [];
+    if (!deleted.includes(recipe.seedId)) deleted.push(recipe.seedId);
+    await dbPut('settings', { ...meta, deletedSeedIds: deleted });
+  }
+  closeModal();
+  showToast('Recipe deleted');
+  renderRoute();
+}
+
+/* ---- Recipe add/edit form ----
+   Ingredients are typed one per line, e.g. "500 g chicken thigh, diced (optional)".
+   Match words, category and staple flag are filled in automatically: kept from the same ingredient
+   if it was already on this recipe, otherwise borrowed from any other recipe using that ingredient. */
+function ingredientToLine(ing) {
+  const qty = formatIngredientQuantity(ing);
+  return [qty, ing.name].filter(Boolean).join(' ')
+    + (ing.prepNote ? `, ${ing.prepNote}` : '')
+    + (ing.optional ? ' (optional)' : '');
+}
+
+function parseQuantity(text) {
+  const unicode = { '½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 1 / 3, '⅔': 2 / 3 };
+  if (unicode[text] !== undefined) return unicode[text];
+  const mixed = text.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  if (mixed) return Number(mixed[1]) + Number(mixed[2]) / Number(mixed[3]);
+  const frac = text.match(/^(\d+)\/(\d+)$/);
+  if (frac) return Number(frac[1]) / Number(frac[2]);
+  return Number(text.replace(',', '.'));
+}
+
+function buildKnownIngredientLookup(excludeRecipeId) {
+  const lookup = new Map();
+  (AppState.recipes || []).forEach((r) => {
+    if (r.id === excludeRecipeId) return;
+    (r.ingredients || []).forEach((ing) => {
+      const key = ing.name.toLowerCase();
+      if (!lookup.has(key)) lookup.set(key, ing);
+    });
+  });
+  return lookup;
+}
+
+function parseIngredientLine(line, previousIngredients, knownLookup) {
+  let text = line.trim();
+  if (!text) return null;
+
+  let optional = false;
+  if (/\(optional\)\s*$/i.test(text)) {
+    optional = true;
+    text = text.replace(/\(optional\)\s*$/i, '').trim();
+  }
+
+  let quantity = null;
+  let unit = '';
+  const qtyMatch = text.match(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾⅓⅔])\s*(.*)$/);
+  if (qtyMatch) {
+    const parsed = parseQuantity(qtyMatch[1]);
+    if (Number.isFinite(parsed)) {
+      quantity = parsed;
+      text = qtyMatch[2];
+      const unitMatch = text.match(/^([A-Za-z]+)\.?\s+(.+)$/);
+      if (unitMatch && RECIPE_UNIT_ALIASES[unitMatch[1].toLowerCase()]) {
+        unit = RECIPE_UNIT_ALIASES[unitMatch[1].toLowerCase()];
+        text = unitMatch[2];
+      }
+    }
+  }
+
+  let prepNote = '';
+  const comma = text.indexOf(',');
+  if (comma > 0) {
+    prepNote = text.slice(comma + 1).trim();
+    text = text.slice(0, comma).trim();
+  }
+  const name = text.trim();
+  if (!name) return null;
+
+  const key = name.toLowerCase();
+  // Also try the singular form so "2 onions" picks up what's known about "Onion"
+  const singular = key.replace(/(?:es|s)$/, '');
+  const known = previousIngredients.find((p) => p.name.toLowerCase() === key)
+    || knownLookup.get(key) || knownLookup.get(singular) || knownLookup.get(key.replace(/s$/, ''));
+  return normalizeRecipeIngredient({
+    name, quantity, unit, prepNote, optional,
+    category: known ? known.category : 'Other',
+    matchTerms: known ? known.matchTerms : [key],
+    assumedStaple: known ? known.assumedStaple : false
+  });
+}
+
+function openRecipeForm(recipe) {
+  const isEdit = !!recipe;
+  const r = recipe || normalizeRecipe({ mealTypes: ['Dinner'], servings: 4, difficulty: 'Easy', proteinLevel: 'High', fatLevel: 'Low' });
+
+  const segmented = (id, options, selected) => `
+    <div class="segmented" id="${id}">
+      ${options.map((o) => `<button type="button" data-val="${o}" class="${o === selected ? 'selected' : ''}">${o}</button>`).join('')}
+    </div>`;
+  const toggleRow = (id, label, desc, on) => `
+    <div class="staple-toggle-row">
+      <div class="label-group"><span class="label">${label}</span><span class="desc">${desc}</span></div>
+      <button type="button" id="${id}" class="toggle-switch ${on ? 'on' : ''}" data-on="${on ? 'true' : 'false'}"></button>
+    </div>`;
+
+  const html = `
+    <div class="modal-title-row">
+      <h2>${isEdit ? 'Edit recipe' : 'Add recipe'}</h2>
+      <button class="close-btn" id="modal-close">×</button>
+    </div>
+    <form id="recipe-form">
+      <div class="modal-scroll-area">
+        ${isEdit && recipe.source === 'built-in' ? '<p class="recipe-muted" style="margin-top:0;">Editing a built-in recipe keeps your changes. Future app updates won\'t overwrite it.</p>' : ''}
+        <div class="field">
+          <label>Name</label>
+          <input type="text" id="r-name" value="${escapeHtml(r.name)}" placeholder="e.g. Mum's chicken curry" required>
+        </div>
+
+        <div class="field">
+          <label>Cuisine</label>
+          <select id="r-cuisine">
+            ${RECIPE_CUISINES.map((c) => `<option value="${c}" ${r.cuisine === c ? 'selected' : ''}>${c}</option>`).join('')}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Meal <span style="text-transform:none;font-weight:500;">(select all that apply)</span></label>
+          <div class="state-chip-grid" id="r-mealTypes">
+            ${MEAL_TYPES.map((m) => `<button type="button" data-val="${m}" class="state-chip ${r.mealTypes.includes(m) ? 'selected' : ''}">${m}</button>`).join('')}
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field"><label>Serves</label><input type="number" id="r-servings" min="1" value="${r.servings ?? ''}"></div>
+          <div class="field"><label>Prep (min)</label><input type="number" id="r-prep" min="0" value="${r.prepMinutes ?? ''}"></div>
+          <div class="field"><label>Cook (min)</label><input type="number" id="r-cook" min="0" value="${r.cookMinutes ?? ''}"></div>
+        </div>
+
+        <div class="field">
+          <label>Ingredients <span style="text-transform:none;font-weight:500;">(one per line, e.g. "500 g chicken thigh, diced")</span></label>
+          <textarea id="r-ingredients" rows="8" placeholder="500 g chicken thigh, diced&#10;2 onions, sliced&#10;1 tsp turmeric&#10;coriander, to garnish (optional)">${escapeHtml(r.ingredients.map(ingredientToLine).join('\n'))}</textarea>
+        </div>
+
+        <div class="field">
+          <label>Method <span style="text-transform:none;font-weight:500;">(one step per line)</span></label>
+          <textarea id="r-method" rows="6">${escapeHtml(r.method.join('\n'))}</textarea>
+        </div>
+
+        <details class="more-fields" ${isEdit ? 'open' : ''}>
+          <summary>Nutrition & details</summary>
+          <div class="more-fields-inner">
+            <div class="field"><label>Difficulty</label>${segmented('r-difficulty', DIFFICULTIES, r.difficulty)}</div>
+            <div class="field"><label>Protein level</label>${segmented('r-proteinLevel', LEVELS, r.proteinLevel)}</div>
+            <div class="field"><label>Fat level</label>${segmented('r-fatLevel', LEVELS, r.fatLevel)}</div>
+            <div class="field">
+              <label>Main protein</label>
+              <select id="r-primaryProtein">
+                ${PRIMARY_PROTEINS.map((p) => `<option value="${p}" ${r.primaryProtein === p ? 'selected' : ''}>${p}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Calories / serve</label><input type="number" id="r-calories" min="0" value="${r.caloriesPerServing ?? ''}" placeholder="approx."></div>
+              <div class="field"><label>Protein g / serve</label><input type="number" id="r-proteinGrams" min="0" value="${r.proteinGramsPerServing ?? ''}" placeholder="approx."></div>
+            </div>
+            ${toggleRow('r-freezer', 'Freezes well', 'Good for batch cooking and freezer portions', r.freezerFriendly)}
+            ${toggleRow('r-leftover', 'Good as leftovers', 'Keeps well in the fridge for another meal', r.leftoverFriendly)}
+            <div class="field"><label>Notes</label><textarea id="r-notes">${escapeHtml(r.notes)}</textarea></div>
+          </div>
+        </details>
+      </div>
+
+      <div class="modal-action-bar">
+        <button type="submit" class="btn-primary">${isEdit ? 'Save changes' : 'Add recipe'}</button>
+      </div>
+    </form>
+  `;
+
+  openModal(html);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+
+  document.querySelectorAll('#r-difficulty button, #r-proteinLevel button, #r-fatLevel button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      btn.parentElement.querySelectorAll('button').forEach((b) => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+  });
+  document.querySelectorAll('#r-mealTypes button').forEach((btn) => {
+    btn.addEventListener('click', () => btn.classList.toggle('selected'));
+  });
+  document.querySelectorAll('#r-freezer, #r-leftover').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const isOn = btn.dataset.on === 'true';
+      btn.dataset.on = isOn ? 'false' : 'true';
+      btn.classList.toggle('on', !isOn);
+    });
+  });
+
+  document.getElementById('recipe-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await saveRecipeFromForm(recipe);
+  });
+}
+
+async function saveRecipeFromForm(existing) {
+  const name = document.getElementById('r-name').value.trim();
+  if (!name) return;
+
+  const selectedVal = (id) => {
+    const el = document.querySelector(`#${id} button.selected`);
+    return el ? el.dataset.val : null;
+  };
+  const previousIngredients = existing ? existing.ingredients : [];
+  const knownLookup = buildKnownIngredientLookup(existing ? existing.id : null);
+  const ingredients = document.getElementById('r-ingredients').value.split('\n')
+    .map((line) => parseIngredientLine(line, previousIngredients, knownLookup))
+    .filter(Boolean);
+
+  const fields = normalizeRecipe({
+    name,
+    cuisine: document.getElementById('r-cuisine').value,
+    mealTypes: Array.from(document.querySelectorAll('#r-mealTypes button.selected')).map((b) => b.dataset.val),
+    servings: document.getElementById('r-servings').value,
+    prepMinutes: document.getElementById('r-prep').value,
+    cookMinutes: document.getElementById('r-cook').value,
+    difficulty: selectedVal('r-difficulty'),
+    caloriesPerServing: document.getElementById('r-calories').value,
+    proteinGramsPerServing: document.getElementById('r-proteinGrams').value,
+    proteinLevel: selectedVal('r-proteinLevel'),
+    fatLevel: selectedVal('r-fatLevel'),
+    primaryProtein: document.getElementById('r-primaryProtein').value,
+    freezerFriendly: document.getElementById('r-freezer').dataset.on === 'true',
+    leftoverFriendly: document.getElementById('r-leftover').dataset.on === 'true',
+    ingredients,
+    method: document.getElementById('r-method').value.split('\n'),
+    notes: document.getElementById('r-notes').value.trim()
+  });
+
+  const now = new Date().toISOString();
+  const record = existing
+    ? { ...existing, ...fields, userModified: existing.source === 'built-in' ? true : !!existing.userModified, updatedAt: now }
+    : { ...fields, seedId: null, source: 'user', userModified: false, userRating: null, partnerRating: null, isFavourite: false, createdAt: now, updatedAt: now };
+
+  try {
+    const id = await dbPut('recipes', record);
+    showToast(existing ? 'Recipe updated' : 'Recipe added');
+    renderRoute();
+    openRecipeDetail(existing ? existing.id : id);
+  } catch (err) {
+    alert('Couldn\'t save this recipe: ' + (err && err.message ? err.message : 'unknown storage error'));
+  }
+}
+
+/* ============================================================
    SETTINGS SCREEN
    ============================================================ */
 async function renderSettingsScreen() {
@@ -2236,6 +2919,10 @@ window.addEventListener('hashchange', handleHashChange);
     await seedIfEmpty();
     registerServiceWorker();
     handleHashChange();
+    // Built-in recipes load in the background so a slow network never delays opening the app
+    syncRecipeSeed()
+      .then((changed) => { if (changed && AppState.route === 'recipes') renderRoute(); })
+      .catch(() => {});
   } catch (err) {
     showFatalError('Kitchen Companion couldn\'t start because local storage failed to open. This usually happens when opening the file directly from a Files app. Try opening it in Safari or Chrome, or host it online (e.g. GitHub Pages) and open that link instead.<br><br><span style="opacity:0.7;font-size:11px;">' + (err && err.message ? err.message : String(err)) + '</span>');
   }
