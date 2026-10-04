@@ -620,6 +620,102 @@ h1, h2, h3 {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ============================================================
+   STOCKTAKE
+   ============================================================ */
+.stocktake-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: var(--color-paper);
+  border: 1px solid var(--color-line);
+  border-left: 4px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--color-ink);
+}
+.stocktake-btn .st-btn-title { font-size: 15px; font-weight: 800; }
+.stocktake-btn .st-btn-desc { font-size: 12px; color: var(--color-ink-soft); margin-top: 2px; }
+.modal-sheet.tall { height: 92vh; max-height: 92vh; }
+.st-intro { font-size: 13px; color: var(--color-ink-soft); margin: 0 0 10px; }
+.st-body { flex: 1; }
+.st-add { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.st-add input, .st-add select {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-family: var(--font-body);
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+.st-add .btn-secondary { flex: 0 0 auto; width: auto; margin-top: 0; padding: 10px 14px; }
+.st-group-title {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-ink-soft);
+  margin: 16px 0 6px;
+}
+.st-row {
+  background: var(--color-paper);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+}
+.st-row.ticked { border-color: var(--color-accent); }
+.st-tick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 12px;
+  background: none;
+  border: none;
+  text-align: left;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.st-box {
+  flex: 0 0 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 2px solid var(--color-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+  color: white;
+}
+.st-row.ticked .st-box { background: var(--color-accent); border-color: var(--color-accent); }
+.st-row.have .st-box { background: var(--color-line); border-color: var(--color-line); color: var(--color-ink-soft); }
+.st-row.have .st-name { color: var(--color-ink-soft); }
+.st-name { flex: 1; font-weight: 600; }
+.st-have { font-size: 11px; font-weight: 700; color: var(--color-ink-soft); text-transform: uppercase; }
+.st-qty { display: flex; gap: 8px; padding: 0 12px 11px 44px; }
+.st-qty input, .st-qty select {
+  padding: 8px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-family: var(--font-body);
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+.st-qty input { flex: 1; min-width: 0; }
+.st-qty select { flex: 0 0 90px; }
 </style>
  </head>
  <body>
@@ -1121,6 +1217,7 @@ function showToast(message) {
 }
 
 function openModal(html) {
+  document.getElementById('modal-sheet').classList.remove('tall');
   document.getElementById('modal-sheet').innerHTML = `<div class="modal-handle"></div>${html}`;
   document.getElementById('modal-overlay').classList.add('open');
 }
@@ -1128,8 +1225,43 @@ function closeModal() {
   document.getElementById('modal-overlay').classList.remove('open');
 }
 document.getElementById('modal-overlay').addEventListener('click', (e) => {
-  if (e.target.id === 'modal-overlay') closeModal();
+  if (e.target.id !== 'modal-overlay') return;
+  if (document.getElementById('st-body')) closeStocktake();
+  else closeModal();
 });
+
+// Units for kitchen items: metric weights/volumes plus counts for packaged goods
+const ITEM_UNITS = ['g', 'kg', 'ml', 'L', 'each', 'can', 'jar', 'bottle', 'pack'];
+const COUNT_UNIT_PLURALS = { can: 'cans', jar: 'jars', bottle: 'bottles', pack: 'packs' };
+
+// Item names can be typed by the user, so escape them before they go into innerHTML.
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// YYYY-MM-DD in local time (toISOString() would shift dates by the UTC offset)
+function localDateString(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function addDays(date, days) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+// "2 cans", "1kg", "6" (each), or "In stock" when no amount was recorded
+function formatItemQuantity(item) {
+  if (item.portionCount) return `${item.portionCount} × ${item.portionSize || ''}`.trim();
+  if (item.quantity === null || item.quantity === undefined || item.quantity === 0) return 'In stock';
+  const q = Number.isInteger(item.quantity) ? item.quantity : Math.round(item.quantity * 100) / 100;
+  if (!item.unit || item.unit === 'each') return String(q);
+  if (COUNT_UNIT_PLURALS[item.unit]) return `${q} ${q === 1 ? item.unit : COUNT_UNIT_PLURALS[item.unit]}`;
+  return `${q}${item.unit}`;
+}
 
 function daysUntil(dateStr) {
   if (!dateStr) return null;
@@ -1196,7 +1328,7 @@ async function renderHomeScreen() {
       const urgent = d <= 1;
       return `
         <div class="expiry-row ${urgent ? 'urgent' : ''}">
-          <span class="name">${item.name}</span>
+          <span class="name">${escapeHtml(item.name)}</span>
           <span class="when">${formatExpiry(item.expiryDate)}</span>
         </div>
       `;
@@ -1211,7 +1343,7 @@ async function renderHomeScreen() {
       <div class="empty-state">
         <div class="glyph">🧺</div>
         <h3>Your kitchen is empty — for now</h3>
-        <p>Head to the Kitchen tab and tap + to log your first item.</p>
+        <p>Head to the Kitchen tab and tap <strong>Stocktake</strong> to tick off what you have.</p>
       </div>
     ` : `
       <div class="section-heading">
@@ -1244,6 +1376,13 @@ async function renderKitchenScreen() {
     </div>
   `;
 
+  const stocktakeHtml = `
+    <button type="button" class="stocktake-btn" id="stocktake-btn">
+      <span class="st-btn-title">📋 Stocktake</span>
+      <span class="st-btn-desc">Tick off what's in your pantry, fridge and freezer</span>
+    </button>
+  `;
+
   const templates = await dbGetAll('quickAddTemplates');
   const sortedTemplates = templates.sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0));
   const quickAddHtml = sortedTemplates.length === 0 ? '' : `
@@ -1253,7 +1392,7 @@ async function renderKitchenScreen() {
   `;
 
   if (filtered.length === 0) {
-    return tabsHtml + quickAddHtml + `
+    return tabsHtml + stocktakeHtml + quickAddHtml + `
       <div class="empty-state">
         <div class="glyph">🧺</div>
         <h3>No items here yet</h3>
@@ -1270,9 +1409,7 @@ async function renderKitchenScreen() {
   });
 
   const itemsHtml = sorted.map((item) => {
-    const qtyLabel = item.portionCount
-      ? `${item.portionCount} × ${item.portionSize || ''}`.trim()
-      : `${item.quantity}${item.unit === 'each' ? '' : item.unit}`;
+    const qtyLabel = formatItemQuantity(item);
 
     const expiryFlag = item.expiryDate
       ? `<div class="expiry-flag">${formatExpiry(item.expiryDate)}</div>`
@@ -1287,8 +1424,8 @@ async function renderKitchenScreen() {
         <div class="edge"></div>
         <div class="body">
           <div class="top-row">
-            <span class="name">${item.name}</span>
-            <span class="qty">${qtyLabel}</span>
+            <span class="name">${escapeHtml(item.name)}</span>
+            <span class="qty">${escapeHtml(qtyLabel)}</span>
           </div>
           <div class="meta-row">
             ${stateTagsHtml}
@@ -1301,10 +1438,12 @@ async function renderKitchenScreen() {
     `;
   }).join('');
 
-  return tabsHtml + quickAddHtml + itemsHtml;
+  return tabsHtml + stocktakeHtml + quickAddHtml + itemsHtml;
 }
 
 function attachKitchenListeners() {
+  document.getElementById('stocktake-btn').addEventListener('click', openStocktake);
+
   document.querySelectorAll('.loc-tab').forEach((tab) => {
     tab.addEventListener('click', () => {
       AppState.activeLocationFilter = tab.dataset.loc;
@@ -1374,12 +1513,12 @@ function openItemForm(item, prefill) {
         <div class="field-row">
           <div class="field">
             <label>Quantity</label>
-            <input type="number" id="f-quantity" value="${seed ? seed.quantity : ''}" min="0" step="any" placeholder="0">
+            <input type="number" id="f-quantity" value="${seed && seed.quantity ? seed.quantity : ''}" min="0" step="any" placeholder="Optional">
           </div>
           <div class="field">
             <label>Unit</label>
             <select id="f-unit">
-              ${['g', 'kg', 'ml', 'L', 'each'].map((u) => `<option value="${u}" ${seed && seed.unit === u ? 'selected' : ''}>${u}</option>`).join('')}
+              ${ITEM_UNITS.map((u) => `<option value="${u}" ${seed && seed.unit === u ? 'selected' : ''}>${u}</option>`).join('')}
             </select>
           </div>
         </div>
@@ -1545,10 +1684,7 @@ async function refreshUseBySuggestion() {
   `;
 
   document.getElementById('apply-use-by-btn').addEventListener('click', () => {
-    const days = suggestion.suggestedDaysMax;
-    const target = new Date();
-    target.setDate(target.getDate() + days);
-    expiryInput.value = target.toISOString().slice(0, 10);
+    expiryInput.value = localDateString(addDays(new Date(), suggestion.suggestedDaysMax));
   });
 }
 
@@ -1571,7 +1707,7 @@ async function saveItemFromForm(existingItem) {
 
   const itemData = {
     name,
-    quantity: parseFloat(document.getElementById('f-quantity').value) || 0,
+    quantity: parseFloat(document.getElementById('f-quantity').value) || null,
     unit: document.getElementById('f-unit').value,
     portionCount: portionCount ? parseInt(portionCount, 10) : null,
     portionSize: portionSize || null,
@@ -1632,9 +1768,7 @@ async function openItemDetail(id) {
   const history = await dbGetAll('inventoryHistory', 'inventoryItemId', id);
   const sortedHistory = history.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  const qtyLabel = item.portionCount
-    ? `${item.portionCount} × ${item.portionSize || ''}`.trim()
-    : `${item.quantity}${item.unit === 'each' ? '' : item.unit}`;
+  const qtyLabel = formatItemQuantity(item);
 
   const historyHtml = sortedHistory.length === 0
     ? `<p style="font-size:13px;color:var(--color-ink-soft);">No history yet.</p>`
@@ -1647,7 +1781,7 @@ async function openItemDetail(id) {
 
   const html = `
     <div class="modal-title-row">
-      <h2>${item.name}</h2>
+      <h2>${escapeHtml(item.name)}</h2>
       <button class="close-btn" id="modal-close">×</button>
     </div>
     <div class="field-row" style="margin-bottom:10px;flex-wrap:wrap;gap:6px;">
@@ -1697,6 +1831,296 @@ async function logHistory(inventoryItemId, action, quantityChanged, fromLocation
     date: new Date().toISOString(),
     notes: notes || ''
   });
+}
+
+/* ============================================================
+   STOCKTAKE
+   Tick off what's in the pantry, fridge and freezer, with optional
+   amounts, and add everything in one go.
+   ============================================================ */
+// Build a stocktake group: every item shares the group's category, unit, states and staple flag.
+// An entry can override its unit or its category after a '|', e.g. 'Crushed tomatoes|can' or 'Nuts|Snacks & Treats'.
+function stocktakeGroup(title, category, unit, states, isStaple, names) {
+  return {
+    title,
+    items: names.map((entry) => {
+      const [name, override] = entry.split('|');
+      const isCategory = CATEGORIES.includes(override);
+      return {
+        name,
+        category: isCategory ? override : category,
+        unit: override && !isCategory ? override : unit,
+        states,
+        isStaple
+      };
+    })
+  };
+}
+
+const STOCKTAKE_LIST = {
+  pantry: [
+    stocktakeGroup('Spices', 'Spices & Seasonings', 'g', ['Raw'], true, [
+      'Turmeric', 'Cumin seeds', 'Ground cumin', 'Coriander seeds', 'Ground coriander', 'Chilli powder',
+      'Kashmiri chilli powder', 'Garam masala', 'Curry powder', 'Mustard seeds', 'Cardamom', 'Cloves',
+      'Cinnamon', 'Bay leaves', 'Black pepper', 'Dried chillies', 'Fenugreek', 'Asafoetida', 'Paprika', 'Salt'
+    ]),
+    stocktakeGroup('Rice, grains & flour', 'Carbs & Grains', 'kg', ['Raw'], true, [
+      'Basmati rice', 'Jasmine rice', 'Brown rice', 'Atta flour', 'Plain flour', 'Besan',
+      'Rolled oats', 'Pasta|g', 'Noodles|pack'
+    ]),
+    stocktakeGroup('Dals & lentils', 'Carbs & Grains', 'g', ['Raw'], true, [
+      'Red lentils', 'Toor dal', 'Chana dal', 'Moong dal'
+    ]),
+    stocktakeGroup('Canned', 'Canned & Jarred', 'can', ['Raw'], false, [
+      'Crushed tomatoes', 'Chickpeas', 'Kidney beans', 'Tuna', 'Coconut milk', 'Coconut cream'
+    ]),
+    stocktakeGroup('Oils & sauces', 'Sauces & Condiments', 'bottle', ['Raw'], true, [
+      'Olive oil', 'Canola oil', 'Coconut oil|jar', 'Soy sauce', 'Oyster sauce', 'Tomato sauce',
+      'BBQ sauce', 'Vinegar', 'Tamarind|jar'
+    ]),
+    stocktakeGroup('Fresh pantry', 'Vegetables', 'kg', ['Fresh'], false, [
+      'Onions', 'Garlic|each', 'Potatoes'
+    ]),
+    stocktakeGroup('Other', 'Other', 'g', ['Raw'], false, [
+      'Sugar|kg', 'Honey|jar', 'Stock powder|jar', 'Desiccated coconut', 'Nuts|Snacks & Treats'
+    ])
+  ],
+  fridge: [
+    stocktakeGroup('Dairy & eggs', 'Dairy & Refrigerated', 'each', ['Fresh'], false, [
+      'Milk|L', 'Greek yoghurt|g', 'Butter|g', 'Ghee|jar', 'Cheese|g', 'Cream|ml', 'Eggs'
+    ]),
+    stocktakeGroup('Vegetables', 'Vegetables', 'each', ['Fresh'], false, [
+      'Spinach|g', 'Bok choy', 'Chinese broccoli', 'Mushrooms|g', 'Carrots', 'Capsicum',
+      'Zucchini', 'Cucumber', 'Lettuce', 'Broccoli'
+    ]),
+    stocktakeGroup('Herbs & aromatics', 'Vegetables', 'each', ['Fresh'], false, [
+      'Coriander', 'Mint', 'Curry leaves', 'Spring onion', 'Ginger|g', 'Green chillies'
+    ]),
+    stocktakeGroup('Opened sauces & jars', 'Sauces & Condiments', 'jar', ['Opened'], false, [
+      'Mayonnaise', 'Mustard', 'Chutney', 'Pickle', 'Tomato paste'
+    ]),
+    stocktakeGroup('Fruit', 'Fruit', 'each', ['Fresh'], false, [
+      'Lemons', 'Limes', 'Berries|g'
+    ])
+  ],
+  freezer: [
+    stocktakeGroup('Meat & seafood', 'Protein', 'kg', ['Frozen', 'Raw'], false, [
+      'Chicken breast', 'Chicken thigh', 'Beef mince', 'Barramundi fillets', 'White fish fillets',
+      'Prawns', 'Lamb'
+    ]),
+    stocktakeGroup('Frozen vegetables', 'Vegetables', 'g', ['Frozen'], false, [
+      'Frozen peas', 'Frozen mixed vegetables', 'Frozen spinach', 'Frozen corn'
+    ]),
+    stocktakeGroup('Prepared portions', 'Ready Meals', 'each', ['Frozen', 'Prepared'], false, [
+      'Bok choy portions|Vegetables', 'Cooked rice portions|Carbs & Grains', 'Curry portions',
+      'Soup portions', 'Roti / paratha|Carbs & Grains'
+    ]),
+    stocktakeGroup('Ready meals', 'Ready Meals', 'each', ['Frozen'], false, [
+      'Lasagne', 'Bolognese', 'Stroganoff'
+    ])
+  ]
+};
+
+// Stocktake selections live here while the sheet is open, so switching
+// Pantry/Fridge/Freezer keeps what's already been ticked.
+const Stocktake = { location: 'pantry', selected: {}, custom: { pantry: [], fridge: [], freezer: [] }, existing: new Set() };
+
+function stocktakeKey(location, name) {
+  return `${location}|${name.toLowerCase()}`;
+}
+
+function stocktakeSelectedCount() {
+  return Object.keys(Stocktake.selected).length;
+}
+
+function stocktakeRowHtml(location, item) {
+  const key = stocktakeKey(location, item.name);
+  const have = Stocktake.existing.has(key);
+  const sel = Stocktake.selected[key];
+  const units = ITEM_UNITS.map((u) => `<option value="${u}" ${(sel ? sel.unit : item.unit) === u ? 'selected' : ''}>${u}</option>`).join('');
+  return `
+    <div class="st-row ${sel ? 'ticked' : ''} ${have ? 'have' : ''}" data-key="${escapeHtml(key)}">
+      <button type="button" class="st-tick" ${have ? 'disabled' : ''}>
+        <span class="st-box">${sel || have ? '✓' : ''}</span>
+        <span class="st-name">${escapeHtml(item.name)}</span>
+        ${have ? '<span class="st-have">In kitchen</span>' : ''}
+      </button>
+      ${sel ? `
+        <div class="st-qty">
+          <input type="number" class="st-amount" min="0" step="any" inputmode="decimal" placeholder="Amount" value="${sel.quantity ?? ''}">
+          <select class="st-unit">${units}</select>
+        </div>` : ''}
+    </div>
+  `;
+}
+
+function renderStocktakeBody() {
+  const loc = Stocktake.location;
+  const groups = [...STOCKTAKE_LIST[loc]];
+  if (Stocktake.custom[loc].length) groups.unshift({ title: 'Your items', items: Stocktake.custom[loc] });
+
+  return `
+    <div class="st-add">
+      <input type="text" id="st-custom-name" placeholder="Add your own, e.g. Kokum">
+      <select id="st-custom-category">
+        ${CATEGORIES.map((c) => `<option value="${c}" ${c === 'Other' ? 'selected' : ''}>${c}</option>`).join('')}
+      </select>
+      <button type="button" class="btn-secondary" id="st-custom-add">+ Add</button>
+    </div>
+    ${groups.map((g) => `
+      <div class="st-group-title">${escapeHtml(g.title)}</div>
+      ${g.items.map((item) => stocktakeRowHtml(loc, item)).join('')}
+    `).join('')}
+  `;
+}
+
+function findStocktakeItem(location, key) {
+  const all = [...Stocktake.custom[location], ...STOCKTAKE_LIST[location].flatMap((g) => g.items)];
+  return all.find((i) => stocktakeKey(location, i.name) === key);
+}
+
+function refreshStocktakeSheet() {
+  document.getElementById('st-body').innerHTML = renderStocktakeBody();
+  document.querySelectorAll('#st-location button').forEach((b) => b.classList.toggle('selected', b.dataset.val === Stocktake.location));
+  const count = stocktakeSelectedCount();
+  const saveBtn = document.getElementById('st-save');
+  saveBtn.textContent = count ? `Add ${count} item${count === 1 ? '' : 's'} to kitchen` : 'Tick items to add';
+  saveBtn.disabled = count === 0;
+  attachStocktakeBodyListeners();
+}
+
+function attachStocktakeBodyListeners() {
+  document.querySelectorAll('.st-row').forEach((row) => {
+    const key = row.dataset.key;
+    row.querySelector('.st-tick').addEventListener('click', () => {
+      if (Stocktake.selected[key]) {
+        delete Stocktake.selected[key];
+      } else {
+        const item = findStocktakeItem(Stocktake.location, key);
+        if (!item) return;
+        Stocktake.selected[key] = { ...item, location: Stocktake.location, quantity: null };
+      }
+      const scroll = document.getElementById('st-body').scrollTop;
+      refreshStocktakeSheet();
+      document.getElementById('st-body').scrollTop = scroll;
+    });
+    const amount = row.querySelector('.st-amount');
+    if (amount) {
+      amount.addEventListener('input', () => {
+        Stocktake.selected[key].quantity = amount.value === '' ? null : parseFloat(amount.value);
+      });
+      row.querySelector('.st-unit').addEventListener('change', (e) => {
+        Stocktake.selected[key].unit = e.target.value;
+      });
+    }
+  });
+
+  document.getElementById('st-custom-add').addEventListener('click', () => {
+    const input = document.getElementById('st-custom-name');
+    const name = input.value.trim();
+    if (!name) { input.focus(); return; }
+    const loc = Stocktake.location;
+    const key = stocktakeKey(loc, name);
+    if (!findStocktakeItem(loc, key)) {
+      const category = document.getElementById('st-custom-category').value;
+      const states = loc === 'freezer' ? ['Frozen'] : loc === 'fridge' ? ['Fresh'] : ['Raw'];
+      Stocktake.custom[loc].push({ name, category, unit: loc === 'pantry' ? 'g' : 'each', states, isStaple: false });
+    }
+    if (!Stocktake.existing.has(key) && !Stocktake.selected[key]) {
+      Stocktake.selected[key] = { ...findStocktakeItem(loc, key), location: loc, quantity: null };
+    }
+    refreshStocktakeSheet();
+    document.getElementById('st-body').scrollTop = 0;
+  });
+}
+
+async function openStocktake() {
+  const items = await dbGetAll('inventoryItems');
+  Stocktake.existing = new Set(items.map((i) => stocktakeKey(i.location, i.name)));
+  Stocktake.selected = {};
+  Stocktake.custom = { pantry: [], fridge: [], freezer: [] };
+  if (!STOCKTAKE_LIST[Stocktake.location]) Stocktake.location = 'pantry';
+
+  openModal(`
+    <div class="modal-title-row">
+      <h2>Stocktake</h2>
+      <button class="close-btn" id="modal-close">×</button>
+    </div>
+    <p class="st-intro">Tick what you have. Amounts are optional, and you can add them later.</p>
+    <div class="segmented" id="st-location" style="margin-bottom:10px;">
+      ${['pantry', 'fridge', 'freezer'].map((loc) => `<button type="button" data-val="${loc}">${LOCATION_LABELS[loc]}</button>`).join('')}
+    </div>
+    <div class="modal-scroll-area st-body" id="st-body"></div>
+    <div class="modal-action-bar">
+      <button type="button" class="btn-primary" id="st-save" disabled>Tick items to add</button>
+    </div>
+  `);
+  document.getElementById('modal-sheet').classList.add('tall');
+
+  document.getElementById('modal-close').addEventListener('click', closeStocktake);
+  document.querySelectorAll('#st-location button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      Stocktake.location = btn.dataset.val;
+      refreshStocktakeSheet();
+      document.getElementById('st-body').scrollTop = 0;
+    });
+  });
+  document.getElementById('st-save').addEventListener('click', saveStocktake);
+  refreshStocktakeSheet();
+}
+
+function closeStocktake() {
+  if (stocktakeSelectedCount() && !confirm('Close without adding the ticked items?')) return;
+  Stocktake.selected = {};
+  closeModal();
+}
+
+async function saveStocktake() {
+  const picks = Object.values(Stocktake.selected);
+  if (!picks.length) return;
+  const saveBtn = document.getElementById('st-save');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Adding…';
+
+  try {
+    const now = new Date().toISOString();
+    for (const pick of picks) {
+      // Fresh food gets a suggested use-by date (the longer end of the range); the user can change it later
+      const suggestion = await getSuggestedUseBy(pick.name, pick.states);
+      const quantity = Number.isFinite(pick.quantity) ? pick.quantity : null;
+      const itemData = {
+        name: pick.name,
+        quantity,
+        unit: pick.unit,
+        portionCount: null,
+        portionSize: null,
+        location: pick.location,
+        subLocation: null,
+        states: pick.states,
+        category: pick.category,
+        isStaple: !!pick.isStaple,
+        purchaseDate: null,
+        expiryDate: suggestion ? localDateString(addDays(new Date(), suggestion.suggestedDaysMax)) : null,
+        useByOverrideDays: null,
+        cost: null,
+        notes: '',
+        freezerFriendlyRating: null,
+        linkedPurchaseEventId: null,
+        createdAt: now,
+        updatedAt: now
+      };
+      const newId = await dbPut('inventoryItems', itemData);
+      await logHistory(newId, 'created', quantity, null, pick.location, 'Added in stocktake');
+    }
+    Stocktake.selected = {};
+    closeModal();
+    showToast(`Added ${picks.length} item${picks.length === 1 ? '' : 's'}`);
+    renderRoute();
+  } catch (err) {
+    saveBtn.disabled = false;
+    saveBtn.textContent = `Add ${picks.length} items to kitchen`;
+    alert('Couldn\'t save the stocktake: ' + (err && err.message ? err.message : 'unknown storage error'));
+  }
 }
 
 /* ============================================================

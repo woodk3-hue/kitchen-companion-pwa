@@ -8,6 +8,8 @@ Personal kitchen inventory PWA. Offline-capable, no backend, all data stored loc
 - Full IndexedDB schema (10 stores, database version 2), so later phases won't need migrations
 - **Kitchen Inventory**: add, edit, delete items; filter by location; portion support; expiry flagging
 - **Categories & states** match `PROJECT_VISION.md`: every item has one of 11 fixed categories, and any combination of states (Fresh, Frozen, Defrosting, Raw, Cooked, Leftover, Opened, Prepared)
+- **Stocktake** (Kitchen tab → 📋 Stocktake): tick off what's in your pantry, fridge and freezer from a list of about 100 common items, or add your own (e.g. Kokum). Amounts are optional, e.g. `2 can`, `1 kg`, `500 g`; items without one show "In stock". Everything is added in one go with category, state and staple flag filled in, fresh food gets a suggested use-by date, and items already in your kitchen are marked so they aren't added twice. The list is `STOCKTAKE_LIST` in `index.html`.
+- **Units**: metric (g, kg, ml, L) plus counts for packaged goods (each, can, jar, bottle, pack)
 - **Inventory history trail**: every create/edit/discard is logged per item (tap an item card to view its history)
 - **Home dashboard**: item counts by location, items expiring within 3 days
 - Pre-seeded, editable freezer suitability reference (chicken, fish, bok choy, coriander, etc.)
