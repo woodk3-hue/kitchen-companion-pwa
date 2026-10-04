@@ -6,7 +6,8 @@ Personal kitchen inventory PWA. Offline-capable, no backend, all data stored loc
 
 - Bottom nav shell: Home, Meal Planner, Recipes, Kitchen, Shopping, Settings (Planner/Recipes/Shopping are placeholders until Phase 2–3)
 - Full IndexedDB schema (all 9 stores), so later phases won't need migrations
-- **Kitchen Inventory**: add, edit, delete items; filter by location; portion support; food state tracking; expiry flagging
+- **Kitchen Inventory**: add, edit, delete items; filter by location; portion support; expiry flagging
+- **Categories & states** match `PROJECT_VISION.md`: every item has one of 11 fixed categories, and any combination of states (Fresh, Frozen, Defrosting, Raw, Cooked, Leftover, Opened, Prepared)
 - **Inventory history trail**: every create/edit/discard is logged per item (tap an item card to view its history)
 - **Home dashboard**: item counts by location, items expiring within 3 days
 - Pre-seeded, editable freezer suitability reference (chicken, fish, bok choy, coriander, etc.)
@@ -38,8 +39,16 @@ Then in repo Settings → Pages, set source to the branch/folder containing thes
 index.html                    — the entire app (HTML, CSS, JS)
 sw.js                         — service worker (must stay a separate file)
 manifest.json                 — PWA install metadata
-icons/icon-192.png, icon-512.png
+icon-192.png, icon-512.png
 ```
+
+## Data upgrades
+
+The database is at version 2. Opening the app over v1 data converts it automatically:
+- Free-text categories are mapped to the fixed list (e.g. "meat" → Protein, "produce" → Vegetables). Anything that can't be mapped becomes **Other**, and the original text is kept in the item's notes as `Category: …`.
+- The single `state` becomes a `states` list. "Prepped" becomes **Prepared**; "Ready meal" becomes the **Ready Meals** category plus Frozen (in the freezer) or Cooked (elsewhere).
+
+Importing an older backup goes through the same conversion.
 
 ## Data safety
 

@@ -6,7 +6,7 @@
 <title>Kitchen Companion</title>
 <meta name="theme-color" content="#1F2620">
 <link rel="manifest" href="./manifest.json">
-<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
@@ -233,6 +233,7 @@ h1, h2, h3 {
 .tag.state-frozen { color: var(--color-freezer); }
 .tag.state-defrosting { color: var(--color-warn); }
 .tag.state-leftover, .tag.state-cooked { color: var(--color-leftovers); }
+.tag.state-opened { color: var(--color-warn); }
 .item-card .expiry-flag { font-size: 11px; font-weight: 700; color: var(--color-warn); margin-top: 4px; }
 
 /* ============================================================
@@ -403,6 +404,7 @@ h1, h2, h3 {
   color: var(--color-ink);
 }
 .field textarea { resize: vertical; min-height: 60px; }
+.field label .label-hint { text-transform: none; letter-spacing: 0; font-weight: 600; opacity: 0.8; }
 .field-row { display: flex; gap: 10px; }
 .field-row .field { flex: 1; }
 
@@ -551,7 +553,7 @@ h1, h2, h3 {
    DATABASE
    ============================================================ */
 const DB_NAME = 'KitchenCompanionDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 let db = null;
 
 function openDatabase() {
@@ -560,11 +562,12 @@ function openDatabase() {
 
     request.onupgradeneeded = (event) => {
       const _db = event.target.result;
+      const upgradeTx = event.target.transaction;
 
       if (!_db.objectStoreNames.contains('inventoryItems')) {
         const store = _db.createObjectStore('inventoryItems', { keyPath: 'id', autoIncrement: true });
         store.createIndex('location', 'location', { unique: false });
-        store.createIndex('state', 'state', { unique: false });
+        store.createIndex('states', 'states', { unique: false, multiEntry: true });
         store.createIndex('expiryDate', 'expiryDate', { unique: false });
         store.createIndex('category', 'category', { unique: false });
       }
@@ -605,6 +608,17 @@ function openDatabase() {
       if (!_db.objectStoreNames.contains('settings')) {
         _db.createObjectStore('settings', { keyPath: 'key' });
       }
+
+      // v2: single free-text category + single state -> fixed category list + multiple states
+      if (event.oldVersion >= 1 && event.oldVersion < 2) {
+        const itemStore = upgradeTx.objectStore('inventoryItems');
+        if (itemStore.indexNames.contains('state')) itemStore.deleteIndex('state');
+        if (!itemStore.indexNames.contains('states')) {
+          itemStore.createIndex('states', 'states', { unique: false, multiEntry: true });
+        }
+        migrateStoreRecords(itemStore, normalizeItem);
+        migrateStoreRecords(upgradeTx.objectStore('quickAddTemplates'), normalizeTemplate);
+      }
     };
 
     request.onsuccess = (event) => {
@@ -614,6 +628,15 @@ function openDatabase() {
 
     request.onerror = (event) => reject(event.target.error);
   });
+}
+
+function migrateStoreRecords(store, normalize) {
+  store.openCursor().onsuccess = (e) => {
+    const cursor = e.target.result;
+    if (!cursor) return;
+    cursor.update(normalize(cursor.value));
+    cursor.continue();
+  };
 }
 
 function dbGetAll(storeName, indexName, query) {
@@ -716,12 +739,12 @@ const FREEZER_RATINGS_SEED = [
 ];
 
 const QUICK_ADD_SEED = [
-  { name: 'Chicken breast', category: 'meat', defaultUnit: 'g', defaultLocation: 'freezer', defaultState: 'frozen', defaultPortionSize: null, usageCount: 0, isUserCreated: false },
-  { name: 'Basmati rice', category: 'grain', defaultUnit: 'kg', defaultLocation: 'pantry', defaultState: 'raw', defaultPortionSize: null, usageCount: 0, isUserCreated: false },
-  { name: 'Bok choy', category: 'produce', defaultUnit: 'g', defaultLocation: 'fridge', defaultState: 'fresh', defaultPortionSize: null, usageCount: 0, isUserCreated: false },
-  { name: 'Coriander', category: 'produce', defaultUnit: 'g', defaultLocation: 'fridge', defaultState: 'fresh', defaultPortionSize: null, usageCount: 0, isUserCreated: false },
-  { name: 'Frozen curry portion', category: 'homemade-meal', defaultUnit: 'each', defaultLocation: 'freezer', defaultState: 'ready-meal', defaultPortionSize: '350g', usageCount: 0, isUserCreated: false },
-  { name: 'Cooked rice', category: 'grain', defaultUnit: 'g', defaultLocation: 'fridge', defaultState: 'cooked', defaultPortionSize: null, usageCount: 0, isUserCreated: false }
+  { name: 'Chicken breast', category: 'protein', defaultUnit: 'g', defaultLocation: 'freezer', defaultStates: ['frozen', 'raw'], defaultPortionSize: null, usageCount: 0, isUserCreated: false },
+  { name: 'Basmati rice', category: 'carbs-grains', defaultUnit: 'kg', defaultLocation: 'pantry', defaultStates: ['raw'], defaultPortionSize: null, usageCount: 0, isUserCreated: false },
+  { name: 'Bok choy', category: 'vegetables', defaultUnit: 'g', defaultLocation: 'fridge', defaultStates: ['fresh'], defaultPortionSize: null, usageCount: 0, isUserCreated: false },
+  { name: 'Coriander', category: 'vegetables', defaultUnit: 'g', defaultLocation: 'fridge', defaultStates: ['fresh'], defaultPortionSize: null, usageCount: 0, isUserCreated: false },
+  { name: 'Frozen curry portion', category: 'ready-meals', defaultUnit: 'each', defaultLocation: 'freezer', defaultStates: ['frozen', 'cooked'], defaultPortionSize: '350g', usageCount: 0, isUserCreated: false },
+  { name: 'Cooked rice', category: 'carbs-grains', defaultUnit: 'g', defaultLocation: 'fridge', defaultStates: ['cooked', 'leftover'], defaultPortionSize: null, usageCount: 0, isUserCreated: false }
 ];
 
 async function seedIfEmpty() {
@@ -855,9 +878,91 @@ function formatExpiry(dateStr) {
 
 const LOCATION_LABELS = { pantry: 'Pantry', fridge: 'Fridge', freezer: 'Freezer', leftovers: 'Leftovers' };
 const STATE_LABELS = {
-  raw: 'Raw', frozen: 'Frozen', defrosting: 'Defrosting', fresh: 'Fresh',
-  cooked: 'Cooked', leftover: 'Leftover', 'prepared-component': 'Prepped', 'ready-meal': 'Ready meal'
+  fresh: 'Fresh', frozen: 'Frozen', defrosting: 'Defrosting', raw: 'Raw',
+  cooked: 'Cooked', leftover: 'Leftover', opened: 'Opened', prepared: 'Prepared'
 };
+const CATEGORY_LABELS = {
+  protein: 'Protein',
+  vegetables: 'Vegetables',
+  fruit: 'Fruit',
+  'carbs-grains': 'Carbs & Grains',
+  'canned-jarred': 'Canned & Jarred',
+  'dairy-refrigerated': 'Dairy & Refrigerated',
+  'sauces-condiments': 'Sauces & Condiments',
+  'spices-seasonings': 'Spices & Seasonings',
+  'snacks-treats': 'Snacks & Treats',
+  'ready-meals': 'Ready Meals',
+  other: 'Other'
+};
+
+/* ---- Normalising pre-v2 data (free-text category, single `state`) ---- */
+const LEGACY_CATEGORY_MAP = {
+  meat: 'protein', poultry: 'protein', chicken: 'protein', beef: 'protein', pork: 'protein', lamb: 'protein',
+  fish: 'protein', seafood: 'protein', egg: 'protein', eggs: 'protein',
+  produce: 'vegetables', veg: 'vegetables', vegetable: 'vegetables', veggies: 'vegetables', greens: 'vegetables',
+  fruits: 'fruit',
+  grain: 'carbs-grains', grains: 'carbs-grains', carbs: 'carbs-grains', rice: 'carbs-grains', pasta: 'carbs-grains',
+  noodles: 'carbs-grains', bread: 'carbs-grains',
+  canned: 'canned-jarred', tinned: 'canned-jarred', jarred: 'canned-jarred', tin: 'canned-jarred', can: 'canned-jarred',
+  dairy: 'dairy-refrigerated', cheese: 'dairy-refrigerated', milk: 'dairy-refrigerated', yoghurt: 'dairy-refrigerated',
+  sauce: 'sauces-condiments', sauces: 'sauces-condiments', condiment: 'sauces-condiments', condiments: 'sauces-condiments',
+  spice: 'spices-seasonings', spices: 'spices-seasonings', seasoning: 'spices-seasonings', seasonings: 'spices-seasonings',
+  herb: 'spices-seasonings', herbs: 'spices-seasonings',
+  snack: 'snacks-treats', snacks: 'snacks-treats', treats: 'snacks-treats',
+  'homemade-meal': 'ready-meals', 'ready-meal': 'ready-meals', meal: 'ready-meals', meals: 'ready-meals'
+};
+const LEGACY_STATE_MAP = { 'prepared-component': 'prepared' };
+const hasKey = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+
+function normalizeCategory(raw) {
+  const text = (raw || '').trim();
+  if (!text) return { category: 'other', unmatched: null };
+  if (hasKey(CATEGORY_LABELS, text)) return { category: text, unmatched: null };
+  const key = text.toLowerCase();
+  const byLabel = Object.keys(CATEGORY_LABELS).find((k) => CATEGORY_LABELS[k].toLowerCase() === key);
+  const mapped = byLabel || (hasKey(LEGACY_CATEGORY_MAP, key) ? LEGACY_CATEGORY_MAP[key] : null);
+  return mapped ? { category: mapped, unmatched: null } : { category: 'other', unmatched: text };
+}
+
+function normalizeStates(rawStates, legacyState, location) {
+  const list = Array.isArray(rawStates) ? rawStates : (legacyState ? [legacyState] : []);
+  const out = [];
+  list.forEach((s) => {
+    let v = hasKey(LEGACY_STATE_MAP, s) ? LEGACY_STATE_MAP[s] : s;
+    // Old 'ready-meal' state is now a category; keep the physical state instead.
+    if (v === 'ready-meal') v = location === 'freezer' ? 'frozen' : 'cooked';
+    if (hasKey(STATE_LABELS, v) && !out.includes(v)) out.push(v);
+  });
+  return out;
+}
+
+function normalizeItem(item) {
+  if (!item || typeof item !== 'object') return item;
+  const out = { ...item };
+  const { category, unmatched } = normalizeCategory(item.category);
+  out.category = (item.state === 'ready-meal' && category === 'other') ? 'ready-meals' : category;
+  // Keep any free-text category we couldn't map, so nothing the user typed is lost.
+  if (unmatched) out.notes = [item.notes, `Category: ${unmatched}`].filter(Boolean).join('\n');
+  out.states = normalizeStates(item.states, item.state, item.location);
+  delete out.state;
+  return out;
+}
+
+function normalizeTemplate(t) {
+  if (!t || typeof t !== 'object') return t;
+  const out = { ...t };
+  const { category } = normalizeCategory(t.category);
+  out.category = (t.defaultState === 'ready-meal' && category === 'other') ? 'ready-meals' : category;
+  out.defaultStates = normalizeStates(t.defaultStates, t.defaultState, t.defaultLocation);
+  delete out.defaultState;
+  return out;
+}
+
+function stateTagsHtml(item) {
+  return (item.states || []).map((s) =>
+    `<span class="tag state-${s}">${STATE_LABELS[s] || s}</span>`
+  ).join('');
+}
 
 /* ============================================================
    HOME DASHBOARD
@@ -978,8 +1083,8 @@ async function renderKitchenScreen() {
             <span class="qty">${qtyLabel}</span>
           </div>
           <div class="meta-row">
-            <span class="tag state-${item.state}">${STATE_LABELS[item.state] || item.state}</span>
-            ${item.category ? `<span class="tag">${item.category}</span>` : ''}
+            ${stateTagsHtml(item)}
+            ${item.category ? `<span class="tag">${CATEGORY_LABELS[item.category] || item.category}</span>` : ''}
           </div>
           ${expiryFlag}
         </div>
@@ -1048,10 +1153,17 @@ function openItemForm(item) {
         </div>
 
         <div class="field">
-          <label>State</label>
-          <div class="segmented" id="f-state">
+          <label>Category</label>
+          <select id="f-category">
+            ${Object.keys(CATEGORY_LABELS).map((c) => `<option value="${c}" ${(item ? item.category : 'other') === c ? 'selected' : ''}>${CATEGORY_LABELS[c]}</option>`).join('')}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>State <span class="label-hint">(pick any that apply)</span></label>
+          <div class="segmented multi" id="f-states">
             ${Object.keys(STATE_LABELS).map((s) => `
-              <button type="button" data-val="${s}" class="${item && item.state === s ? 'selected' : (!item && s === 'raw' ? 'selected' : '')}">${STATE_LABELS[s]}</button>
+              <button type="button" data-val="${s}" aria-pressed="${item && (item.states || []).includes(s) ? 'true' : 'false'}" class="${item && (item.states || []).includes(s) ? 'selected' : ''}">${STATE_LABELS[s]}</button>
             `).join('')}
           </div>
         </div>
@@ -1068,11 +1180,6 @@ function openItemForm(item) {
                 <label>Portion size</label>
                 <input type="text" id="f-portionSize" value="${item && item.portionSize ? item.portionSize : ''}" placeholder="e.g. 350g each">
               </div>
-            </div>
-
-            <div class="field">
-              <label>Category</label>
-              <input type="text" id="f-category" value="${item ? item.category || '' : ''}" placeholder="e.g. meat, produce, spice">
             </div>
 
             <div class="field-row">
@@ -1108,10 +1215,17 @@ function openItemForm(item) {
 
   openModal(html);
 
-  document.querySelectorAll('#f-location button, #f-state button').forEach((btn) => {
+  document.querySelectorAll('#f-location button').forEach((btn) => {
     btn.addEventListener('click', () => {
       btn.parentElement.querySelectorAll('button').forEach((b) => b.classList.remove('selected'));
       btn.classList.add('selected');
+    });
+  });
+
+  document.querySelectorAll('#f-states button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const on = btn.classList.toggle('selected');
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
   });
 
@@ -1150,8 +1264,8 @@ async function saveItemFromForm(existingItem) {
     portionSize: portionSize || null,
     location: getSelected('f-location') || 'pantry',
     subLocation: null,
-    state: getSelected('f-state') || 'raw',
-    category: document.getElementById('f-category').value.trim(),
+    states: Array.from(document.querySelectorAll('#f-states button.selected')).map((b) => b.dataset.val),
+    category: document.getElementById('f-category').value || 'other',
     purchaseDate: document.getElementById('f-purchaseDate').value || null,
     expiryDate: document.getElementById('f-expiryDate').value || null,
     cost: document.getElementById('f-cost').value ? parseFloat(document.getElementById('f-cost').value) : null,
@@ -1221,9 +1335,10 @@ async function openItemDetail(id) {
       <h2>${item.name}</h2>
       <button class="close-btn" id="modal-close">×</button>
     </div>
-    <div class="field-row" style="margin-bottom:10px;">
+    <div class="field-row" style="margin-bottom:10px;flex-wrap:wrap;gap:6px;">
       <span class="tag">${LOCATION_LABELS[item.location]}</span>
-      <span class="tag state-${item.state}">${STATE_LABELS[item.state] || item.state}</span>
+      ${stateTagsHtml(item)}
+      ${item.category ? `<span class="tag">${CATEGORY_LABELS[item.category] || item.category}</span>` : ''}
     </div>
     <p style="font-size:15px;font-weight:700;margin:0 0 4px;">${qtyLabel}</p>
     ${item.expiryDate ? `<p style="font-size:13px;color:var(--color-warn);font-weight:700;margin:0 0 14px;">${formatExpiry(item.expiryDate)}</p>` : '<div style="margin-bottom:14px;"></div>'}
@@ -1337,9 +1452,12 @@ async function handleImportFile(e) {
     const confirmed = confirm('Importing will replace all current kitchen data with the backup. Continue?');
     if (!confirmed) { e.target.value = ''; return; }
 
+    const normalizers = { inventoryItems: normalizeItem, quickAddTemplates: normalizeTemplate };
     for (const storeName of Object.keys(backup.data)) {
       if (db.objectStoreNames.contains(storeName)) {
-        await dbClearAndBulkPut(storeName, backup.data[storeName]);
+        const records = backup.data[storeName];
+        const normalize = normalizers[storeName];
+        await dbClearAndBulkPut(storeName, normalize ? records.map(normalize) : records);
       }
     }
     showToast('Kitchen data restored');
