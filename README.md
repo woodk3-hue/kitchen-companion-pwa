@@ -1,10 +1,10 @@
-# Kitchen Companion — Phase 1
+# Kitchen Companion
 
 Personal kitchen inventory PWA. Offline-capable, no backend, all data stored locally in IndexedDB on your device.
 
 ## What's in Phase 1
 
-- Bottom nav shell: Home, Meal Planner, Recipes, Kitchen, Shopping, Settings (Planner/Recipes/Shopping are placeholders until Phase 2–3)
+- Bottom nav shell: Home, Meal Planner, Recipes, Kitchen, Shopping, Settings (Planner and Shopping are placeholders until later phases)
 - Full IndexedDB schema (10 stores, database version 2), so later phases won't need migrations
 - **Kitchen Inventory**: add, edit, delete items; filter by location; portion support; expiry flagging
 - **Categories & states** match `PROJECT_VISION.md`: every item has one of 11 fixed categories, and any combination of states (Fresh, Frozen, Defrosting, Raw, Cooked, Leftover, Opened, Prepared)
@@ -41,6 +41,7 @@ Then in repo Settings → Pages, set source to the branch/folder containing thes
 index.html                    — the entire app (HTML, CSS, JS)
 sw.js                         — service worker (must stay a separate file)
 manifest.json                 — PWA install metadata
+recipes-seed.json             — built-in recipes, loaded into the app on first open
 icon-192.png, icon-512.png
 ```
 
@@ -57,6 +58,22 @@ Not yet converted: quick-add templates saved by a v1 install, and backups export
 
 IndexedDB is local to the browser/device. Clearing browser data, switching browsers, or a new phone will lose everything. **Use Settings → Export Kitchen Data** regularly — it downloads a single `kitchen_backup_YYYY-MM-DD.json` you can keep on your NAS or wherever. Import restores from that file (it fully replaces current data, so it'll ask you to confirm first).
 
-## Next: Phase 2
+## Phase 2a: Recipes
 
-Recipes (~100 seeded across Indian / Anglo-Indian / Australian-Western), ingredient match scoring against your inventory, and the Meal Planner. Will be a new pass — same file, surgical additions only.
+- **Recipes tab**: search by name or ingredient, filter by cuisine, plus Favourites, ≤ 30 min, High protein and Freezes well.
+- **Recipe page**: servings, prep/cook time, difficulty, approximate calories and protein per serving, ingredients, method and notes. Rate each recipe 1–5 for you and your partner (your partner's name comes from Settings once that screen exists), and mark favourites.
+- **Your own recipes**: tap + on the Recipes tab. Type ingredients one per line, e.g. `500 g chicken thigh, diced` or `coriander, to garnish (optional)`. Category, staple flag and match words are filled in automatically from other recipes that use the same ingredient.
+- **30 built-in recipes** in `recipes-seed.json`: 12 Indian, 6 Anglo-Indian, 6 Australian, 6 Western. Calories and protein are approximate.
+
+### How built-in recipes update
+
+`recipes-seed.json` has a `version` number. When it goes up, the app adds new built-in recipes and refreshes untouched ones the next time it opens. It never overwrites a built-in recipe you've edited, never re-adds one you've deleted, and keeps your ratings and favourites. When changing the seed file, also bump `CACHE_NAME` in `sw.js` so phones fetch the new copy.
+
+### Recipe matching data (used by Phase 2b)
+
+Each ingredient stores `matchTerms` (inventory names that count as having it, e.g. `chicken thigh`, `chicken`), `assumedStaple` (salt, oil and dried spices are assumed on hand) and `optional`.
+
+## Next
+
+- **Phase 2b**: ingredient match % against your inventory ("95% match, need coriander"), "Use What I Own" and "I don't want to cook" modes.
+- **Phase 2c**: Meal Planner.
