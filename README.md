@@ -63,6 +63,7 @@ IndexedDB is local to the browser/device. Clearing browser data, switching brows
 - **Recipes tab**: search by name or ingredient, filter by cuisine, plus Favourites, ≤ 30 min, High protein and Freezes well.
 - **Recipe page**: servings, prep/cook time, difficulty, approximate calories and protein per serving, ingredients, method and notes. Rate each recipe 1–5 for you and your partner (your partner's name comes from Settings once that screen exists), and mark favourites.
 - **Your own recipes**: tap + on the Recipes tab. Type ingredients one per line, e.g. `500 g chicken thigh, diced` or `coriander, to garnish (optional)`. Category, staple flag and match words are filled in automatically from other recipes that use the same ingredient.
+- **Settings → Import recipes**: adds recipes from a `.json` file on your phone (e.g. saved in Files/iCloud Drive). It only adds: recipes with the same name as one you already have are skipped, and nothing else is changed. Use this for private recipes, such as ones from a recipe book, that shouldn't go in this public repo. A recipe can carry a `sourceName` (e.g. the book's title), shown as "From …" on its page.
 - **30 built-in recipes** in `recipes-seed.json`: 12 Indian, 6 Anglo-Indian, 6 Australian, 6 Western. Calories and protein are approximate.
 
 ### How built-in recipes update

@@ -2068,6 +2068,7 @@ async function openRecipeDetail(id) {
         ${recipe.leftoverFriendly ? '<span class="tag state-leftover">Good leftovers</span>' : ''}
         ${recipe.source === 'built-in' ? '<span class="tag">Built-in</span>' : ''}
       </div>
+      ${recipe.sourceName ? `<p class="recipe-muted" style="margin:0 0 10px;">From ${escapeHtml(recipe.sourceName)}</p>` : ''}
 
       <div class="recipe-stats">
         ${stat('Serves', recipe.servings)}
@@ -2409,6 +2410,14 @@ async function renderSettingsScreen() {
       <span class="chev">›</span>
     </div>
     <input type="file" id="import-file-input" accept="application/json" style="display:none;">
+    <div class="settings-row" id="import-recipes-row">
+      <div>
+        <div class="label">Import recipes</div>
+        <div class="desc">Add recipes from a file — keeps everything else</div>
+      </div>
+      <span class="chev">›</span>
+    </div>
+    <input type="file" id="import-recipes-input" accept=".json,application/json" style="display:none;">
 
     <div class="phase-placeholder">
       <span class="eyebrow">Reserved for later phases</span>
@@ -2423,6 +2432,67 @@ function attachSettingsListeners() {
     document.getElementById('import-file-input').click();
   });
   document.getElementById('import-file-input').addEventListener('change', handleImportFile);
+  document.getElementById('import-recipes-row').addEventListener('click', () => {
+    document.getElementById('import-recipes-input').click();
+  });
+  document.getElementById('import-recipes-input').addEventListener('change', handleImportRecipesFile);
+}
+
+/* ---- Import recipes (additive) ----
+   Accepts a recipe file ({ recipes: [...] } or a plain array) or a full backup file.
+   Only adds recipes: anything with the same name or built-in id as an existing recipe is skipped. */
+async function handleImportRecipesFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    const parsed = JSON.parse(await file.text());
+    const incoming = Array.isArray(parsed) ? parsed
+      : Array.isArray(parsed.recipes) ? parsed.recipes
+      : (parsed.data && Array.isArray(parsed.data.recipes)) ? parsed.data.recipes
+      : null;
+    if (!incoming) throw new Error('No recipes found');
+
+    const existing = await dbGetAll('recipes');
+    const names = new Set(existing.map((r) => r.name.toLowerCase()));
+    const seedIds = new Set(existing.filter((r) => r.seedId).map((r) => r.seedId));
+    const now = new Date().toISOString();
+
+    const toAdd = [];
+    let skipped = 0;
+    for (const raw of incoming) {
+      const fields = normalizeRecipe(raw || {});
+      const key = fields.name.toLowerCase();
+      if (!fields.name || names.has(key) || (raw.seedId && seedIds.has(raw.seedId))) { skipped++; continue; }
+      names.add(key);
+      toAdd.push({
+        ...fields,
+        sourceName: typeof raw.sourceName === 'string' ? raw.sourceName : '',
+        seedId: null,
+        source: 'user',
+        userModified: false,
+        userRating: toNumberOrNull(raw.userRating),
+        partnerRating: toNumberOrNull(raw.partnerRating),
+        isFavourite: !!raw.isFavourite,
+        createdAt: now,
+        updatedAt: now
+      });
+    }
+
+    if (toAdd.length === 0) {
+      alert(skipped ? `All ${skipped} recipes in this file are already in your app.` : 'No recipes found in this file.');
+      return;
+    }
+    const skippedNote = skipped ? ` (${skipped} already in your app will be skipped)` : '';
+    if (!confirm(`Add ${toAdd.length} recipe${toAdd.length === 1 ? '' : 's'} from this file${skippedNote}?`)) return;
+
+    for (const r of toAdd) await dbPut('recipes', r);
+    showToast(`Added ${toAdd.length} recipe${toAdd.length === 1 ? '' : 's'}`);
+  } catch (err) {
+    alert('Could not read recipes from this file. Make sure it\'s a Kitchen Companion recipe file.');
+  } finally {
+    e.target.value = '';
+  }
 }
 
 async function exportKitchenData() {
