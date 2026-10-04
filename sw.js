@@ -1,13 +1,13 @@
 // Kitchen Companion — Service Worker
 // Caches the app shell so it works fully offline after first load.
 
-const CACHE_NAME = 'kitchen-companion-v1';
+const CACHE_NAME = 'kitchen-companion-v2';
 const APP_SHELL = [
   './',
-  './kitchen_companion_pwa.html',
+  './index.html',
   './manifest.json',
-  './icons/icon-192.png',
-  './icons/icon-512.png'
+  './icon-192.png',
+  './icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -43,7 +43,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
           return response;
         })
-        .catch(() => caches.match(request).then((r) => r || caches.match('./kitchen_companion_pwa.html')))
+        .catch(() => caches.match(request).then((r) => r || caches.match('./index.html')))
     );
     return;
   }

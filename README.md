@@ -5,12 +5,15 @@ Personal kitchen inventory PWA. Offline-capable, no backend, all data stored loc
 ## What's in Phase 1
 
 - Bottom nav shell: Home, Meal Planner, Recipes, Kitchen, Shopping, Settings (Planner/Recipes/Shopping are placeholders until Phase 2–3)
-- Full IndexedDB schema (all 9 stores), so later phases won't need migrations
-- **Kitchen Inventory**: add, edit, delete items; filter by location; portion support; food state tracking; expiry flagging
+- Full IndexedDB schema (10 stores, database version 2), so later phases won't need migrations
+- **Kitchen Inventory**: add, edit, delete items; filter by location; portion support; expiry flagging
+- **Categories & states** match `PROJECT_VISION.md`: every item has one of 11 fixed categories, and any combination of states (Fresh, Frozen, Defrosting, Raw, Cooked, Leftover, Opened, Prepared)
 - **Inventory history trail**: every create/edit/discard is logged per item (tap an item card to view its history)
 - **Home dashboard**: item counts by location, items expiring within 3 days
 - Pre-seeded, editable freezer suitability reference (chicken, fish, bok choy, coriander, etc.)
-- Pre-seeded quick-add templates (schema only used internally for now — UI hookup comes with a later pass)
+- **Pantry staples**: items can be flagged as staples (shown with a Staple badge) for future meal planning
+- **Smart use-by suggestions**: 42 pre-seeded entries for raw/cooked meat, fish, eggs and fresh/cooked vegetables, matched on the item's name and states
+- **Quick-add chips**: 15 pre-seeded templates (Chicken Breast, Basmati Rice, Salt, Turmeric, etc.) shown above the inventory list; tapping one prefills the add-item form
 - **Settings → Export/Import**: full JSON backup and restore, since this is your only copy of the data
 
 ## Running it
@@ -38,8 +41,17 @@ Then in repo Settings → Pages, set source to the branch/folder containing thes
 index.html                    — the entire app (HTML, CSS, JS)
 sw.js                         — service worker (must stay a separate file)
 manifest.json                 — PWA install metadata
-icons/icon-192.png, icon-512.png
+icon-192.png, icon-512.png
 ```
+
+## Data upgrades
+
+The database is at version 2. Opening the app over v1 data converts inventory items automatically:
+- Old categories are mapped to the fixed list ("meat" → Protein, "grain" → Carbs & Grains, "produce" → Vegetables, "homemade-meal" → Ready Meals). Anything else becomes **Other**.
+- The single `state` becomes a `states` list (e.g. "frozen" → Frozen + Raw, "prepared-component" → Prepared).
+- Every item gets `isStaple: false` until you flag it.
+
+Not yet converted: quick-add templates saved by a v1 install, and backups exported from v1 (imports are restored as-is).
 
 ## Data safety
 

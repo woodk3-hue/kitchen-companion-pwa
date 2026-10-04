@@ -1,15 +1,15 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Kitchen Companion</title>
-<meta name="theme-color" content="#1F2620">
-<link rel="manifest" href="./manifest.json">
-<link rel="apple-touch-icon" href="./icons/icon-192.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<style>
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Kitchen Companion</title>
+  <meta name="theme-color" content="#1F2620">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <style>
 /* ============================================================
    DESIGN TOKENS
    ============================================================ */
@@ -233,7 +233,109 @@ h1, h2, h3 {
 .tag.state-frozen { color: var(--color-freezer); }
 .tag.state-defrosting { color: var(--color-warn); }
 .tag.state-leftover, .tag.state-cooked { color: var(--color-leftovers); }
+.tag.state-opened { color: var(--color-warn); }
+.tag.state-prepared { color: var(--color-fridge); }
+.tag.staple-badge { background: var(--color-accent); color: white; border-color: var(--color-accent); }
 .item-card .expiry-flag { font-size: 11px; font-weight: 700; color: var(--color-warn); margin-top: 4px; }
+.use-by-suggestion {
+  font-size: 12px;
+  color: var(--color-ink-soft);
+  background: var(--color-bg);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  margin-top: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.use-by-suggestion .apply-btn {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.state-chip-grid { display: flex; gap: 6px; flex-wrap: wrap; }
+.state-chip {
+  padding: 8px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--color-line);
+  background: var(--color-paper);
+  color: var(--color-ink-soft);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.state-chip.selected {
+  background: var(--color-ink);
+  border-color: var(--color-ink);
+  color: var(--color-bg);
+}
+.staple-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-paper);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.staple-toggle-row .label-group { display: flex; flex-direction: column; }
+.staple-toggle-row .label { font-size: 14px; font-weight: 700; }
+.staple-toggle-row .desc { font-size: 12px; color: var(--color-ink-soft); margin-top: 2px; }
+.toggle-switch {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  border-radius: 13px;
+  background: var(--color-line);
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+.toggle-switch.on { background: var(--color-accent); }
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.15s ease;
+}
+.toggle-switch.on::after { transform: translateX(18px); }
+
+.quick-add-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 16px;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.quick-add-row::-webkit-scrollbar { display: none; }
+.quick-add-chip {
+  flex: 0 0 auto;
+  padding: 9px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+  border: 1px dashed var(--color-line);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.quick-add-chip:active { background: var(--color-bg); }
 
 /* ============================================================
    FAB
@@ -519,40 +621,74 @@ h1, h2, h3 {
   * { transition: none !important; animation: none !important; }
 }
 </style>
-</head>
-<body>
-
-<header class="app-header">
-  <h1 id="header-title">Kitchen Companion</h1>
-  <div class="subtitle" id="header-subtitle">Know what you've got</div>
-</header>
-
-<main id="app-content"></main>
-
-<button class="fab" id="fab-btn" style="display:none;" aria-label="Add item">+</button>
-
-<nav class="bottom-nav">
-  <button class="nav-btn" data-route="home"><span class="icon">⌂</span>Home</button>
-  <button class="nav-btn" data-route="planner"><span class="icon">📅</span>Planner</button>
-  <button class="nav-btn" data-route="recipes"><span class="icon">📖</span>Recipes</button>
-  <button class="nav-btn" data-route="kitchen"><span class="icon">🧺</span>Kitchen</button>
-  <button class="nav-btn" data-route="shopping"><span class="icon">🛒</span>Shopping</button>
-  <button class="nav-btn" data-route="settings"><span class="icon">⚙</span>Settings</button>
-</nav>
-
-<div class="modal-overlay" id="modal-overlay">
-  <div class="modal-sheet" id="modal-sheet"></div>
-</div>
-
-<div class="toast" id="toast"></div>
-
-<script>
+ </head>
+ <body>
+  <header class="app-header">
+   <h1 id="header-title">Kitchen Companion</h1>
+   <div class="subtitle" id="header-subtitle">Know what you've got</div>
+  </header>
+  <main id="app-content"></main>
+  <button class="fab" id="fab-btn" style="display:none;" aria-label="Add item">+</button>
+  <nav class="bottom-nav">
+   <button class="nav-btn" data-route="home"><span class="icon">⌂</span>Home</button>
+   <button class="nav-btn" data-route="planner"><span class="icon">📅</span>Planner</button>
+   <button class="nav-btn" data-route="recipes"><span class="icon">📖</span>Recipes</button>
+   <button class="nav-btn" data-route="kitchen"><span class="icon">🧺</span>Kitchen</button>
+   <button class="nav-btn" data-route="shopping"><span class="icon">🛒</span>Shopping</button>
+   <button class="nav-btn" data-route="settings"><span class="icon">⚙</span>Settings</button>
+  </nav>
+  <div class="modal-overlay" id="modal-overlay">
+   <div class="modal-sheet" id="modal-sheet"></div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script>
 /* ============================================================
    DATABASE
    ============================================================ */
 const DB_NAME = 'KitchenCompanionDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 let db = null;
+
+// Controlled category list (PROJECT_VISION.md)
+const CATEGORIES = [
+  'Protein', 'Vegetables', 'Fruit', 'Carbs & Grains', 'Canned & Jarred',
+  'Dairy & Refrigerated', 'Sauces & Condiments', 'Spices & Seasonings',
+  'Snacks & Treats', 'Ready Meals', 'Other'
+];
+
+// Controlled, combinable state vocabulary (PROJECT_VISION.md)
+const STATES_V2 = ['Fresh', 'Frozen', 'Defrosting', 'Raw', 'Cooked', 'Leftover', 'Opened', 'Prepared'];
+
+// Maps old single-value `state` strings (schema v1) to new `states` arrays (schema v2)
+const STATE_MIGRATION_MAP = {
+  'raw': ['Raw'],
+  'frozen': ['Frozen', 'Raw'],
+  'defrosting': ['Defrosting', 'Raw'],
+  'fresh': ['Fresh'],
+  'cooked': ['Cooked'],
+  'leftover': ['Leftover', 'Cooked'],
+  'prepared-component': ['Prepared'],
+  'ready-meal': ['Frozen']
+};
+
+// Maps old free-text category guesses (schema v1 seed data) to the new controlled list
+const CATEGORY_MIGRATION_MAP = {
+  'meat': 'Protein',
+  'grain': 'Carbs & Grains',
+  'produce': 'Vegetables',
+  'homemade-meal': 'Ready Meals'
+};
+
+function migrateStateV1toV2(oldState) {
+  return STATE_MIGRATION_MAP[oldState] || (oldState ? [oldState] : ['Fresh']);
+}
+
+function migrateCategoryV1toV2(oldCategory) {
+  if (!oldCategory) return 'Other';
+  if (CATEGORIES.includes(oldCategory)) return oldCategory;
+  const mapped = CATEGORY_MIGRATION_MAP[oldCategory.toLowerCase().trim()];
+  return mapped || 'Other';
+}
 
 function openDatabase() {
   return new Promise((resolve, reject) => {
@@ -560,13 +696,59 @@ function openDatabase() {
 
     request.onupgradeneeded = (event) => {
       const _db = event.target.result;
+      const tx = event.target.transaction;
+      const oldVersion = event.oldVersion;
 
+      let itemsStore;
       if (!_db.objectStoreNames.contains('inventoryItems')) {
-        const store = _db.createObjectStore('inventoryItems', { keyPath: 'id', autoIncrement: true });
-        store.createIndex('location', 'location', { unique: false });
-        store.createIndex('state', 'state', { unique: false });
-        store.createIndex('expiryDate', 'expiryDate', { unique: false });
-        store.createIndex('category', 'category', { unique: false });
+        itemsStore = _db.createObjectStore('inventoryItems', { keyPath: 'id', autoIncrement: true });
+        itemsStore.createIndex('location', 'location', { unique: false });
+        itemsStore.createIndex('expiryDate', 'expiryDate', { unique: false });
+        itemsStore.createIndex('category', 'category', { unique: false });
+      } else {
+        itemsStore = tx.objectStore('inventoryItems');
+      }
+
+      // v1 -> v2: states became a multi-value array, category became a controlled list
+      if (oldVersion < 2) {
+        if (itemsStore.indexNames.contains('state')) {
+          itemsStore.deleteIndex('state');
+        }
+        if (!itemsStore.indexNames.contains('states')) {
+          itemsStore.createIndex('states', 'states', { unique: false, multiEntry: true });
+        }
+        if (!itemsStore.indexNames.contains('isStaple')) {
+          itemsStore.createIndex('isStaple', 'isStaple', { unique: false });
+        }
+
+        // Migrate every existing record from old shape to new shape
+        itemsStore.openCursor().onsuccess = (cursorEvent) => {
+          const cursor = cursorEvent.target.result;
+          if (!cursor) return;
+          const record = cursor.value;
+          let changed = false;
+
+          if (record.state !== undefined && record.states === undefined) {
+            record.states = migrateStateV1toV2(record.state);
+            delete record.state;
+            changed = true;
+          }
+          if (record.category !== undefined && !CATEGORIES.includes(record.category)) {
+            record.category = migrateCategoryV1toV2(record.category);
+            changed = true;
+          }
+          if (record.isStaple === undefined) {
+            record.isStaple = false;
+            changed = true;
+          }
+          if (record.useByOverrideDays === undefined) {
+            record.useByOverrideDays = null;
+            changed = true;
+          }
+
+          if (changed) cursor.update(record);
+          cursor.continue();
+        };
       }
 
       if (!_db.objectStoreNames.contains('inventoryHistory')) {
@@ -577,6 +759,10 @@ function openDatabase() {
 
       if (!_db.objectStoreNames.contains('freezerRatingsReference')) {
         _db.createObjectStore('freezerRatingsReference', { keyPath: 'ingredientName' });
+      }
+
+      if (!_db.objectStoreNames.contains('useByReference')) {
+        _db.createObjectStore('useByReference', { keyPath: 'lookupKey' });
       }
 
       if (!_db.objectStoreNames.contains('quickAddTemplates')) {
@@ -716,12 +902,92 @@ const FREEZER_RATINGS_SEED = [
 ];
 
 const QUICK_ADD_SEED = [
-  { name: 'Chicken breast', category: 'meat', defaultUnit: 'g', defaultLocation: 'freezer', defaultState: 'frozen', defaultPortionSize: null, usageCount: 0, isUserCreated: false },
-  { name: 'Basmati rice', category: 'grain', defaultUnit: 'kg', defaultLocation: 'pantry', defaultState: 'raw', defaultPortionSize: null, usageCount: 0, isUserCreated: false },
-  { name: 'Bok choy', category: 'produce', defaultUnit: 'g', defaultLocation: 'fridge', defaultState: 'fresh', defaultPortionSize: null, usageCount: 0, isUserCreated: false },
-  { name: 'Coriander', category: 'produce', defaultUnit: 'g', defaultLocation: 'fridge', defaultState: 'fresh', defaultPortionSize: null, usageCount: 0, isUserCreated: false },
-  { name: 'Frozen curry portion', category: 'homemade-meal', defaultUnit: 'each', defaultLocation: 'freezer', defaultState: 'ready-meal', defaultPortionSize: '350g', usageCount: 0, isUserCreated: false },
-  { name: 'Cooked rice', category: 'grain', defaultUnit: 'g', defaultLocation: 'fridge', defaultState: 'cooked', defaultPortionSize: null, usageCount: 0, isUserCreated: false }
+  { name: 'Chicken Breast', category: 'Protein', defaultUnit: 'g', defaultLocation: 'freezer', defaultStates: ['Frozen', 'Raw'], defaultPortionSize: null, isStaple: false, usageCount: 0, isUserCreated: false },
+  { name: 'Basmati Rice', category: 'Carbs & Grains', defaultUnit: 'kg', defaultLocation: 'pantry', defaultStates: ['Raw'], defaultPortionSize: null, isStaple: true, usageCount: 0, isUserCreated: false },
+  { name: 'Greek Yoghurt', category: 'Dairy & Refrigerated', defaultUnit: 'g', defaultLocation: 'fridge', defaultStates: ['Fresh'], defaultPortionSize: null, isStaple: false, usageCount: 0, isUserCreated: false },
+  { name: 'Bok Choy', category: 'Vegetables', defaultUnit: 'g', defaultLocation: 'fridge', defaultStates: ['Fresh'], defaultPortionSize: null, isStaple: false, usageCount: 0, isUserCreated: false },
+  { name: 'Coriander', category: 'Vegetables', defaultUnit: 'g', defaultLocation: 'fridge', defaultStates: ['Fresh'], defaultPortionSize: null, isStaple: false, usageCount: 0, isUserCreated: false },
+  { name: 'Frozen Lasagne', category: 'Ready Meals', defaultUnit: 'each', defaultLocation: 'freezer', defaultStates: ['Frozen'], defaultPortionSize: null, isStaple: false, usageCount: 0, isUserCreated: false },
+  { name: 'Kokum', category: 'Spices & Seasonings', defaultUnit: 'g', defaultLocation: 'pantry', defaultStates: ['Raw'], defaultPortionSize: null, isStaple: false, usageCount: 0, isUserCreated: false },
+  { name: 'Cooked Rice', category: 'Carbs & Grains', defaultUnit: 'g', defaultLocation: 'fridge', defaultStates: ['Cooked'], defaultPortionSize: null, isStaple: false, usageCount: 0, isUserCreated: false },
+  { name: 'Salt', category: 'Spices & Seasonings', defaultUnit: 'g', defaultLocation: 'pantry', defaultStates: ['Raw'], defaultPortionSize: null, isStaple: true, usageCount: 0, isUserCreated: false },
+  { name: 'Pepper', category: 'Spices & Seasonings', defaultUnit: 'g', defaultLocation: 'pantry', defaultStates: ['Raw'], defaultPortionSize: null, isStaple: true, usageCount: 0, isUserCreated: false },
+  { name: 'Turmeric', category: 'Spices & Seasonings', defaultUnit: 'g', defaultLocation: 'pantry', defaultStates: ['Raw'], defaultPortionSize: null, isStaple: true, usageCount: 0, isUserCreated: false },
+  { name: 'Cumin', category: 'Spices & Seasonings', defaultUnit: 'g', defaultLocation: 'pantry', defaultStates: ['Raw'], defaultPortionSize: null, isStaple: true, usageCount: 0, isUserCreated: false },
+  { name: 'Soy Sauce', category: 'Sauces & Condiments', defaultUnit: 'ml', defaultLocation: 'pantry', defaultStates: ['Raw'], defaultPortionSize: null, isStaple: true, usageCount: 0, isUserCreated: false },
+  { name: 'Mayonnaise', category: 'Sauces & Condiments', defaultUnit: 'g', defaultLocation: 'fridge', defaultStates: ['Fresh'], defaultPortionSize: null, isStaple: true, usageCount: 0, isUserCreated: false },
+  { name: 'BBQ Sauce', category: 'Sauces & Condiments', defaultUnit: 'ml', defaultLocation: 'pantry', defaultStates: ['Raw'], defaultPortionSize: null, isStaple: true, usageCount: 0, isUserCreated: false }
+];
+
+// Smart use-by suggestions (PROJECT_VISION.md). lookupKey is lowercase ingredient name,
+// optionally suffixed with a state for state-specific windows (e.g. defrosted/opened/cooked items).
+// Day ranges reflect standard fridge-storage food-safety guidance (stored at or below 5°C).
+const USE_BY_REFERENCE_SEED = [
+  // --- Leafy & soft vegetables (fresh) ---
+  { lookupKey: 'spinach', ingredientName: 'Spinach', applicableStates: ['Fresh'], suggestedDaysMin: 5, suggestedDaysMax: 7, notes: '', isUserOverride: false },
+  { lookupKey: 'bok choy', ingredientName: 'Bok Choy', applicableStates: ['Fresh'], suggestedDaysMin: 5, suggestedDaysMax: 7, notes: '', isUserOverride: false },
+  { lookupKey: 'chinese broccoli', ingredientName: 'Chinese Broccoli', applicableStates: ['Fresh'], suggestedDaysMin: 5, suggestedDaysMax: 7, notes: '', isUserOverride: false },
+  { lookupKey: 'coriander', ingredientName: 'Coriander', applicableStates: ['Fresh'], suggestedDaysMin: 5, suggestedDaysMax: 10, notes: '', isUserOverride: false },
+  { lookupKey: 'spring onion', ingredientName: 'Spring Onion', applicableStates: ['Fresh'], suggestedDaysMin: 5, suggestedDaysMax: 7, notes: '', isUserOverride: false },
+  { lookupKey: 'lettuce', ingredientName: 'Lettuce', applicableStates: ['Fresh'], suggestedDaysMin: 5, suggestedDaysMax: 7, notes: '', isUserOverride: false },
+  { lookupKey: 'mushrooms', ingredientName: 'Mushrooms', applicableStates: ['Fresh'], suggestedDaysMin: 5, suggestedDaysMax: 7, notes: '', isUserOverride: false },
+
+  // --- Firmer vegetables (fresh) ---
+  { lookupKey: 'tomato', ingredientName: 'Tomato', applicableStates: ['Fresh'], suggestedDaysMin: 5, suggestedDaysMax: 7, notes: '', isUserOverride: false },
+  { lookupKey: 'capsicum', ingredientName: 'Capsicum', applicableStates: ['Fresh'], suggestedDaysMin: 7, suggestedDaysMax: 10, notes: '', isUserOverride: false },
+  { lookupKey: 'cucumber', ingredientName: 'Cucumber', applicableStates: ['Fresh'], suggestedDaysMin: 5, suggestedDaysMax: 7, notes: '', isUserOverride: false },
+  { lookupKey: 'carrot', ingredientName: 'Carrot', applicableStates: ['Fresh'], suggestedDaysMin: 14, suggestedDaysMax: 21, notes: '', isUserOverride: false },
+  { lookupKey: 'potato', ingredientName: 'Potato', applicableStates: ['Fresh'], suggestedDaysMin: 21, suggestedDaysMax: 30, notes: 'Store in a cool, dark place rather than the fridge.', isUserOverride: false },
+  { lookupKey: 'onion', ingredientName: 'Onion', applicableStates: ['Fresh'], suggestedDaysMin: 21, suggestedDaysMax: 30, notes: 'Store in a cool, dark place rather than the fridge.', isUserOverride: false },
+  { lookupKey: 'broccoli', ingredientName: 'Broccoli', applicableStates: ['Fresh'], suggestedDaysMin: 5, suggestedDaysMax: 7, notes: '', isUserOverride: false },
+  { lookupKey: 'cauliflower', ingredientName: 'Cauliflower', applicableStates: ['Fresh'], suggestedDaysMin: 5, suggestedDaysMax: 7, notes: '', isUserOverride: false },
+
+  // --- Cooked vegetables (leftover side dishes / poriyal etc.) ---
+  { lookupKey: 'vegetables|cooked', ingredientName: 'Vegetables', applicableStates: ['Cooked'], suggestedDaysMin: 3, suggestedDaysMax: 4, notes: '', isUserOverride: false },
+
+  // --- Chicken ---
+  { lookupKey: 'chicken|fresh', ingredientName: 'Chicken', applicableStates: ['Fresh', 'Raw'], suggestedDaysMin: 1, suggestedDaysMax: 2, notes: 'Raw chicken in the fridge — use promptly.', isUserOverride: false },
+  { lookupKey: 'chicken|defrosting', ingredientName: 'Chicken', applicableStates: ['Defrosting'], suggestedDaysMin: 2, suggestedDaysMax: 2, notes: 'Use promptly once defrosted — do not refreeze raw.', isUserOverride: false },
+  { lookupKey: 'chicken|cooked', ingredientName: 'Chicken', applicableStates: ['Cooked'], suggestedDaysMin: 3, suggestedDaysMax: 4, notes: '', isUserOverride: false },
+  { lookupKey: 'chicken|leftover', ingredientName: 'Chicken', applicableStates: ['Leftover'], suggestedDaysMin: 3, suggestedDaysMax: 4, notes: '', isUserOverride: false },
+
+  // --- Beef ---
+  { lookupKey: 'beef|fresh', ingredientName: 'Beef', applicableStates: ['Fresh', 'Raw'], suggestedDaysMin: 2, suggestedDaysMax: 3, notes: 'Whole cuts — mince and offal spoil faster, use within 1-2 days.', isUserOverride: false },
+  { lookupKey: 'beef|defrosting', ingredientName: 'Beef', applicableStates: ['Defrosting'], suggestedDaysMin: 2, suggestedDaysMax: 2, notes: 'Use promptly once defrosted — do not refreeze raw.', isUserOverride: false },
+  { lookupKey: 'beef|cooked', ingredientName: 'Beef', applicableStates: ['Cooked'], suggestedDaysMin: 3, suggestedDaysMax: 4, notes: '', isUserOverride: false },
+  { lookupKey: 'beef|leftover', ingredientName: 'Beef', applicableStates: ['Leftover'], suggestedDaysMin: 3, suggestedDaysMax: 4, notes: '', isUserOverride: false },
+
+  // --- Pork ---
+  { lookupKey: 'pork|fresh', ingredientName: 'Pork', applicableStates: ['Fresh', 'Raw'], suggestedDaysMin: 1, suggestedDaysMax: 2, notes: '', isUserOverride: false },
+  { lookupKey: 'pork|defrosting', ingredientName: 'Pork', applicableStates: ['Defrosting'], suggestedDaysMin: 2, suggestedDaysMax: 2, notes: 'Use promptly once defrosted — do not refreeze raw.', isUserOverride: false },
+  { lookupKey: 'pork|cooked', ingredientName: 'Pork', applicableStates: ['Cooked'], suggestedDaysMin: 3, suggestedDaysMax: 4, notes: '', isUserOverride: false },
+  { lookupKey: 'pork|leftover', ingredientName: 'Pork', applicableStates: ['Leftover'], suggestedDaysMin: 3, suggestedDaysMax: 4, notes: '', isUserOverride: false },
+
+  // --- Mince (beef/pork/chicken) — spoils faster than whole cuts ---
+  { lookupKey: 'mince|fresh', ingredientName: 'Mince', applicableStates: ['Fresh', 'Raw'], suggestedDaysMin: 1, suggestedDaysMax: 2, notes: '', isUserOverride: false },
+  { lookupKey: 'mince|defrosting', ingredientName: 'Mince', applicableStates: ['Defrosting'], suggestedDaysMin: 1, suggestedDaysMax: 2, notes: 'Use promptly once defrosted — do not refreeze raw.', isUserOverride: false },
+  { lookupKey: 'mince|cooked', ingredientName: 'Mince', applicableStates: ['Cooked'], suggestedDaysMin: 3, suggestedDaysMax: 4, notes: '', isUserOverride: false },
+
+  // --- Fish & seafood ---
+  { lookupKey: 'fish|fresh', ingredientName: 'Fish', applicableStates: ['Fresh', 'Raw'], suggestedDaysMin: 1, suggestedDaysMax: 2, notes: '', isUserOverride: false },
+  { lookupKey: 'fish|defrosting', ingredientName: 'Fish', applicableStates: ['Defrosting'], suggestedDaysMin: 1, suggestedDaysMax: 2, notes: 'Use promptly once defrosted — do not refreeze raw.', isUserOverride: false },
+  { lookupKey: 'fish|cooked', ingredientName: 'Fish', applicableStates: ['Cooked'], suggestedDaysMin: 2, suggestedDaysMax: 3, notes: '', isUserOverride: false },
+  { lookupKey: 'prawns|fresh', ingredientName: 'Prawns', applicableStates: ['Fresh', 'Raw'], suggestedDaysMin: 1, suggestedDaysMax: 2, notes: '', isUserOverride: false },
+  { lookupKey: 'prawns|cooked', ingredientName: 'Prawns', applicableStates: ['Cooked'], suggestedDaysMin: 2, suggestedDaysMax: 3, notes: '', isUserOverride: false },
+
+  // --- Eggs ---
+  { lookupKey: 'eggs|fresh', ingredientName: 'Eggs', applicableStates: ['Fresh', 'Raw'], suggestedDaysMin: 21, suggestedDaysMax: 28, notes: 'In shell, refrigerated.', isUserOverride: false },
+  { lookupKey: 'eggs|cooked', ingredientName: 'Eggs', applicableStates: ['Cooked'], suggestedDaysMin: 5, suggestedDaysMax: 7, notes: 'Hard-boiled, in shell or peeled and refrigerated.', isUserOverride: false },
+
+  // --- Dairy / opened items ---
+  { lookupKey: 'yoghurt|opened', ingredientName: 'Yoghurt', applicableStates: ['Opened'], suggestedDaysMin: 7, suggestedDaysMax: 10, notes: '', isUserOverride: false },
+  { lookupKey: 'milk|opened', ingredientName: 'Milk', applicableStates: ['Opened'], suggestedDaysMin: 5, suggestedDaysMax: 7, notes: '', isUserOverride: false },
+
+  // --- Cooked rice/grains (common alongside curries) ---
+  { lookupKey: 'rice|cooked', ingredientName: 'Rice', applicableStates: ['Cooked'], suggestedDaysMin: 3, suggestedDaysMax: 4, notes: 'Cool quickly after cooking before refrigerating.', isUserOverride: false },
+
+  // --- General cooked leftovers fallback (curries, dal, sambar, soups etc.) ---
+  { lookupKey: 'curry|cooked', ingredientName: 'Curry', applicableStates: ['Cooked', 'Leftover'], suggestedDaysMin: 3, suggestedDaysMax: 4, notes: '', isUserOverride: false }
 ];
 
 async function seedIfEmpty() {
@@ -733,6 +999,10 @@ async function seedIfEmpty() {
   if (existingTemplates.length === 0) {
     for (const t of QUICK_ADD_SEED) await dbPut('quickAddTemplates', t);
   }
+  const existingUseBy = await dbGetAll('useByReference');
+  if (existingUseBy.length === 0) {
+    for (const u of USE_BY_REFERENCE_SEED) await dbPut('useByReference', u);
+  }
   const existingSettings = await dbGet('settings', 'profiles');
   if (!existingSettings) {
     await dbPut('settings', {
@@ -741,6 +1011,32 @@ async function seedIfEmpty() {
       partnerProfile: { name: '', spicePreference: '', favouriteCuisines: [], dislikedFoods: [] }
     });
   }
+}
+
+// Looks up a suggested use-by window for an ingredient + its current states.
+// Tries state-specific keys first (e.g. "chicken|defrosting"), then falls back to the plain name.
+async function getSuggestedUseBy(ingredientName, states) {
+  const nameKey = ingredientName.toLowerCase().trim();
+  const selectedStates = (states || []).map((s) => s.toLowerCase());
+
+  // Try exact compound keys first (fast path for single-state entries, e.g. "yoghurt|opened")
+  for (const s of selectedStates) {
+    const compound = await dbGet('useByReference', `${nameKey}|${s}`);
+    if (compound) return compound;
+  }
+
+  // Fall back to scanning all entries for this ingredient name and matching by applicableStates,
+  // so a single seed entry covering multiple states (e.g. Chicken: ['Fresh','Raw']) is found
+  // regardless of which one of those states the user actually selected.
+  const allEntries = await dbGetAll('useByReference');
+  const nameMatches = allEntries.filter((e) => e.lookupKey === nameKey || e.lookupKey.split('|')[0] === nameKey);
+  for (const entry of nameMatches) {
+    const entryStates = (entry.applicableStates || []).map((s) => s.toLowerCase());
+    if (selectedStates.some((s) => entryStates.includes(s))) return entry;
+  }
+
+  // Last resort: plain name with no state qualifier at all
+  return await dbGet('useByReference', nameKey);
 }
 
 /* ============================================================
@@ -854,10 +1150,15 @@ function formatExpiry(dateStr) {
 }
 
 const LOCATION_LABELS = { pantry: 'Pantry', fridge: 'Fridge', freezer: 'Freezer', leftovers: 'Leftovers' };
+// STATES_V2 and CATEGORIES are defined earlier (DATABASE section) since the migration logic needs them too.
 const STATE_LABELS = {
-  raw: 'Raw', frozen: 'Frozen', defrosting: 'Defrosting', fresh: 'Fresh',
-  cooked: 'Cooked', leftover: 'Leftover', 'prepared-component': 'Prepped', 'ready-meal': 'Ready meal'
+  Fresh: 'Fresh', Frozen: 'Frozen', Defrosting: 'Defrosting', Raw: 'Raw',
+  Cooked: 'Cooked', Leftover: 'Leftover', Opened: 'Opened', Prepared: 'Prepared'
 };
+
+function stateCssClass(state) {
+  return 'state-' + state.toLowerCase();
+}
 
 /* ============================================================
    HOME DASHBOARD
@@ -943,8 +1244,16 @@ async function renderKitchenScreen() {
     </div>
   `;
 
+  const templates = await dbGetAll('quickAddTemplates');
+  const sortedTemplates = templates.sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0));
+  const quickAddHtml = sortedTemplates.length === 0 ? '' : `
+    <div class="quick-add-row">
+      ${sortedTemplates.map((t) => `<button type="button" class="quick-add-chip" data-template-id="${t.id}">+ ${t.name}</button>`).join('')}
+    </div>
+  `;
+
   if (filtered.length === 0) {
-    return tabsHtml + `
+    return tabsHtml + quickAddHtml + `
       <div class="empty-state">
         <div class="glyph">🧺</div>
         <h3>No items here yet</h3>
@@ -969,6 +1278,10 @@ async function renderKitchenScreen() {
       ? `<div class="expiry-flag">${formatExpiry(item.expiryDate)}</div>`
       : '';
 
+    const states = item.states && item.states.length ? item.states : ['Fresh'];
+    const stateTagsHtml = states.map((s) => `<span class="tag ${stateCssClass(s)}">${STATE_LABELS[s] || s}</span>`).join('');
+    const stapleBadge = item.isStaple ? `<span class="tag staple-badge">Staple</span>` : '';
+
     return `
       <div class="item-card loc-${item.location}" data-id="${item.id}">
         <div class="edge"></div>
@@ -978,8 +1291,9 @@ async function renderKitchenScreen() {
             <span class="qty">${qtyLabel}</span>
           </div>
           <div class="meta-row">
-            <span class="tag state-${item.state}">${STATE_LABELS[item.state] || item.state}</span>
+            ${stateTagsHtml}
             ${item.category ? `<span class="tag">${item.category}</span>` : ''}
+            ${stapleBadge}
           </div>
           ${expiryFlag}
         </div>
@@ -987,7 +1301,7 @@ async function renderKitchenScreen() {
     `;
   }).join('');
 
-  return tabsHtml + itemsHtml;
+  return tabsHtml + quickAddHtml + itemsHtml;
 }
 
 function attachKitchenListeners() {
@@ -1004,14 +1318,46 @@ function attachKitchenListeners() {
       openItemDetail(id);
     });
   });
+
+  document.querySelectorAll('.quick-add-chip').forEach((chip) => {
+    chip.addEventListener('click', async () => {
+      const templateId = parseInt(chip.dataset.templateId, 10);
+      const template = await dbGet('quickAddTemplates', templateId);
+      if (!template) return;
+
+      // Track usage so frequently-used templates float to the front over time
+      template.usageCount = (template.usageCount || 0) + 1;
+      await dbPut('quickAddTemplates', template);
+
+      openItemForm(null, {
+        name: template.name,
+        category: template.category,
+        unit: template.defaultUnit,
+        location: template.defaultLocation,
+        states: template.defaultStates,
+        portionSize: template.defaultPortionSize,
+        isStaple: template.isStaple,
+        quantity: '',
+        portionCount: '',
+        purchaseDate: '',
+        expiryDate: '',
+        cost: '',
+        notes: ''
+      });
+    });
+  });
 }
 
 document.getElementById('fab-btn').addEventListener('click', () => openItemForm(null));
 
 /* ---- Item Add/Edit Form ---- */
-function openItemForm(item) {
+function openItemForm(item, prefill) {
   AppState.editingItemId = item ? item.id : null;
   const isEdit = !!item;
+  const seed = item || prefill || null;
+  const initialStates = seed && seed.states && seed.states.length ? seed.states : ['Raw'];
+  const initialCategory = (seed && CATEGORIES.includes(seed.category)) ? seed.category : 'Other';
+  const initialStaple = seed ? !!seed.isStaple : false;
 
   const html = `
     <div class="modal-title-row">
@@ -1022,38 +1368,58 @@ function openItemForm(item) {
       <div class="modal-scroll-area">
         <div class="field">
           <label>Name</label>
-          <input type="text" id="f-name" value="${item ? item.name : ''}" placeholder="e.g. Chicken breast" required>
+          <input type="text" id="f-name" value="${seed ? seed.name : ''}" placeholder="e.g. Chicken breast, or a custom ingredient like Kokum" required>
         </div>
 
         <div class="field-row">
           <div class="field">
             <label>Quantity</label>
-            <input type="number" id="f-quantity" value="${item ? item.quantity : ''}" min="0" step="any" placeholder="0">
+            <input type="number" id="f-quantity" value="${seed ? seed.quantity : ''}" min="0" step="any" placeholder="0">
           </div>
           <div class="field">
             <label>Unit</label>
             <select id="f-unit">
-              ${['g', 'kg', 'ml', 'L', 'each'].map((u) => `<option value="${u}" ${item && item.unit === u ? 'selected' : ''}>${u}</option>`).join('')}
+              ${['g', 'kg', 'ml', 'L', 'each'].map((u) => `<option value="${u}" ${seed && seed.unit === u ? 'selected' : ''}>${u}</option>`).join('')}
             </select>
           </div>
+        </div>
+
+        <div class="field">
+          <label>Category</label>
+          <select id="f-category">
+            ${CATEGORIES.map((c) => `<option value="${c}" ${initialCategory === c ? 'selected' : ''}>${c}</option>`).join('')}
+          </select>
         </div>
 
         <div class="field">
           <label>Location</label>
           <div class="segmented" id="f-location">
             ${['pantry', 'fridge', 'freezer', 'leftovers'].map((loc) => `
-              <button type="button" data-val="${loc}" class="${item && item.location === loc ? 'selected' : (!item && loc === 'pantry' ? 'selected' : '')}">${LOCATION_LABELS[loc]}</button>
+              <button type="button" data-val="${loc}" class="${seed && seed.location === loc ? 'selected' : (!seed && loc === 'pantry' ? 'selected' : '')}">${LOCATION_LABELS[loc]}</button>
             `).join('')}
           </div>
         </div>
 
         <div class="field">
-          <label>State</label>
-          <div class="segmented" id="f-state">
-            ${Object.keys(STATE_LABELS).map((s) => `
-              <button type="button" data-val="${s}" class="${item && item.state === s ? 'selected' : (!item && s === 'raw' ? 'selected' : '')}">${STATE_LABELS[s]}</button>
+          <label>State <span style="text-transform:none;font-weight:500;">(select all that apply)</span></label>
+          <div class="state-chip-grid" id="f-states">
+            ${STATES_V2.map((s) => `
+              <button type="button" data-val="${s}" class="state-chip ${initialStates.includes(s) ? 'selected' : ''}">${STATE_LABELS[s]}</button>
             `).join('')}
           </div>
+        </div>
+
+        <div class="staple-toggle-row">
+          <div class="label-group">
+            <span class="label">Pantry staple</span>
+            <span class="desc">Assume this is normally on hand for meal planning</span>
+          </div>
+          <button type="button" id="f-staple-toggle" class="toggle-switch ${initialStaple ? 'on' : ''}" data-on="${initialStaple ? 'true' : 'false'}"></button>
+        </div>
+
+        <div class="field" id="use-by-suggestion-field" style="display:none;">
+          <label>Suggested use-by</label>
+          <div class="use-by-suggestion" id="use-by-suggestion-box"></div>
         </div>
 
         <details class="more-fields" ${isEdit ? 'open' : ''}>
@@ -1062,38 +1428,33 @@ function openItemForm(item) {
             <div class="field-row">
               <div class="field">
                 <label>Portions</label>
-                <input type="number" id="f-portionCount" value="${item && item.portionCount ? item.portionCount : ''}" min="0" placeholder="e.g. 8">
+                <input type="number" id="f-portionCount" value="${seed && seed.portionCount ? seed.portionCount : ''}" min="0" placeholder="e.g. 8">
               </div>
               <div class="field">
                 <label>Portion size</label>
-                <input type="text" id="f-portionSize" value="${item && item.portionSize ? item.portionSize : ''}" placeholder="e.g. 350g each">
+                <input type="text" id="f-portionSize" value="${seed && seed.portionSize ? seed.portionSize : ''}" placeholder="e.g. 350g each">
               </div>
-            </div>
-
-            <div class="field">
-              <label>Category</label>
-              <input type="text" id="f-category" value="${item ? item.category || '' : ''}" placeholder="e.g. meat, produce, spice">
             </div>
 
             <div class="field-row">
               <div class="field">
                 <label>Purchase date</label>
-                <input type="date" id="f-purchaseDate" value="${item && item.purchaseDate ? item.purchaseDate : ''}">
+                <input type="date" id="f-purchaseDate" value="${seed && seed.purchaseDate ? seed.purchaseDate : ''}">
               </div>
               <div class="field">
-                <label>Expiry date</label>
-                <input type="date" id="f-expiryDate" value="${item && item.expiryDate ? item.expiryDate : ''}">
+                <label>Expiry date <span style="text-transform:none;font-weight:500;">(overrides suggestion)</span></label>
+                <input type="date" id="f-expiryDate" value="${seed && seed.expiryDate ? seed.expiryDate : ''}">
               </div>
             </div>
 
             <div class="field">
               <label>Cost</label>
-              <input type="number" id="f-cost" value="${item && item.cost ? item.cost : ''}" min="0" step="0.01" placeholder="$">
+              <input type="number" id="f-cost" value="${seed && seed.cost ? seed.cost : ''}" min="0" step="0.01" placeholder="$">
             </div>
 
             <div class="field">
               <label>Notes</label>
-              <textarea id="f-notes" placeholder="Anything else worth noting">${item ? item.notes || '' : ''}</textarea>
+              <textarea id="f-notes" placeholder="Anything else worth noting">${seed ? seed.notes || '' : ''}</textarea>
             </div>
           </div>
         </details>
@@ -1108,11 +1469,32 @@ function openItemForm(item) {
 
   openModal(html);
 
-  document.querySelectorAll('#f-location button, #f-state button').forEach((btn) => {
+  document.querySelectorAll('#f-location button').forEach((btn) => {
     btn.addEventListener('click', () => {
       btn.parentElement.querySelectorAll('button').forEach((b) => b.classList.remove('selected'));
       btn.classList.add('selected');
     });
+  });
+
+  // State is multi-select: toggle individual chips rather than single-select
+  document.querySelectorAll('#f-states button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('selected');
+      refreshUseBySuggestion();
+    });
+  });
+
+  document.getElementById('f-staple-toggle').addEventListener('click', (e) => {
+    const btn = e.currentTarget;
+    const isOn = btn.dataset.on === 'true';
+    btn.dataset.on = isOn ? 'false' : 'true';
+    btn.classList.toggle('on', !isOn);
+  });
+
+  document.getElementById('f-name').addEventListener('input', debounce(refreshUseBySuggestion, 400));
+  document.getElementById('f-expiryDate').addEventListener('change', () => {
+    // If user manually sets an expiry date, treat it as an override of the suggestion
+    refreshUseBySuggestion();
   });
 
   document.getElementById('modal-close').addEventListener('click', closeModal);
@@ -1127,13 +1509,55 @@ function openItemForm(item) {
       await deleteItem(item.id, item.name);
     });
   }
+
+  // Run once on open so editing an item with an existing name shows its suggestion immediately
+  refreshUseBySuggestion();
+}
+
+function debounce(fn, delay) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
+}
+
+async function refreshUseBySuggestion() {
+  const nameInput = document.getElementById('f-name');
+  const box = document.getElementById('use-by-suggestion-box');
+  const field = document.getElementById('use-by-suggestion-field');
+  const expiryInput = document.getElementById('f-expiryDate');
+  if (!nameInput || !box || !field) return;
+
+  const name = nameInput.value.trim();
+  if (!name) { field.style.display = 'none'; return; }
+
+  const selectedStates = Array.from(document.querySelectorAll('#f-states button.selected')).map((b) => b.dataset.val);
+  const suggestion = await getSuggestedUseBy(name, selectedStates);
+
+  if (!suggestion) { field.style.display = 'none'; return; }
+
+  const rangeLabel = suggestion.suggestedDaysMin === suggestion.suggestedDaysMax
+    ? `${suggestion.suggestedDaysMin} day${suggestion.suggestedDaysMin === 1 ? '' : 's'}`
+    : `${suggestion.suggestedDaysMin}-${suggestion.suggestedDaysMax} days`;
+
+  field.style.display = 'block';
+  box.innerHTML = `
+    <span>${rangeLabel} from today${suggestion.notes ? ' — ' + suggestion.notes : ''}</span>
+    <button type="button" class="apply-btn" id="apply-use-by-btn">Use this</button>
+  `;
+
+  document.getElementById('apply-use-by-btn').addEventListener('click', () => {
+    const days = suggestion.suggestedDaysMax;
+    const target = new Date();
+    target.setDate(target.getDate() + days);
+    expiryInput.value = target.toISOString().slice(0, 10);
+  });
 }
 
 async function saveItemFromForm(existingItem) {
-  const getSelected = (id) => {
-    const el = document.querySelector(`#${id} button.selected`);
+  const getSelectedLocation = () => {
+    const el = document.querySelector('#f-location button.selected');
     return el ? el.dataset.val : null;
   };
+  const getSelectedStates = () => Array.from(document.querySelectorAll('#f-states button.selected')).map((b) => b.dataset.val);
 
   const name = document.getElementById('f-name').value.trim();
   if (!name) return;
@@ -1141,6 +1565,9 @@ async function saveItemFromForm(existingItem) {
   const now = new Date().toISOString();
   const portionCount = document.getElementById('f-portionCount').value;
   const portionSize = document.getElementById('f-portionSize').value.trim();
+  const isStaple = document.getElementById('f-staple-toggle').dataset.on === 'true';
+  const selectedStates = getSelectedStates();
+  const expiryDate = document.getElementById('f-expiryDate').value || null;
 
   const itemData = {
     name,
@@ -1148,12 +1575,14 @@ async function saveItemFromForm(existingItem) {
     unit: document.getElementById('f-unit').value,
     portionCount: portionCount ? parseInt(portionCount, 10) : null,
     portionSize: portionSize || null,
-    location: getSelected('f-location') || 'pantry',
+    location: getSelectedLocation() || 'pantry',
     subLocation: null,
-    state: getSelected('f-state') || 'raw',
-    category: document.getElementById('f-category').value.trim(),
+    states: selectedStates.length ? selectedStates : ['Fresh'],
+    category: document.getElementById('f-category').value,
+    isStaple,
     purchaseDate: document.getElementById('f-purchaseDate').value || null,
-    expiryDate: document.getElementById('f-expiryDate').value || null,
+    expiryDate,
+    useByOverrideDays: null,
     cost: document.getElementById('f-cost').value ? parseFloat(document.getElementById('f-cost').value) : null,
     notes: document.getElementById('f-notes').value.trim(),
     freezerFriendlyRating: null,
@@ -1221,9 +1650,11 @@ async function openItemDetail(id) {
       <h2>${item.name}</h2>
       <button class="close-btn" id="modal-close">×</button>
     </div>
-    <div class="field-row" style="margin-bottom:10px;">
+    <div class="field-row" style="margin-bottom:10px;flex-wrap:wrap;gap:6px;">
       <span class="tag">${LOCATION_LABELS[item.location]}</span>
-      <span class="tag state-${item.state}">${STATE_LABELS[item.state] || item.state}</span>
+      ${(item.states && item.states.length ? item.states : ['Fresh']).map((s) => `<span class="tag ${stateCssClass(s)}">${STATE_LABELS[s] || s}</span>`).join('')}
+      ${item.category ? `<span class="tag">${item.category}</span>` : ''}
+      ${item.isStaple ? `<span class="tag staple-badge">Staple</span>` : ''}
     </div>
     <p style="font-size:15px;font-weight:700;margin:0 0 4px;">${qtyLabel}</p>
     ${item.expiryDate ? `<p style="font-size:13px;color:var(--color-warn);font-weight:700;margin:0 0 14px;">${formatExpiry(item.expiryDate)}</p>` : '<div style="margin-bottom:14px;"></div>'}
@@ -1305,7 +1736,7 @@ function attachSettingsListeners() {
 }
 
 async function exportKitchenData() {
-  const storeNames = ['inventoryItems', 'inventoryHistory', 'freezerRatingsReference', 'quickAddTemplates', 'recipes', 'mealPlans', 'batchCookEvents', 'purchaseEvents', 'settings'];
+  const storeNames = ['inventoryItems', 'inventoryHistory', 'freezerRatingsReference', 'useByReference', 'quickAddTemplates', 'recipes', 'mealPlans', 'batchCookEvents', 'purchaseEvents', 'settings'];
   const backup = { exportedAt: new Date().toISOString(), version: DB_VERSION, data: {} };
 
   for (const storeName of storeNames) {
@@ -1398,5 +1829,5 @@ function showFatalError(message) {
 }
 
 </script>
-</body>
+ </body>
 </html>
