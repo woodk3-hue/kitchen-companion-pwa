@@ -737,6 +737,10 @@ h1, h2, h3 {
 .recipe-card.cuisine-anglo-indian .edge { background: var(--color-leftovers); }
 .recipe-card.cuisine-australian .edge { background: var(--color-fridge); }
 .recipe-card.cuisine-western .edge { background: var(--color-freezer); }
+.recipe-card.cuisine-chinese .edge,
+.recipe-card.cuisine-indo-chinese .edge,
+.recipe-card.cuisine-korean .edge,
+.recipe-card.cuisine-vietnamese .edge { background: var(--color-warn); }
 .fav-star { color: var(--color-accent); }
 .tag.tag-protein { color: var(--color-fridge); }
 .recipe-stats { display: flex; gap: 8px; margin-bottom: 10px; }
@@ -2265,7 +2269,7 @@ async function saveStocktake() {
    RECIPES
    ============================================================ */
 const RECIPE_SEED_URL = './recipes-seed.json';
-const RECIPE_CUISINES = ['Indian', 'Anglo-Indian', 'Australian', 'Western'];
+const RECIPE_CUISINES = ['Indian', 'Anglo-Indian', 'Australian', 'Western', 'Chinese', 'Indo-Chinese', 'Korean', 'Vietnamese'];
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
 const LEVELS = ['Low', 'Medium', 'High'];
@@ -2910,12 +2914,21 @@ const DEFAULT_HEALTH_GOALS = {
   key: 'healthGoals',
   caloriesMin: 450,
   caloriesMax: 500,
-  preferredCuisines: ['Anglo-Indian', 'Indian', 'Australian', 'Western']
+  preferredCuisines: ['Anglo-Indian', 'Indian', 'Australian', 'Western', 'Chinese', 'Indo-Chinese', 'Korean', 'Vietnamese'],
+  cuisinesVersion: 2
 };
+
+// Cuisines added in version 2 start switched on, even for goals saved before they existed
+const CUISINES_ADDED_V2 = ['Chinese', 'Indo-Chinese', 'Korean', 'Vietnamese'];
 
 async function getHealthGoals() {
   const saved = await dbGet('settings', 'healthGoals');
-  return { ...DEFAULT_HEALTH_GOALS, ...(saved || {}) };
+  const goals = { ...DEFAULT_HEALTH_GOALS, ...(saved || {}) };
+  if (saved && (saved.cuisinesVersion || 1) < 2) {
+    goals.preferredCuisines = [...goals.preferredCuisines, ...CUISINES_ADDED_V2.filter((c) => !goals.preferredCuisines.includes(c))];
+    goals.cuisinesVersion = 2;
+  }
+  return goals;
 }
 
 // "✓ 480 kcal" inside the target, "590 kcal · over" above it, plain below it
@@ -3140,7 +3153,7 @@ async function requestAiSuggestions(mealType, request) {
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
       output_config: { effort: 'medium', format: { type: 'json_schema', schema: aiSuggestionSchema() } },
-      system: 'You are the meal-suggestion feature of Kitchen Companion, a personal kitchen app for a home cook in Brisbane, Australia who cooks Anglo-Indian, Indian, Australian and Western food. Suggest practical, healthy home-cooked meals with clear, concise methods.',
+      system: 'You are the meal-suggestion feature of Kitchen Companion, a personal kitchen app for a home cook in Brisbane, Australia who cooks Anglo-Indian, Indian, Australian, Western, Chinese, Indo-Chinese, Korean and Vietnamese food. Suggest practical, healthy home-cooked meals with clear, concise methods.',
       messages: [{ role: 'user', content: buildAiPrompt(items, goals, mealType, request) }]
     });
     if (response.stop_reason === 'refusal') {
@@ -3300,7 +3313,7 @@ async function runAiSuggest() {
    ONLINE RECIPE SEARCH (TheMealDB, free, no account)
    ============================================================ */
 const MEALDB_BASE = 'https://www.themealdb.com/api/json/v1/1';
-const MEALDB_AREAS = ['Indian', 'British', 'Australian', 'Malaysian', 'Thai', 'Chinese', 'Italian'];
+const MEALDB_AREAS = ['Indian', 'British', 'Australian', 'Chinese', 'Vietnamese', 'Malaysian', 'Thai', 'Japanese', 'Italian'];
 const MEALDB_CATEGORY_PROTEIN = { Chicken: 'Chicken', Beef: 'Beef', Lamb: 'Lamb', Goat: 'Lamb', Pork: 'Pork', Seafood: 'Fish', Vegetarian: 'None', Vegan: 'None' };
 
 async function mealDbFetch(path) {
@@ -3367,7 +3380,7 @@ function mealDbToRecipe(meal) {
     .split(/\r?\n+/)
     .map((s) => s.replace(/^\s*(step\s*\d+[:.)]?|\d+[.)])\s*/i, '').trim())
     .filter((s) => s.length > 1);
-  const cuisine = meal.strArea === 'Indian' ? 'Indian' : meal.strArea === 'Australian' ? 'Australian' : 'Western';
+  const cuisine = RECIPE_CUISINES.includes(meal.strArea) ? meal.strArea : 'Western';
   const fields = normalizeRecipe({
     name: meal.strMeal,
     cuisine,
