@@ -1,7 +1,7 @@
 // Kitchen Companion — Service Worker
 // Caches the app shell so it works fully offline after first load.
 
-const CACHE_NAME = 'kitchen-companion-v3';
+const CACHE_NAME = 'kitchen-companion-v4';
 const APP_SHELL = [
   './',
   './index.html',
@@ -35,6 +35,9 @@ self.addEventListener('activate', (event) => {
 // falling back to cache when offline. Cache-first for static assets.
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+
+  // Leave API calls (Anthropic, TheMealDB) and anything that isn't a GET to the network
+  if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
 
   if (request.mode === 'navigate' || request.url.endsWith('.html')) {
     event.respondWith(

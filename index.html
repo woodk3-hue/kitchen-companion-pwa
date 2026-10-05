@@ -787,6 +787,68 @@ h1, h2, h3 {
 }
 .method-list { padding-left: 20px; margin: 0; }
 .method-list li { font-size: 14px; line-height: 1.5; margin-bottom: 8px; }
+
+/* ============================================================
+   STEP 2: MATCHING, AI SUGGESTIONS, ONLINE SEARCH
+   ============================================================ */
+.recipe-online-row { display: flex; gap: 8px; }
+.recipe-online-row .stocktake-btn { flex: 1; min-width: 0; }
+.stocktake-btn.alt { border-left-color: var(--color-fridge); }
+.tag.match-pct { color: var(--color-ink); }
+.tag.match-pct.high { color: var(--color-fridge); border-color: var(--color-fridge); }
+.tag.kcal-ok { color: var(--color-fridge); }
+.tag.kcal-over { color: var(--color-warn); }
+.match-line { font-size: 12px; color: var(--color-ink-soft); margin: 5px 0 0; }
+.match-line.uses { color: var(--color-warn); font-weight: 700; }
+.ing-have { font-size: 11px; font-weight: 700; color: var(--color-fridge); margin-left: 6px; }
+.settings-card {
+  background: var(--color-paper);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+}
+.settings-card .field input[type="password"] {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-family: var(--font-body);
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+.ai-meal {
+  background: var(--color-paper);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-top: 12px;
+}
+.ai-meal-head { display: flex; justify-content: space-between; gap: 8px; }
+.ai-meal-head .name { font-size: 15px; font-weight: 800; }
+.ai-meal-head .qty { font-size: 13px; color: var(--color-ink-soft); white-space: nowrap; }
+.ai-meal .meta-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.ai-why { font-size: 13px; margin: 8px 0 0; }
+.ai-error { font-size: 14px; color: var(--color-warn); font-weight: 600; margin-top: 12px; }
+.ai-wait { margin-top: 12px; }
+.online-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 6px;
+  background: var(--color-paper);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+  text-align: left;
+  cursor: pointer;
+}
+.online-result img { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; flex: 0 0 48px; }
 </style>
  </head>
  <body>
@@ -2331,9 +2393,17 @@ function recipeMatchesFilters(r, f) {
 
 function renderRecipeList() {
   const f = AppState.recipeFilters;
+  const index = AppState.inventoryIndex || [];
+  const scores = new Map((AppState.recipes || []).map((r) => [r.id, index.length ? scoreRecipe(r, index) : null]));
+  // With food in the kitchen: best match, with a boost for recipes that use something about to go off.
+  // With an empty kitchen: favourites first, then A–Z.
+  const rank = (r) => {
+    const sc = scores.get(r.id);
+    return sc ? sc.pct + (sc.expiring.length ? 30 : 0) : (r.isFavourite ? 1 : 0);
+  };
   const recipes = (AppState.recipes || [])
     .filter((r) => recipeMatchesFilters(r, f))
-    .sort((a, b) => (b.isFavourite ? 1 : 0) - (a.isFavourite ? 1 : 0) || a.name.localeCompare(b.name));
+    .sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name));
 
   if (recipes.length === 0) {
     const none = (AppState.recipes || []).length === 0;
@@ -2347,6 +2417,7 @@ function renderRecipeList() {
   }
 
   return recipes.map((r) => {
+    const sc = scores.get(r.id);
     const total = recipeTotalMinutes(r);
     const cuisineClass = 'cuisine-' + r.cuisine.toLowerCase().replace(/[^a-z]+/g, '-');
     return `
@@ -2358,11 +2429,14 @@ function renderRecipeList() {
             <span class="qty">${total ? `${total} min` : ''}</span>
           </div>
           <div class="meta-row">
+            ${sc ? `<span class="tag match-pct ${sc.pct >= 80 ? 'high' : ''}">${sc.pct}% match</span>` : ''}
             <span class="tag">${escapeHtml(r.cuisine)}</span>
-            ${r.primaryProtein !== 'None' ? `<span class="tag">${escapeHtml(r.primaryProtein)}</span>` : ''}
+            ${calorieBadgeHtml(r.caloriesPerServing, AppState.healthGoals)}
             ${r.proteinLevel === 'High' ? '<span class="tag tag-protein">High protein</span>' : ''}
             ${r.freezerFriendly ? '<span class="tag state-frozen">Freezes well</span>' : ''}
           </div>
+          ${sc && sc.expiring.length ? `<div class="match-line uses">Uses ${sc.expiring.map((e) => `${escapeHtml(e.name)} (${formatDaysLeft(e.daysLeft)})`).join(', ')}</div>` : ''}
+          ${sc && sc.missing.length && sc.pct > 0 ? `<div class="match-line">Need: ${escapeHtml(sc.missing.slice(0, 4).join(', '))}${sc.missing.length > 4 ? ` +${sc.missing.length - 4} more` : ''}</div>` : ''}
         </div>
       </div>
     `;
@@ -2370,12 +2444,25 @@ function renderRecipeList() {
 }
 
 async function renderRecipesScreen() {
-  AppState.recipes = await dbGetAll('recipes');
+  const [recipes, items, goals] = await Promise.all([dbGetAll('recipes'), dbGetAll('inventoryItems'), getHealthGoals()]);
+  AppState.recipes = recipes;
+  AppState.inventoryIndex = buildInventoryIndex(items);
+  AppState.healthGoals = goals;
   const f = AppState.recipeFilters;
   const filterChip = (key, label) =>
     `<button type="button" class="state-chip recipe-filter ${f[key] ? 'selected' : ''}" data-filter="${key}">${label}</button>`;
 
   return `
+    <div class="recipe-online-row">
+      <button type="button" class="stocktake-btn" id="ai-suggest-btn">
+        <span class="st-btn-title">✨ Suggest meals</span>
+        <span class="st-btn-desc">AI ideas from what you have</span>
+      </button>
+      <button type="button" class="stocktake-btn alt" id="online-search-btn">
+        <span class="st-btn-title">🔎 Search online</span>
+        <span class="st-btn-desc">Free recipe ideas</span>
+      </button>
+    </div>
     <div class="field recipe-search">
       <input type="search" id="recipe-search" placeholder="Search recipes or ingredients" value="${escapeHtml(f.search)}">
     </div>
@@ -2401,6 +2488,9 @@ function attachRecipeCardListeners() {
 }
 
 function attachRecipesListeners() {
+  document.getElementById('ai-suggest-btn').addEventListener('click', openAiSuggest);
+  document.getElementById('online-search-btn').addEventListener('click', openOnlineSearch);
+
   // Search only redraws the list so the input keeps focus while typing
   document.getElementById('recipe-search').addEventListener('input', (e) => {
     AppState.recipeFilters.search = e.target.value;
@@ -2450,12 +2540,15 @@ async function openRecipeDetail(id) {
 
   const stat = (label, value) => (value ? `<div class="recipe-stat"><span class="v">${escapeHtml(value)}</span><span class="l">${label}</span></div>` : '');
 
+  const [goals, kitchenItems] = await Promise.all([getHealthGoals(), dbGetAll('inventoryItems')]);
+  const index = buildInventoryIndex(kitchenItems);
   const ingredientsHtml = recipe.ingredients.length === 0
     ? '<p class="recipe-muted">No ingredients listed.</p>'
     : `<ul class="ingredient-list">${recipe.ingredients.map((ing) => `
         <li>
           <span class="ing-qty">${escapeHtml(formatIngredientQuantity(ing))}</span>
           <span class="ing-name">${escapeHtml(ing.name)}${ing.prepNote ? `<span class="ing-note">, ${escapeHtml(ing.prepNote)}</span>` : ''}
+            ${index.length && findInventoryMatch(ing, index) ? '<span class="ing-have">✓ in kitchen</span>' : ''}
             ${ing.optional ? '<span class="ing-flag">optional</span>' : ''}
             ${ing.assumedStaple ? '<span class="ing-flag">staple</span>' : ''}
           </span>
@@ -2480,6 +2573,7 @@ async function openRecipeDetail(id) {
       <div class="field-row" style="margin-bottom:12px;flex-wrap:wrap;gap:6px;">
         <span class="tag">${escapeHtml(recipe.cuisine)}</span>
         ${recipe.mealTypes.map((m) => `<span class="tag">${escapeHtml(m)}</span>`).join('')}
+        ${calorieBadgeHtml(recipe.caloriesPerServing, goals)}
         ${recipe.proteinLevel === 'High' ? '<span class="tag tag-protein">High protein</span>' : ''}
         ${recipe.freezerFriendly ? '<span class="tag state-frozen">Freezes well</span>' : ''}
         ${recipe.leftoverFriendly ? '<span class="tag state-leftover">Good leftovers</span>' : ''}
@@ -2808,9 +2902,610 @@ async function saveRecipeFromForm(existing) {
 }
 
 /* ============================================================
+   HEALTH GOALS
+   Calories per meal and preferred cuisines. Used to flag recipes
+   inside or over the target and to steer AI meal suggestions.
+   ============================================================ */
+const DEFAULT_HEALTH_GOALS = {
+  key: 'healthGoals',
+  caloriesMin: 450,
+  caloriesMax: 500,
+  preferredCuisines: ['Anglo-Indian', 'Indian', 'Australian', 'Western']
+};
+
+async function getHealthGoals() {
+  const saved = await dbGet('settings', 'healthGoals');
+  return { ...DEFAULT_HEALTH_GOALS, ...(saved || {}) };
+}
+
+// "✓ 480 kcal" inside the target, "590 kcal · over" above it, plain below it
+function calorieBadgeHtml(kcal, goals) {
+  if (!kcal || !goals) return '';
+  if (kcal > goals.caloriesMax) return `<span class="tag kcal-over">${kcal} kcal · over</span>`;
+  if (kcal >= goals.caloriesMin) return `<span class="tag kcal-ok">✓ ${kcal} kcal</span>`;
+  return `<span class="tag">${kcal} kcal</span>`;
+}
+
+/* ============================================================
+   RECIPE MATCHING
+   How much of each recipe is already in the kitchen, and whether it
+   uses food that is about to go off. Staples and optional ingredients
+   don't count against the score.
+   ============================================================ */
+const EXPIRING_SOON_DAYS = 3;
+
+// Lower-case, letters only, crude singular form, so "Tomatoes" matches "tomato"
+function matchWords(text) {
+  return String(text || '').toLowerCase().replace(/[^a-z]+/g, ' ').trim().split(' ')
+    .filter(Boolean)
+    .map((w) => (w.length > 3 && w.endsWith('oes') ? w.slice(0, -2)
+      : w.length > 3 && w.endsWith('ies') ? w.slice(0, -2)
+        : w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w))
+    .join(' ');
+}
+
+// Whole-word containment either way: "chicken" matches "chicken breast", "egg" doesn't match "eggplant"
+function termMatchesItem(term, itemWords) {
+  if (!term || !itemWords) return false;
+  return ` ${itemWords} `.includes(` ${term} `) || ` ${term} `.includes(` ${itemWords} `);
+}
+
+function buildInventoryIndex(items) {
+  return items
+    .filter((i) => i.expiryDate == null || daysUntil(i.expiryDate) >= 0)
+    .map((i) => ({ item: i, words: matchWords(i.name), daysLeft: i.expiryDate ? daysUntil(i.expiryDate) : null }));
+}
+
+function findInventoryMatch(ingredient, index) {
+  const terms = (ingredient.matchTerms && ingredient.matchTerms.length ? ingredient.matchTerms : [ingredient.name]).map(matchWords);
+  const hits = index.filter((entry) => terms.some((t) => termMatchesItem(t, entry.words)));
+  if (!hits.length) return null;
+  // Prefer the one that goes off soonest, so recipes are credited for using it up
+  return hits.sort((a, b) => (a.daysLeft ?? Infinity) - (b.daysLeft ?? Infinity))[0];
+}
+
+function scoreRecipe(recipe, index) {
+  const needed = (recipe.ingredients || []).filter((i) => !i.optional && !i.assumedStaple);
+  const have = [];
+  const missing = [];
+  const expiring = [];
+  needed.forEach((ing) => {
+    const hit = findInventoryMatch(ing, index);
+    if (hit) {
+      have.push(ing.name);
+      if (hit.daysLeft !== null && hit.daysLeft <= EXPIRING_SOON_DAYS && !expiring.some((e) => e.name === hit.item.name)) {
+        expiring.push({ name: hit.item.name, daysLeft: hit.daysLeft });
+      }
+    } else {
+      missing.push(ing.name);
+    }
+  });
+  const pct = needed.length ? Math.round((have.length / needed.length) * 100) : 100;
+  return { pct, have, missing, expiring };
+}
+
+function formatDaysLeft(d) {
+  return d === 0 ? 'today' : d === 1 ? '1 day left' : `${d} days left`;
+}
+
+/* ============================================================
+   AI MEAL SUGGESTIONS (Claude API)
+   The API key is kept in this browser's localStorage only: it is never
+   written to IndexedDB, so it is not included in kitchen backups.
+   ============================================================ */
+const AI_MODEL = 'claude-opus-5-5';
+const AI_SDK_URL = 'https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.131.0/+esm';
+const AI_KEY_STORAGE = 'kitchenCompanion.anthropicApiKey';
+
+function getAiKey() {
+  try { return localStorage.getItem(AI_KEY_STORAGE) || ''; } catch (err) { return ''; }
+}
+function setAiKey(key) {
+  try {
+    if (key) localStorage.setItem(AI_KEY_STORAGE, key);
+    else localStorage.removeItem(AI_KEY_STORAGE);
+    return true;
+  } catch (err) { return false; }
+}
+
+let anthropicModulePromise = null;
+async function getAnthropicClient() {
+  const apiKey = getAiKey();
+  if (!apiKey) throw new Error('NO_KEY');
+  if (!anthropicModulePromise) {
+    anthropicModulePromise = import(AI_SDK_URL).catch((err) => { anthropicModulePromise = null; throw err; });
+  }
+  const mod = await anthropicModulePromise;
+  const Anthropic = mod.default || mod.Anthropic;
+  // The key belongs to this phone's owner and never leaves this browser except to api.anthropic.com
+  return { Anthropic, client: new Anthropic({ apiKey, dangerouslyAllowBrowser: true }) };
+}
+
+// Turns SDK errors into something a person can act on
+function describeAiError(err, Anthropic) {
+  if (err && err.message === 'NO_KEY') return 'Add your Anthropic API key in Settings → AI suggestions first.';
+  if (!navigator.onLine) return 'You\'re offline. AI suggestions need an internet connection.';
+  if (Anthropic) {
+    if (err instanceof Anthropic.AuthenticationError) return 'Your API key wasn\'t accepted. Check it in Settings → AI suggestions.';
+    if (err instanceof Anthropic.PermissionDeniedError) return 'This API key doesn\'t have permission to use Claude. Check your Anthropic Console.';
+    if (err instanceof Anthropic.RateLimitError) return 'Too many requests just now. Wait a minute and try again.';
+    if (err instanceof Anthropic.BadRequestError) return `Anthropic couldn't run this request: ${err.message}. If it mentions credit, add credit under Billing in the Anthropic Console.`;
+    if (err instanceof Anthropic.APIConnectionError) return 'Couldn\'t reach Anthropic. Check your internet connection and try again.';
+    if (err instanceof Anthropic.APIError) return `Anthropic returned an error (${err.status || 'unknown'}). Try again in a moment.`;
+  }
+  return 'Couldn\'t load the AI service. Check your internet connection and try again.';
+}
+
+// Free check: looks up the model with the key, without generating anything
+async function testAiKey() {
+  let Anthropic = null;
+  try {
+    const loaded = await getAnthropicClient();
+    Anthropic = loaded.Anthropic;
+    await loaded.client.models.retrieve(AI_MODEL);
+    return { ok: true, message: 'Key works. AI suggestions are ready.' };
+  } catch (err) {
+    return { ok: false, message: describeAiError(err, Anthropic) };
+  }
+}
+
+function aiSuggestionSchema() {
+  const str = { type: 'string' };
+  const int = { type: 'integer' };
+  const ingredient = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['name', 'quantity', 'unit', 'prepNote', 'category', 'matchTerms', 'optional', 'assumedStaple', 'inKitchen'],
+    properties: {
+      name: str,
+      quantity: { type: 'number' },
+      unit: { type: 'string', enum: ['g', 'kg', 'ml', 'L', 'tsp', 'tbsp', 'cup', 'each', 'clove', 'bunch', 'sprig', 'pinch', 'can', ''] },
+      prepNote: str,
+      category: { type: 'string', enum: CATEGORIES },
+      matchTerms: { type: 'array', items: str },
+      optional: { type: 'boolean' },
+      assumedStaple: { type: 'boolean' },
+      inKitchen: { type: 'boolean' }
+    }
+  };
+  const meal = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['name', 'cuisine', 'mealTypes', 'whyThisMeal', 'usesExpiring', 'servings', 'prepMinutes', 'cookMinutes',
+      'difficulty', 'caloriesPerServing', 'proteinGramsPerServing', 'fatLevel', 'primaryProtein',
+      'freezerFriendly', 'leftoverFriendly', 'ingredients', 'method'],
+    properties: {
+      name: str,
+      cuisine: { type: 'string', enum: RECIPE_CUISINES },
+      mealTypes: { type: 'array', items: { type: 'string', enum: MEAL_TYPES } },
+      whyThisMeal: str,
+      usesExpiring: { type: 'array', items: str },
+      servings: int,
+      prepMinutes: int,
+      cookMinutes: int,
+      difficulty: { type: 'string', enum: DIFFICULTIES },
+      caloriesPerServing: int,
+      proteinGramsPerServing: int,
+      fatLevel: { type: 'string', enum: LEVELS },
+      primaryProtein: { type: 'string', enum: PRIMARY_PROTEINS },
+      freezerFriendly: { type: 'boolean' },
+      leftoverFriendly: { type: 'boolean' },
+      ingredients: { type: 'array', items: ingredient },
+      method: { type: 'array', items: str }
+    }
+  };
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['meals'],
+    properties: { meals: { type: 'array', items: meal } }
+  };
+}
+
+function buildAiPrompt(items, goals, mealType, request) {
+  const kitchen = items.map((i) => ({
+    name: i.name,
+    location: i.location,
+    amount: formatItemQuantity(i),
+    states: i.states || [],
+    staple: !!i.isStaple,
+    daysUntilUseBy: i.expiryDate ? daysUntil(i.expiryDate) : null
+  }));
+  return [
+    'Suggest 3 different meals I can cook, using what is in my kitchen.',
+    '',
+    `Meal: ${mealType}.`,
+    `Calorie target: ${goals.caloriesMin}-${goals.caloriesMax} kcal per serving. Prioritise protein (chicken, fish, lean beef, pork, eggs, legumes, in that order) and keep fat lower where possible.`,
+    `Cuisines I like, in order: ${goals.preferredCuisines.join(', ')}.`,
+    'Use food with the fewest days until its use-by date first, and say which of those items each meal uses in usesExpiring (exact kitchen item names). Skip anything already past its use-by date (negative days).',
+    'Salt, pepper, oil and dried spices count as staples; mark them assumedStaple. Prefer meals that need few or no extra purchases; set inKitchen for each ingredient that is in my kitchen list.',
+    'Use metric quantities. Use quantity 0 with an empty unit for "to taste". matchTerms are lower-case names a kitchen item could be called, most specific first (e.g. "chicken thigh", "chicken").',
+    'Calories and protein are per serving and approximate. whyThisMeal is one short sentence.',
+    request ? `Also: ${request}` : '',
+    '',
+    'My kitchen (JSON):',
+    JSON.stringify(kitchen)
+  ].filter((line) => line !== null).join('\n');
+}
+
+async function requestAiSuggestions(mealType, request) {
+  let Anthropic = null;
+  try {
+    const loaded = await getAnthropicClient();
+    Anthropic = loaded.Anthropic;
+    const [items, goals] = await Promise.all([dbGetAll('inventoryItems'), getHealthGoals()]);
+    const response = await loaded.client.beta.messages.create({
+      model: AI_MODEL,
+      max_tokens: 16000,
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+      output_config: { effort: 'medium', format: { type: 'json_schema', schema: aiSuggestionSchema() } },
+      system: 'You are the meal-suggestion feature of Kitchen Companion, a personal kitchen app for a home cook in Brisbane, Australia who cooks Anglo-Indian, Indian, Australian and Western food. Suggest practical, healthy home-cooked meals with clear, concise methods.',
+      messages: [{ role: 'user', content: buildAiPrompt(items, goals, mealType, request) }]
+    });
+    if (response.stop_reason === 'refusal') {
+      return { error: 'Claude couldn\'t suggest meals for this request. Try rewording the extra request, or leave it blank.' };
+    }
+    if (response.stop_reason === 'max_tokens') {
+      return { error: 'The suggestions were too long to finish. Try again, maybe with a shorter extra request.' };
+    }
+    const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+    const parsed = JSON.parse(text);
+    return { meals: Array.isArray(parsed.meals) ? parsed.meals : [] };
+  } catch (err) {
+    if (err instanceof SyntaxError) return { error: 'Claude\'s reply couldn\'t be read. Please try again.' };
+    return { error: describeAiError(err, Anthropic) };
+  }
+}
+
+function aiMealToRecipe(meal) {
+  const fields = normalizeRecipe({
+    ...meal,
+    proteinLevel: (meal.proteinGramsPerServing || 0) >= 25 ? 'High' : (meal.proteinGramsPerServing || 0) >= 12 ? 'Medium' : 'Low',
+    ingredients: (meal.ingredients || []).map((i) => ({ ...i, quantity: i.quantity ? i.quantity : null })),
+    notes: meal.whyThisMeal || ''
+  });
+  const now = new Date().toISOString();
+  return {
+    ...fields,
+    sourceName: 'Claude suggestion',
+    seedId: null,
+    source: 'ai',
+    userModified: false,
+    userRating: null,
+    partnerRating: null,
+    isFavourite: false,
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+function aiMealCardHtml(meal, idx, goals) {
+  const needToBuy = (meal.ingredients || []).filter((i) => !i.inKitchen && !i.assumedStaple && !i.optional).map((i) => i.name);
+  return `
+    <div class="ai-meal" data-idx="${idx}">
+      <div class="ai-meal-head">
+        <span class="name">${escapeHtml(meal.name)}</span>
+        <span class="qty">${(meal.prepMinutes || 0) + (meal.cookMinutes || 0)} min</span>
+      </div>
+      <div class="meta-row">
+        <span class="tag">${escapeHtml(meal.cuisine)}</span>
+        ${calorieBadgeHtml(meal.caloriesPerServing, goals)}
+        <span class="tag tag-protein">~${escapeHtml(meal.proteinGramsPerServing)} g protein</span>
+      </div>
+      <p class="ai-why">${escapeHtml(meal.whyThisMeal)}</p>
+      ${meal.usesExpiring && meal.usesExpiring.length ? `<p class="match-line uses">Uses up: ${escapeHtml(meal.usesExpiring.join(', '))}</p>` : ''}
+      <p class="match-line">${needToBuy.length ? `Need: ${escapeHtml(needToBuy.join(', '))}` : 'You have everything'}</p>
+      <details class="more-fields">
+        <summary>Ingredients & method</summary>
+        <ul class="ingredient-list">${(meal.ingredients || []).map((ing) => `
+          <li><span class="ing-qty">${escapeHtml(formatIngredientQuantity({ quantity: ing.quantity || null, unit: ing.unit }))}</span>
+          <span class="ing-name">${escapeHtml(ing.name)}${ing.prepNote ? `<span class="ing-note">, ${escapeHtml(ing.prepNote)}</span>` : ''}${ing.inKitchen ? ' <span class="ing-have">✓</span>' : ''}</span></li>`).join('')}
+        </ul>
+        <ol class="method-list" style="margin-top:10px;">${(meal.method || []).map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ol>
+      </details>
+      <button type="button" class="btn-primary ai-save-btn" data-idx="${idx}">Save to my recipes</button>
+    </div>
+  `;
+}
+
+function openAiSuggest() {
+  const hasKey = !!getAiKey();
+  openModal(`
+    <div class="modal-title-row">
+      <h2>✨ Suggest meals</h2>
+      <button class="close-btn" id="modal-close">×</button>
+    </div>
+    <div class="modal-scroll-area" id="ai-body">
+      ${hasKey ? `
+        <p class="recipe-muted" style="margin-top:0;">Claude looks at what's in your kitchen, uses food that's about to go off first, and aims for your calorie target. Takes up to a minute.</p>
+        <div class="field">
+          <label>Meal</label>
+          <div class="segmented" id="ai-mealType">
+            ${['Breakfast', 'Lunch', 'Dinner'].map((m) => `<button type="button" data-val="${m}" class="${m === 'Dinner' ? 'selected' : ''}">${m}</button>`).join('')}
+          </div>
+        </div>
+        <div class="field">
+          <label>Anything in particular? <span style="text-transform:none;font-weight:500;">(optional)</span></label>
+          <input type="text" id="ai-request" placeholder="e.g. quick, use the barramundi, no beef">
+        </div>
+        <button type="button" class="btn-primary" id="ai-go">Suggest 3 meals</button>
+        <div id="ai-results"></div>
+      ` : `
+        <div class="empty-state">
+          <div class="glyph">✨</div>
+          <h3>Add your API key first</h3>
+          <p>AI suggestions use your own Anthropic account. Add your key in Settings → AI suggestions.</p>
+        </div>
+        <button type="button" class="btn-primary" id="ai-to-settings">Go to Settings</button>
+      `}
+    </div>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  if (!hasKey) {
+    document.getElementById('ai-to-settings').addEventListener('click', () => { closeModal(); navigateTo('settings'); });
+    return;
+  }
+  document.querySelectorAll('#ai-mealType button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      btn.parentElement.querySelectorAll('button').forEach((b) => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+  });
+  document.getElementById('ai-go').addEventListener('click', runAiSuggest);
+}
+
+async function runAiSuggest() {
+  const goBtn = document.getElementById('ai-go');
+  const results = document.getElementById('ai-results');
+  const mealType = document.querySelector('#ai-mealType button.selected')?.dataset.val || 'Dinner';
+  const request = document.getElementById('ai-request').value.trim();
+  goBtn.disabled = true;
+  goBtn.textContent = 'Thinking…';
+  results.innerHTML = '<p class="recipe-muted ai-wait">Looking through your kitchen…</p>';
+
+  const [outcome, goals] = await Promise.all([requestAiSuggestions(mealType, request), getHealthGoals()]);
+  if (!document.getElementById('ai-results')) return; // sheet was closed while waiting
+  goBtn.disabled = false;
+  goBtn.textContent = 'Suggest 3 more';
+
+  if (outcome.error) {
+    results.innerHTML = `<p class="ai-error">${escapeHtml(outcome.error)}</p>`;
+    return;
+  }
+  if (!outcome.meals.length) {
+    results.innerHTML = '<p class="ai-error">No suggestions came back. Please try again.</p>';
+    return;
+  }
+  results.innerHTML = outcome.meals.map((m, i) => aiMealCardHtml(m, i, goals)).join('');
+  results.querySelectorAll('.ai-save-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const meal = outcome.meals[parseInt(btn.dataset.idx, 10)];
+      const existing = await dbGetAll('recipes');
+      if (existing.some((r) => r.name.toLowerCase() === meal.name.toLowerCase())) {
+        btn.textContent = 'Already in your recipes';
+        btn.disabled = true;
+        return;
+      }
+      await dbPut('recipes', aiMealToRecipe(meal));
+      btn.textContent = '✓ Saved';
+      btn.disabled = true;
+      showToast('Saved to your recipes');
+      if (AppState.route === 'recipes') renderRoute();
+    });
+  });
+}
+
+/* ============================================================
+   ONLINE RECIPE SEARCH (TheMealDB, free, no account)
+   ============================================================ */
+const MEALDB_BASE = 'https://www.themealdb.com/api/json/v1/1';
+const MEALDB_AREAS = ['Indian', 'British', 'Australian', 'Malaysian', 'Thai', 'Chinese', 'Italian'];
+const MEALDB_CATEGORY_PROTEIN = { Chicken: 'Chicken', Beef: 'Beef', Lamb: 'Lamb', Goat: 'Lamb', Pork: 'Pork', Seafood: 'Fish', Vegetarian: 'None', Vegan: 'None' };
+
+async function mealDbFetch(path) {
+  const res = await fetch(`${MEALDB_BASE}/${path}`);
+  if (!res.ok) throw new Error(`TheMealDB returned ${res.status}`);
+  const data = await res.json();
+  return Array.isArray(data.meals) ? data.meals : [];
+}
+
+// Results from an ingredient filter and a name search, without duplicates
+async function searchMealDb(query) {
+  const q = query.trim();
+  const [byIngredient, byName] = await Promise.all([
+    mealDbFetch(`filter.php?i=${encodeURIComponent(q.toLowerCase().replace(/\s+/g, '_'))}`).catch(() => []),
+    mealDbFetch(`search.php?s=${encodeURIComponent(q)}`).catch(() => [])
+  ]);
+  const seen = new Set();
+  return [...byIngredient, ...byName].filter((m) => !seen.has(m.idMeal) && seen.add(m.idMeal));
+}
+
+// TheMealDB measures are free text ("1 tbs", "1.2 kg", "5 thinly sliced", "to taste"):
+// take a leading amount and a known unit, and keep anything else as the prep note.
+const MEALDB_UNIT_ALIASES = { ...RECIPE_UNIT_ALIASES, tbs: 'tbsp', tbls: 'tbsp', tblsp: 'tbsp', tsps: 'tsp', ml: 'ml', g: 'g', kg: 'kg' };
+function parseMealDbMeasure(measure) {
+  let text = String(measure || '').trim();
+  let quantity = null;
+  let unit = '';
+  const qtyMatch = text.match(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾⅓⅔])\s*(.*)$/);
+  if (qtyMatch) {
+    const parsed = parseQuantity(qtyMatch[1]);
+    if (Number.isFinite(parsed)) {
+      quantity = parsed;
+      text = qtyMatch[2];
+      const unitMatch = text.match(/^([A-Za-z]+)\.?(?:\s+|$)(.*)$/);
+      if (unitMatch && MEALDB_UNIT_ALIASES[unitMatch[1].toLowerCase()]) {
+        unit = MEALDB_UNIT_ALIASES[unitMatch[1].toLowerCase()];
+        text = unitMatch[2];
+      }
+    }
+  }
+  return { quantity, unit, note: text.trim() };
+}
+
+function mealDbToRecipe(meal) {
+  const knownLookup = buildKnownIngredientLookup(null);
+  const ingredients = [];
+  for (let n = 1; n <= 20; n++) {
+    const name = (meal[`strIngredient${n}`] || '').trim();
+    if (!name) continue;
+    const { quantity, unit, note } = parseMealDbMeasure(meal[`strMeasure${n}`]);
+    const key = name.toLowerCase();
+    const known = knownLookup.get(key) || knownLookup.get(key.replace(/(?:es|s)$/, ''));
+    ingredients.push(normalizeRecipeIngredient({
+      name,
+      quantity,
+      unit,
+      prepNote: note,
+      category: known ? known.category : 'Other',
+      matchTerms: known ? known.matchTerms : [key],
+      assumedStaple: known ? known.assumedStaple : false
+    }));
+  }
+  const method = String(meal.strInstructions || '')
+    .split(/\r?\n+/)
+    .map((s) => s.replace(/^\s*(step\s*\d+[:.)]?|\d+[.)])\s*/i, '').trim())
+    .filter((s) => s.length > 1);
+  const cuisine = meal.strArea === 'Indian' ? 'Indian' : meal.strArea === 'Australian' ? 'Australian' : 'Western';
+  const fields = normalizeRecipe({
+    name: meal.strMeal,
+    cuisine,
+    mealTypes: meal.strCategory === 'Breakfast' ? ['Breakfast'] : ['Lunch', 'Dinner'],
+    primaryProtein: MEALDB_CATEGORY_PROTEIN[meal.strCategory] || 'None',
+    ingredients,
+    method,
+    notes: [meal.strArea ? `${meal.strArea} ${meal.strCategory || ''}`.trim() : '', meal.strSource ? `Original: ${meal.strSource}` : '']
+      .filter(Boolean).join('\n')
+  });
+  const now = new Date().toISOString();
+  return {
+    ...fields,
+    sourceName: 'TheMealDB',
+    seedId: null,
+    source: 'online',
+    userModified: false,
+    userRating: null,
+    partnerRating: null,
+    isFavourite: false,
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+async function openOnlineSearch() {
+  const items = await dbGetAll('inventoryItems');
+  const proteinChips = [...new Set(items.filter((i) => i.category === 'Protein').map((i) => i.name))].slice(0, 6);
+  openModal(`
+    <div class="modal-title-row">
+      <h2>🔎 Search online</h2>
+      <button class="close-btn" id="modal-close">×</button>
+    </div>
+    <div class="modal-scroll-area" id="online-body">
+      <p class="recipe-muted" style="margin-top:0;">Free recipes from TheMealDB. Search by an ingredient or dish name. These don't include calories.</p>
+      <div class="st-add">
+        <input type="text" id="online-q" placeholder="e.g. chicken, lamb, dal">
+        <button type="button" class="btn-secondary" id="online-go">Search</button>
+      </div>
+      ${proteinChips.length ? `<div class="st-group-title">From your kitchen</div>
+        <div class="state-chip-grid">${proteinChips.map((n) => `<button type="button" class="state-chip online-chip" data-q="${escapeHtml(n)}">${escapeHtml(n)}</button>`).join('')}</div>` : ''}
+      <div class="st-group-title">Browse by cuisine</div>
+      <div class="state-chip-grid">${MEALDB_AREAS.map((a) => `<button type="button" class="state-chip online-area" data-area="${a}">${a}</button>`).join('')}</div>
+      <div id="online-results" style="margin-top:14px;"></div>
+    </div>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+
+  const show = async (loader, label) => {
+    const out = document.getElementById('online-results');
+    out.innerHTML = `<p class="recipe-muted">Searching ${escapeHtml(label)}…</p>`;
+    try {
+      const meals = await loader();
+      if (!document.getElementById('online-results')) return;
+      if (!meals.length) { out.innerHTML = `<p class="recipe-muted">Nothing found for ${escapeHtml(label)}. Try a simpler word, e.g. "chicken".</p>`; return; }
+      out.innerHTML = meals.slice(0, 40).map((m) => `
+        <button type="button" class="online-result" data-id="${escapeHtml(m.idMeal)}">
+          ${m.strMealThumb ? `<img src="${escapeHtml(m.strMealThumb)}/preview" alt="" loading="lazy">` : ''}
+          <span>${escapeHtml(m.strMeal)}</span>
+        </button>`).join('');
+      out.querySelectorAll('.online-result').forEach((btn) => btn.addEventListener('click', () => openOnlineMeal(btn.dataset.id)));
+    } catch (err) {
+      out.innerHTML = `<p class="ai-error">${navigator.onLine ? 'Couldn\'t reach TheMealDB. Try again in a moment.' : 'You\'re offline. Online search needs an internet connection.'}</p>`;
+    }
+  };
+
+  const runSearch = () => {
+    const q = document.getElementById('online-q').value.trim();
+    if (q) show(() => searchMealDb(q), `"${q}"`);
+  };
+  document.getElementById('online-go').addEventListener('click', runSearch);
+  document.getElementById('online-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
+  document.querySelectorAll('.online-chip').forEach((chip) => chip.addEventListener('click', () => {
+    document.getElementById('online-q').value = chip.dataset.q;
+    runSearch();
+  }));
+  document.querySelectorAll('.online-area').forEach((chip) => chip.addEventListener('click', () => {
+    show(() => mealDbFetch(`filter.php?a=${encodeURIComponent(chip.dataset.area)}`), `${chip.dataset.area} dishes`);
+  }));
+}
+
+async function openOnlineMeal(id) {
+  let meal;
+  try {
+    meal = (await mealDbFetch(`lookup.php?i=${encodeURIComponent(id)}`))[0];
+  } catch (err) {
+    showToast('Couldn\'t load that recipe');
+    return;
+  }
+  if (!meal) return;
+  const recipe = mealDbToRecipe(meal);
+  openModal(`
+    <div class="modal-title-row">
+      <h2>${escapeHtml(recipe.name)}</h2>
+      <button class="close-btn" id="modal-close">×</button>
+    </div>
+    <div class="modal-scroll-area">
+      <div class="field-row" style="margin-bottom:10px;flex-wrap:wrap;gap:6px;">
+        <span class="tag">${escapeHtml(meal.strArea || '')}</span>
+        <span class="tag">${escapeHtml(meal.strCategory || '')}</span>
+        <span class="tag">From TheMealDB</span>
+      </div>
+      <div class="section-heading"><h2>Ingredients</h2></div>
+      <ul class="ingredient-list">${recipe.ingredients.map((ing) => `
+        <li><span class="ing-qty">${escapeHtml(formatIngredientQuantity(ing))}</span>
+        <span class="ing-name">${escapeHtml(ing.name)}${ing.prepNote ? `<span class="ing-note">, ${escapeHtml(ing.prepNote)}</span>` : ''}</span></li>`).join('')}
+      </ul>
+      <div class="section-heading" style="margin-top:18px;"><h2>Method</h2></div>
+      <ol class="method-list">${recipe.method.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ol>
+    </div>
+    <div class="modal-action-bar">
+      <button type="button" class="btn-primary" id="online-save">Save to my recipes</button>
+      <button type="button" class="btn-secondary" id="online-back">Back to search</button>
+    </div>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('online-back').addEventListener('click', openOnlineSearch);
+  document.getElementById('online-save').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const existing = await dbGetAll('recipes');
+    if (existing.some((r) => r.name.toLowerCase() === recipe.name.toLowerCase())) {
+      btn.textContent = 'Already in your recipes';
+      btn.disabled = true;
+      return;
+    }
+    const newId = await dbPut('recipes', recipe);
+    showToast('Saved. Add calories when you can.');
+    renderRoute();
+    openRecipeForm({ ...recipe, id: newId });
+  });
+}
+
+/* ============================================================
    SETTINGS SCREEN
    ============================================================ */
 async function renderSettingsScreen() {
+  const goals = await getHealthGoals();
+  const hasKey = !!getAiKey();
   return `
     <div class="settings-row" id="export-row">
       <div>
@@ -2836,9 +3531,34 @@ async function renderSettingsScreen() {
     </div>
     <input type="file" id="import-recipes-input" accept=".json,application/json" style="display:none;">
 
-    <div class="phase-placeholder">
-      <span class="eyebrow">Reserved for later phases</span>
-      <p>Household profiles, spice preference and favourite cuisines for you and your partner will live here once meal planning is built — the data structure is already in place.</p>
+    <div class="section-heading" style="margin-top:22px;"><h2>Health goals</h2></div>
+    <div class="settings-card">
+      <div class="field-row">
+        <div class="field"><label>Min kcal per meal</label><input type="number" id="goal-min" min="100" step="10" value="${goals.caloriesMin}"></div>
+        <div class="field"><label>Max kcal per meal</label><input type="number" id="goal-max" min="100" step="10" value="${goals.caloriesMax}"></div>
+      </div>
+      <div class="field">
+        <label>Cuisines you like</label>
+        <div class="state-chip-grid" id="goal-cuisines">
+          ${RECIPE_CUISINES.map((c) => `<button type="button" data-val="${c}" class="state-chip ${goals.preferredCuisines.includes(c) ? 'selected' : ''}">${c}</button>`).join('')}
+        </div>
+      </div>
+      <p class="recipe-muted" style="margin:0;">Recipes show ✓ when they're inside this range. AI suggestions also put protein first and keep fat lower.</p>
+    </div>
+
+    <div class="section-heading" style="margin-top:22px;"><h2>AI suggestions</h2></div>
+    <div class="settings-card">
+      <p class="recipe-muted" style="margin-top:0;">Uses your own Anthropic account (about 10–15¢ per set of suggestions). Your key is stored only on this phone and isn't included in backups.</p>
+      <div class="field">
+        <label>Anthropic API key</label>
+        <input type="password" id="ai-key" autocomplete="off" placeholder="${hasKey ? 'Key saved (hidden)' : 'Paste your sk-ant-… key'}">
+      </div>
+      <div class="field-row">
+        <button type="button" class="btn-primary" id="ai-key-save" style="margin-top:0;">${hasKey ? 'Replace key' : 'Save key'}</button>
+        <button type="button" class="btn-secondary" id="ai-key-test" style="margin-top:0;" ${hasKey ? '' : 'disabled'}>Test</button>
+      </div>
+      ${hasKey ? '<button type="button" class="btn-danger" id="ai-key-remove">Remove key</button>' : ''}
+      <p class="recipe-muted" id="ai-key-status" style="margin-bottom:0;"></p>
     </div>
   `;
 }
@@ -2853,6 +3573,45 @@ function attachSettingsListeners() {
     document.getElementById('import-recipes-input').click();
   });
   document.getElementById('import-recipes-input').addEventListener('change', handleImportRecipesFile);
+
+  // Health goals save as soon as they change
+  const saveGoals = async () => {
+    const min = parseInt(document.getElementById('goal-min').value, 10);
+    const max = parseInt(document.getElementById('goal-max').value, 10);
+    if (!(min > 0 && max >= min)) { showToast('"From" must be lower than "to"'); return; }
+    const cuisines = Array.from(document.querySelectorAll('#goal-cuisines button.selected')).map((b) => b.dataset.val);
+    await dbPut('settings', { ...DEFAULT_HEALTH_GOALS, caloriesMin: min, caloriesMax: max, preferredCuisines: cuisines.length ? cuisines : DEFAULT_HEALTH_GOALS.preferredCuisines });
+    showToast('Health goals saved');
+  };
+  document.getElementById('goal-min').addEventListener('change', saveGoals);
+  document.getElementById('goal-max').addEventListener('change', saveGoals);
+  document.querySelectorAll('#goal-cuisines button').forEach((btn) => btn.addEventListener('click', () => {
+    btn.classList.toggle('selected');
+    saveGoals();
+  }));
+
+  const status = document.getElementById('ai-key-status');
+  document.getElementById('ai-key-save').addEventListener('click', async () => {
+    const key = document.getElementById('ai-key').value.trim();
+    if (!key) { status.textContent = 'Paste your key into the box first.'; return; }
+    if (!key.startsWith('sk-ant-')) { status.textContent = 'That doesn\'t look like an Anthropic API key. It should start with sk-ant-'; return; }
+    if (!setAiKey(key)) { status.textContent = 'This browser won\'t let the app store the key (private browsing?).'; return; }
+    await renderRoute();
+    const s = document.getElementById('ai-key-status');
+    s.textContent = 'Saved. Testing…';
+    s.textContent = (await testAiKey()).message;
+  });
+  document.getElementById('ai-key-test').addEventListener('click', async () => {
+    status.textContent = 'Testing…';
+    status.textContent = (await testAiKey()).message;
+  });
+  const removeBtn = document.getElementById('ai-key-remove');
+  if (removeBtn) removeBtn.addEventListener('click', () => {
+    if (!confirm('Remove your API key from this phone?')) return;
+    setAiKey('');
+    showToast('Key removed');
+    renderRoute();
+  });
 }
 
 /* ---- Import recipes (additive) ----

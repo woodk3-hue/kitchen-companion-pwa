@@ -76,7 +76,22 @@ IndexedDB is local to the browser/device. Clearing browser data, switching brows
 
 Each ingredient stores `matchTerms` (inventory names that count as having it, e.g. `chicken thigh`, `chicken`), `assumedStaple` (salt, oil and dried spices are assumed on hand) and `optional`.
 
+## Step 2: What can I make?
+
+- **Match %**: each recipe shows how much of it is already in your kitchen ("71% match"), what you'd need to buy, and which food about to go off it uses ("Uses Spinach (2 days left)"). Staples (salt, oil, dried spices) and optional ingredients don't count against the score. With food in the kitchen, the list is sorted by best match, with a boost for recipes that use up expiring food.
+- **Health goals** (Settings): calories per meal (default 450–500 kcal) and the cuisines you like. Recipes show **✓ 480 kcal** inside the range and **590 kcal · over** above it.
+- **✨ Suggest meals** (Recipes tab): sends your kitchen list, use-by dates and health goals to Claude (`claude-opus-5-5`), which suggests 3 meals that use expiring food first and aim for your calorie target, each with ingredients, method, approximate kcal and protein, and what you'd need to buy. **Save to my recipes** keeps one. Needs your own Anthropic API key, pasted into **Settings → AI suggestions** (stored only in this browser's localStorage, not in backups). Roughly 10–15 Australian cents per set of suggestions.
+- **🔎 Search online** (Recipes tab): free search of TheMealDB by ingredient or dish name, or browse by cuisine. Saved recipes have no calories, so the edit form opens to let you add them.
+- The service worker now leaves API calls (Anthropic, TheMealDB) to the network instead of caching them.
+
+### Getting an Anthropic API key
+1. Sign in at console.anthropic.com (same email as your Claude account works, but API billing is separate from a Claude subscription).
+2. **Billing**: add a small prepaid credit (e.g. US$5–10). Under **Limits**, set a monthly spend limit.
+3. **API keys → Create key**: name it "Kitchen Companion" and copy the `sk-ant-…` key. Skip workload identity federation; that is for servers, not phone apps.
+4. In the app: **Settings → AI suggestions**, paste the key, **Save key**. It is tested automatically.
+
 ## Next
 
-- **Phase 2b**: ingredient match % against your inventory ("95% match, need coriander"), "Use What I Own" and "I don't want to cook" modes.
-- **Phase 2c**: Meal Planner.
+- **Step 3**: Meal plan, built around food expiring soonest and your calorie target.
+- **Step 4**: Shopping list and running low.
+- **Step 5**: "I cooked this" (e.g. cooked 4 portions, ate 2, 2 left over), then barcode scanning.
