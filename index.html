@@ -716,6 +716,139 @@ h1, h2, h3 {
 }
 .st-qty input { flex: 1; min-width: 0; }
 .st-qty select { flex: 0 0 90px; }
+
+/* ============================================================
+   RECIPES
+   ============================================================ */
+#recipe-form { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.recipe-search { margin-bottom: 12px; }
+.recipe-search input[type="search"] {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-family: var(--font-body);
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+.recipe-filter-row { margin-bottom: 16px; }
+.recipe-card.cuisine-indian .edge { background: var(--color-accent); }
+.recipe-card.cuisine-anglo-indian .edge { background: var(--color-leftovers); }
+.recipe-card.cuisine-australian .edge { background: var(--color-fridge); }
+.recipe-card.cuisine-western .edge { background: var(--color-freezer); }
+.fav-star { color: var(--color-accent); }
+.tag.tag-protein { color: var(--color-fridge); }
+.recipe-stats { display: flex; gap: 8px; margin-bottom: 10px; }
+.recipe-stat {
+  flex: 1;
+  background: var(--color-paper);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  padding: 8px 6px;
+  text-align: center;
+}
+.recipe-stat .v { display: block; font-size: 15px; font-weight: 800; }
+.recipe-stat .l { display: block; font-size: 11px; color: var(--color-ink-soft); text-transform: uppercase; letter-spacing: 0.03em; }
+.recipe-muted { font-size: 13px; color: var(--color-ink-soft); }
+.recipe-notes { font-size: 14px; line-height: 1.5; margin: 0; white-space: pre-line; }
+.rating-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; }
+.rating-label { font-size: 14px; font-weight: 700; }
+.star-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  padding: 2px 3px;
+  color: var(--color-line);
+  cursor: pointer;
+}
+.star-btn.on { color: var(--color-accent); }
+.ingredient-list { list-style: none; padding: 0; margin: 0; }
+.ingredient-list li {
+  display: flex;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-line);
+  font-size: 14px;
+}
+.ingredient-list .ing-qty { flex: 0 0 72px; font-weight: 700; color: var(--color-ink-soft); }
+.ingredient-list .ing-note { color: var(--color-ink-soft); }
+.ingredient-list .ing-flag {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  padding: 0 6px;
+}
+.method-list { padding-left: 20px; margin: 0; }
+.method-list li { font-size: 14px; line-height: 1.5; margin-bottom: 8px; }
+
+/* ============================================================
+   STEP 2: MATCHING, AI SUGGESTIONS, ONLINE SEARCH
+   ============================================================ */
+.recipe-online-row { display: flex; gap: 8px; }
+.recipe-online-row .stocktake-btn { flex: 1; min-width: 0; }
+.stocktake-btn.alt { border-left-color: var(--color-fridge); }
+.tag.match-pct { color: var(--color-ink); }
+.tag.match-pct.high { color: var(--color-fridge); border-color: var(--color-fridge); }
+.tag.kcal-ok { color: var(--color-fridge); }
+.tag.kcal-over { color: var(--color-warn); }
+.match-line { font-size: 12px; color: var(--color-ink-soft); margin: 5px 0 0; }
+.match-line.uses { color: var(--color-warn); font-weight: 700; }
+.ing-have { font-size: 11px; font-weight: 700; color: var(--color-fridge); margin-left: 6px; }
+.settings-card {
+  background: var(--color-paper);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+}
+.settings-card .field input[type="password"] {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-family: var(--font-body);
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+.ai-meal {
+  background: var(--color-paper);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-top: 12px;
+}
+.ai-meal-head { display: flex; justify-content: space-between; gap: 8px; }
+.ai-meal-head .name { font-size: 15px; font-weight: 800; }
+.ai-meal-head .qty { font-size: 13px; color: var(--color-ink-soft); white-space: nowrap; }
+.ai-meal .meta-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.ai-why { font-size: 13px; margin: 8px 0 0; }
+.ai-error { font-size: 14px; color: var(--color-warn); font-weight: 600; margin-top: 12px; }
+.ai-wait { margin-top: 12px; }
+.online-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 6px;
+  background: var(--color-paper);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+  text-align: left;
+  cursor: pointer;
+}
+.online-result img { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; flex: 0 0 48px; }
 </style>
  </head>
  <body>
@@ -1142,7 +1275,9 @@ const AppState = {
   route: 'home',
   inventory: [],
   activeLocationFilter: 'all',
-  editingItemId: null
+  editingItemId: null,
+  recipes: [],
+  recipeFilters: { search: '', cuisine: 'all', favourites: false, quick: false, highProtein: false, freezer: false }
 };
 
 /* ============================================================
@@ -1169,12 +1304,12 @@ async function renderRoute() {
   });
 
   const fab = document.getElementById('fab-btn');
-  fab.style.display = AppState.route === 'kitchen' ? 'flex' : 'none';
+  fab.style.display = (AppState.route === 'kitchen' || AppState.route === 'recipes') ? 'flex' : 'none';
 
   const titleMap = {
     home: ['Kitchen Companion', "Know what you've got"],
     planner: ['Meal Planner', 'Coming in Phase 2'],
-    recipes: ['Recipes', 'Coming in Phase 2'],
+    recipes: ['Recipes', 'Indian · Anglo-Indian · Australian · Western'],
     kitchen: ['Kitchen', 'Pantry · Fridge · Freezer · Leftovers'],
     shopping: ['Shopping', 'Coming in Phase 3'],
     settings: ['Settings', 'App data & preferences']
@@ -1190,7 +1325,7 @@ async function renderRoute() {
     case 'kitchen': content.innerHTML = await renderKitchenScreen(); attachKitchenListeners(); break;
     case 'settings': content.innerHTML = await renderSettingsScreen(); attachSettingsListeners(); break;
     case 'planner': content.innerHTML = renderPlaceholder('Meal Planner', 'Weekly breakfast, lunch and dinner planning — built around what\'s already in your kitchen, expiry dates, and your protein targets.'); break;
-    case 'recipes': content.innerHTML = renderPlaceholder('Recipes', 'A curated library of Indian, Anglo-Indian and Australian/Western recipes, with ingredient match scoring against your inventory.'); break;
+    case 'recipes': content.innerHTML = await renderRecipesScreen(); attachRecipesListeners(); break;
     case 'shopping': content.innerHTML = renderPlaceholder('Shopping', 'Budget tracking, purchase events, and shopping lists built from your meal plan.'); break;
   }
 }
@@ -1487,7 +1622,10 @@ function attachKitchenListeners() {
   });
 }
 
-document.getElementById('fab-btn').addEventListener('click', () => openItemForm(null));
+document.getElementById('fab-btn').addEventListener('click', () => {
+  if (AppState.route === 'recipes') openRecipeForm(null);
+  else openItemForm(null);
+});
 
 /* ---- Item Add/Edit Form ---- */
 function openItemForm(item, prefill) {
@@ -2124,9 +2262,1250 @@ async function saveStocktake() {
 }
 
 /* ============================================================
+   RECIPES
+   ============================================================ */
+const RECIPE_SEED_URL = './recipes-seed.json';
+const RECIPE_CUISINES = ['Indian', 'Anglo-Indian', 'Australian', 'Western'];
+const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
+const LEVELS = ['Low', 'Medium', 'High'];
+const PRIMARY_PROTEINS = ['Chicken', 'Fish', 'Beef', 'Lamb', 'Pork', 'Eggs', 'Legumes', 'None'];
+const QUICK_RECIPE_MINUTES = 30;
+
+// Units the ingredient parser recognises; plurals and long forms map to the stored unit.
+const RECIPE_UNIT_ALIASES = {
+  g: 'g', gram: 'g', grams: 'g', kg: 'kg', ml: 'ml', l: 'L', litre: 'L', litres: 'L',
+  tsp: 'tsp', tsps: 'tsp', teaspoon: 'tsp', teaspoons: 'tsp',
+  tbsp: 'tbsp', tbsps: 'tbsp', tablespoon: 'tbsp', tablespoons: 'tbsp',
+  cup: 'cup', cups: 'cup', clove: 'clove', cloves: 'clove', bunch: 'bunch', bunches: 'bunch',
+  sprig: 'sprig', sprigs: 'sprig', pinch: 'pinch', pinches: 'pinch', can: 'can', cans: 'can', each: 'each'
+};
+const RECIPE_UNIT_PLURALS = { cup: 'cups', clove: 'cloves', bunch: 'bunches', sprig: 'sprigs', pinch: 'pinches', can: 'cans' };
+
+function toNumberOrNull(value) {
+  if (value === '' || value === null || value === undefined) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeRecipeIngredient(ing) {
+  const name = String(ing.name || '').trim();
+  const terms = Array.isArray(ing.matchTerms) && ing.matchTerms.length ? ing.matchTerms : [name];
+  return {
+    name,
+    quantity: toNumberOrNull(ing.quantity),
+    unit: ing.unit || '',
+    category: CATEGORIES.includes(ing.category) ? ing.category : 'Other',
+    matchTerms: terms.map((t) => String(t).toLowerCase().trim()).filter(Boolean),
+    optional: !!ing.optional,
+    assumedStaple: !!ing.assumedStaple,
+    prepNote: ing.prepNote || ''
+  };
+}
+
+// Fills defaults so seed recipes, user recipes and restored backups all have the same shape.
+function normalizeRecipe(r) {
+  const pick = (value, allowed, fallback) => (allowed.includes(value) ? value : fallback);
+  return {
+    name: String(r.name || '').trim(),
+    cuisine: pick(r.cuisine, RECIPE_CUISINES, 'Western'),
+    mealTypes: (Array.isArray(r.mealTypes) ? r.mealTypes : []).filter((m) => MEAL_TYPES.includes(m)),
+    servings: toNumberOrNull(r.servings),
+    prepMinutes: toNumberOrNull(r.prepMinutes),
+    cookMinutes: toNumberOrNull(r.cookMinutes),
+    difficulty: pick(r.difficulty, DIFFICULTIES, 'Easy'),
+    caloriesPerServing: toNumberOrNull(r.caloriesPerServing),
+    proteinGramsPerServing: toNumberOrNull(r.proteinGramsPerServing),
+    proteinLevel: pick(r.proteinLevel, LEVELS, 'Medium'),
+    fatLevel: pick(r.fatLevel, LEVELS, 'Medium'),
+    primaryProtein: pick(r.primaryProtein, PRIMARY_PROTEINS, 'None'),
+    freezerFriendly: !!r.freezerFriendly,
+    leftoverFriendly: !!r.leftoverFriendly,
+    ingredients: (Array.isArray(r.ingredients) ? r.ingredients : []).map(normalizeRecipeIngredient).filter((i) => i.name),
+    method: (Array.isArray(r.method) ? r.method : []).map((s) => String(s).trim()).filter(Boolean),
+    notes: r.notes || ''
+  };
+}
+
+function recipeTotalMinutes(r) {
+  return (r.prepMinutes || 0) + (r.cookMinutes || 0);
+}
+
+/* ---- Built-in recipe seed ----
+   recipes-seed.json carries a version number. When it goes up, new built-in recipes are added
+   and untouched ones are refreshed. Recipes the user has edited or deleted are left alone. */
+async function syncRecipeSeed() {
+  let seed;
+  try {
+    const res = await fetch(RECIPE_SEED_URL);
+    if (!res.ok) return false;
+    seed = await res.json();
+  } catch (err) {
+    return false; // e.g. opened from file:// — the app still works without built-in recipes
+  }
+  if (!seed || !Array.isArray(seed.recipes) || !seed.version) return false;
+
+  const meta = (await dbGet('settings', 'recipeSeed')) || { key: 'recipeSeed', version: 0, deletedSeedIds: [] };
+  if (meta.version >= seed.version) return false;
+
+  const existing = await dbGetAll('recipes');
+  const bySeedId = new Map(existing.filter((r) => r.seedId).map((r) => [r.seedId, r]));
+  const deleted = meta.deletedSeedIds || [];
+  const now = new Date().toISOString();
+
+  for (const s of seed.recipes) {
+    if (!s.seedId || deleted.includes(s.seedId)) continue;
+    const current = bySeedId.get(s.seedId);
+    if (current && current.userModified) continue;
+    const record = {
+      ...normalizeRecipe(s),
+      seedId: s.seedId,
+      source: 'built-in',
+      userModified: false,
+      userRating: current ? current.userRating : null,
+      partnerRating: current ? current.partnerRating : null,
+      isFavourite: current ? !!current.isFavourite : false,
+      createdAt: current ? current.createdAt : now,
+      updatedAt: now
+    };
+    if (current) record.id = current.id;
+    await dbPut('recipes', record);
+  }
+
+  await dbPut('settings', { ...meta, version: seed.version, deletedSeedIds: deleted });
+  return true;
+}
+
+/* ---- Recipes list screen ---- */
+function recipeMatchesFilters(r, f) {
+  if (f.cuisine !== 'all' && r.cuisine !== f.cuisine) return false;
+  if (f.favourites && !r.isFavourite) return false;
+  if (f.quick && !(recipeTotalMinutes(r) > 0 && recipeTotalMinutes(r) <= QUICK_RECIPE_MINUTES)) return false;
+  if (f.highProtein && r.proteinLevel !== 'High') return false;
+  if (f.freezer && !r.freezerFriendly) return false;
+  const q = f.search.trim().toLowerCase();
+  if (q) {
+    const haystack = [r.name, r.cuisine, r.primaryProtein, ...(r.ingredients || []).map((i) => i.name)].join(' ').toLowerCase();
+    if (!haystack.includes(q)) return false;
+  }
+  return true;
+}
+
+function renderRecipeList() {
+  const f = AppState.recipeFilters;
+  const index = AppState.inventoryIndex || [];
+  const scores = new Map((AppState.recipes || []).map((r) => [r.id, index.length ? scoreRecipe(r, index) : null]));
+  // With food in the kitchen: best match, with a boost for recipes that use something about to go off.
+  // With an empty kitchen: favourites first, then A–Z.
+  const rank = (r) => {
+    const sc = scores.get(r.id);
+    return sc ? sc.pct + (sc.expiring.length ? 30 : 0) : (r.isFavourite ? 1 : 0);
+  };
+  const recipes = (AppState.recipes || [])
+    .filter((r) => recipeMatchesFilters(r, f))
+    .sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name));
+
+  if (recipes.length === 0) {
+    const none = (AppState.recipes || []).length === 0;
+    return `
+      <div class="empty-state">
+        <div class="glyph">📖</div>
+        <h3>${none ? 'No recipes yet' : 'No recipes match'}</h3>
+        <p>${none ? 'Tap + to add your own. Built-in recipes load when the app is opened from its web address.' : 'Try clearing a filter or the search.'}</p>
+      </div>
+    `;
+  }
+
+  return recipes.map((r) => {
+    const sc = scores.get(r.id);
+    const total = recipeTotalMinutes(r);
+    const cuisineClass = 'cuisine-' + r.cuisine.toLowerCase().replace(/[^a-z]+/g, '-');
+    return `
+      <div class="item-card recipe-card ${cuisineClass}" data-recipe-id="${r.id}">
+        <div class="edge"></div>
+        <div class="body">
+          <div class="top-row">
+            <span class="name">${r.isFavourite ? '<span class="fav-star">★</span> ' : ''}${escapeHtml(r.name)}</span>
+            <span class="qty">${total ? `${total} min` : ''}</span>
+          </div>
+          <div class="meta-row">
+            ${sc ? `<span class="tag match-pct ${sc.pct >= 80 ? 'high' : ''}">${sc.pct}% match</span>` : ''}
+            <span class="tag">${escapeHtml(r.cuisine)}</span>
+            ${calorieBadgeHtml(r.caloriesPerServing, AppState.healthGoals)}
+            ${r.proteinLevel === 'High' ? '<span class="tag tag-protein">High protein</span>' : ''}
+            ${r.freezerFriendly ? '<span class="tag state-frozen">Freezes well</span>' : ''}
+          </div>
+          ${sc && sc.expiring.length ? `<div class="match-line uses">Uses ${sc.expiring.map((e) => `${escapeHtml(e.name)} (${formatDaysLeft(e.daysLeft)})`).join(', ')}</div>` : ''}
+          ${sc && sc.missing.length && sc.pct > 0 ? `<div class="match-line">Need: ${escapeHtml(sc.missing.slice(0, 4).join(', '))}${sc.missing.length > 4 ? ` +${sc.missing.length - 4} more` : ''}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function renderRecipesScreen() {
+  const [recipes, items, goals] = await Promise.all([dbGetAll('recipes'), dbGetAll('inventoryItems'), getHealthGoals()]);
+  AppState.recipes = recipes;
+  AppState.inventoryIndex = buildInventoryIndex(items);
+  AppState.healthGoals = goals;
+  const f = AppState.recipeFilters;
+  const filterChip = (key, label) =>
+    `<button type="button" class="state-chip recipe-filter ${f[key] ? 'selected' : ''}" data-filter="${key}">${label}</button>`;
+
+  return `
+    <div class="recipe-online-row">
+      <button type="button" class="stocktake-btn" id="ai-suggest-btn">
+        <span class="st-btn-title">✨ Suggest meals</span>
+        <span class="st-btn-desc">AI ideas from what you have</span>
+      </button>
+      <button type="button" class="stocktake-btn alt" id="online-search-btn">
+        <span class="st-btn-title">🔎 Search online</span>
+        <span class="st-btn-desc">Free recipe ideas</span>
+      </button>
+    </div>
+    <div class="field recipe-search">
+      <input type="search" id="recipe-search" placeholder="Search recipes or ingredients" value="${escapeHtml(f.search)}">
+    </div>
+    <div class="location-tabs">
+      ${['all', ...RECIPE_CUISINES].map((c) => `
+        <button class="loc-tab recipe-cuisine-tab ${f.cuisine === c ? 'active' : ''}" data-cuisine="${c}">${c === 'all' ? 'All' : c}</button>
+      `).join('')}
+    </div>
+    <div class="state-chip-grid recipe-filter-row">
+      ${filterChip('favourites', '★ Favourites')}
+      ${filterChip('quick', `≤ ${QUICK_RECIPE_MINUTES} min`)}
+      ${filterChip('highProtein', 'High protein')}
+      ${filterChip('freezer', 'Freezes well')}
+    </div>
+    <div id="recipe-list">${renderRecipeList()}</div>
+  `;
+}
+
+function attachRecipeCardListeners() {
+  document.querySelectorAll('.recipe-card').forEach((card) => {
+    card.addEventListener('click', () => openRecipeDetail(parseInt(card.dataset.recipeId, 10)));
+  });
+}
+
+function attachRecipesListeners() {
+  document.getElementById('ai-suggest-btn').addEventListener('click', openAiSuggest);
+  document.getElementById('online-search-btn').addEventListener('click', openOnlineSearch);
+
+  // Search only redraws the list so the input keeps focus while typing
+  document.getElementById('recipe-search').addEventListener('input', (e) => {
+    AppState.recipeFilters.search = e.target.value;
+    document.getElementById('recipe-list').innerHTML = renderRecipeList();
+    attachRecipeCardListeners();
+  });
+
+  document.querySelectorAll('.recipe-cuisine-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      AppState.recipeFilters.cuisine = tab.dataset.cuisine;
+      renderRoute();
+    });
+  });
+
+  document.querySelectorAll('.recipe-filter').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const key = chip.dataset.filter;
+      AppState.recipeFilters[key] = !AppState.recipeFilters[key];
+      renderRoute();
+    });
+  });
+
+  attachRecipeCardListeners();
+}
+
+/* ---- Recipe detail ---- */
+function formatIngredientQuantity(ing) {
+  if (ing.quantity === null) return '';
+  const qty = Number.isInteger(ing.quantity) ? String(ing.quantity) : String(Math.round(ing.quantity * 100) / 100);
+  if (!ing.unit || ing.unit === 'each') return qty;
+  const unit = ing.quantity > 1 && RECIPE_UNIT_PLURALS[ing.unit] ? RECIPE_UNIT_PLURALS[ing.unit] : ing.unit;
+  return `${qty} ${unit}`;
+}
+
+function starRowHtml(field, value) {
+  return [1, 2, 3, 4, 5].map((n) => `
+    <button type="button" class="star-btn ${value && n <= value ? 'on' : ''}" data-field="${field}" data-value="${n}" aria-label="${n} star${n === 1 ? '' : 's'}">★</button>
+  `).join('');
+}
+
+async function openRecipeDetail(id) {
+  const recipe = await dbGet('recipes', id);
+  if (!recipe) return;
+
+  const profiles = await dbGet('settings', 'profiles');
+  const partnerName = profiles && profiles.partnerProfile && profiles.partnerProfile.name ? profiles.partnerProfile.name : 'Partner';
+
+  const stat = (label, value) => (value ? `<div class="recipe-stat"><span class="v">${escapeHtml(value)}</span><span class="l">${label}</span></div>` : '');
+
+  const [goals, kitchenItems] = await Promise.all([getHealthGoals(), dbGetAll('inventoryItems')]);
+  const index = buildInventoryIndex(kitchenItems);
+  const ingredientsHtml = recipe.ingredients.length === 0
+    ? '<p class="recipe-muted">No ingredients listed.</p>'
+    : `<ul class="ingredient-list">${recipe.ingredients.map((ing) => `
+        <li>
+          <span class="ing-qty">${escapeHtml(formatIngredientQuantity(ing))}</span>
+          <span class="ing-name">${escapeHtml(ing.name)}${ing.prepNote ? `<span class="ing-note">, ${escapeHtml(ing.prepNote)}</span>` : ''}
+            ${index.length && findInventoryMatch(ing, index) ? '<span class="ing-have">✓ in kitchen</span>' : ''}
+            ${ing.optional ? '<span class="ing-flag">optional</span>' : ''}
+            ${ing.assumedStaple ? '<span class="ing-flag">staple</span>' : ''}
+          </span>
+        </li>`).join('')}</ul>`;
+
+  const methodHtml = recipe.method.length === 0
+    ? '<p class="recipe-muted">No method added.</p>'
+    : `<ol class="method-list">${recipe.method.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ol>`;
+
+  const nutrition = [
+    recipe.caloriesPerServing ? `~${recipe.caloriesPerServing} kcal` : '',
+    recipe.proteinGramsPerServing ? `~${recipe.proteinGramsPerServing} g protein` : '',
+    `${recipe.fatLevel} fat`
+  ].filter(Boolean).join(' · ');
+
+  const html = `
+    <div class="modal-title-row">
+      <h2>${escapeHtml(recipe.name)}</h2>
+      <button class="close-btn" id="modal-close">×</button>
+    </div>
+    <div class="modal-scroll-area">
+      <div class="field-row" style="margin-bottom:12px;flex-wrap:wrap;gap:6px;">
+        <span class="tag">${escapeHtml(recipe.cuisine)}</span>
+        ${recipe.mealTypes.map((m) => `<span class="tag">${escapeHtml(m)}</span>`).join('')}
+        ${calorieBadgeHtml(recipe.caloriesPerServing, goals)}
+        ${recipe.proteinLevel === 'High' ? '<span class="tag tag-protein">High protein</span>' : ''}
+        ${recipe.freezerFriendly ? '<span class="tag state-frozen">Freezes well</span>' : ''}
+        ${recipe.leftoverFriendly ? '<span class="tag state-leftover">Good leftovers</span>' : ''}
+        ${recipe.source === 'built-in' ? '<span class="tag">Built-in</span>' : ''}
+      </div>
+      ${recipe.sourceName ? `<p class="recipe-muted" style="margin:0 0 10px;">From ${escapeHtml(recipe.sourceName)}</p>` : ''}
+
+      <div class="recipe-stats">
+        ${stat('Serves', recipe.servings)}
+        ${stat('Prep', recipe.prepMinutes ? recipe.prepMinutes + ' min' : '')}
+        ${stat('Cook', recipe.cookMinutes ? recipe.cookMinutes + ' min' : '')}
+        ${stat('Difficulty', recipe.difficulty)}
+      </div>
+      <p class="recipe-muted" style="margin:0 0 14px;">Per serving: ${escapeHtml(nutrition)} (approximate)</p>
+
+      <div class="rating-row">
+        <span class="rating-label">You</span>
+        <span class="stars">${starRowHtml('userRating', recipe.userRating)}</span>
+      </div>
+      <div class="rating-row">
+        <span class="rating-label">${escapeHtml(partnerName)}</span>
+        <span class="stars">${starRowHtml('partnerRating', recipe.partnerRating)}</span>
+      </div>
+      <button type="button" class="btn-secondary" id="recipe-fav-btn" style="margin:6px 0 4px;">
+        ${recipe.isFavourite ? '★ Favourite (tap to remove)' : '☆ Add to favourites'}
+      </button>
+
+      <div class="section-heading" style="margin-top:18px;"><h2>Ingredients</h2></div>
+      ${ingredientsHtml}
+
+      <div class="section-heading" style="margin-top:18px;"><h2>Method</h2></div>
+      ${methodHtml}
+
+      ${recipe.notes ? `<div class="section-heading" style="margin-top:18px;"><h2>Notes</h2></div><p class="recipe-notes">${escapeHtml(recipe.notes)}</p>` : ''}
+    </div>
+    <div class="modal-action-bar">
+      <button type="button" class="btn-primary" id="edit-recipe-btn">Edit recipe</button>
+      <button type="button" class="btn-danger" id="delete-recipe-btn">Delete recipe</button>
+    </div>
+  `;
+
+  openModal(html);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+
+  // Ratings and favourite save straight away; tapping the current rating again clears it
+  document.querySelectorAll('.star-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const field = btn.dataset.field;
+      const value = parseInt(btn.dataset.value, 10);
+      recipe[field] = recipe[field] === value ? null : value;
+      recipe.updatedAt = new Date().toISOString();
+      await dbPut('recipes', recipe);
+      openRecipeDetail(id);
+      renderRoute();
+    });
+  });
+
+  document.getElementById('recipe-fav-btn').addEventListener('click', async () => {
+    recipe.isFavourite = !recipe.isFavourite;
+    recipe.updatedAt = new Date().toISOString();
+    await dbPut('recipes', recipe);
+    showToast(recipe.isFavourite ? 'Added to favourites' : 'Removed from favourites');
+    openRecipeDetail(id);
+    renderRoute();
+  });
+
+  document.getElementById('edit-recipe-btn').addEventListener('click', () => openRecipeForm(recipe));
+  document.getElementById('delete-recipe-btn').addEventListener('click', () => deleteRecipe(recipe));
+}
+
+async function deleteRecipe(recipe) {
+  const builtInNote = recipe.source === 'built-in' ? ' It won\'t be added back by future updates.' : '';
+  if (!confirm(`Delete "${recipe.name}"?${builtInNote}`)) return;
+  await dbDelete('recipes', recipe.id);
+  if (recipe.seedId) {
+    const meta = (await dbGet('settings', 'recipeSeed')) || { key: 'recipeSeed', version: 0, deletedSeedIds: [] };
+    const deleted = meta.deletedSeedIds || [];
+    if (!deleted.includes(recipe.seedId)) deleted.push(recipe.seedId);
+    await dbPut('settings', { ...meta, deletedSeedIds: deleted });
+  }
+  closeModal();
+  showToast('Recipe deleted');
+  renderRoute();
+}
+
+/* ---- Recipe add/edit form ----
+   Ingredients are typed one per line, e.g. "500 g chicken thigh, diced (optional)".
+   Match words, category and staple flag are filled in automatically: kept from the same ingredient
+   if it was already on this recipe, otherwise borrowed from any other recipe using that ingredient. */
+function ingredientToLine(ing) {
+  const qty = formatIngredientQuantity(ing);
+  return [qty, ing.name].filter(Boolean).join(' ')
+    + (ing.prepNote ? `, ${ing.prepNote}` : '')
+    + (ing.optional ? ' (optional)' : '');
+}
+
+function parseQuantity(text) {
+  const unicode = { '½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 1 / 3, '⅔': 2 / 3 };
+  if (unicode[text] !== undefined) return unicode[text];
+  const mixed = text.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  if (mixed) return Number(mixed[1]) + Number(mixed[2]) / Number(mixed[3]);
+  const frac = text.match(/^(\d+)\/(\d+)$/);
+  if (frac) return Number(frac[1]) / Number(frac[2]);
+  return Number(text.replace(',', '.'));
+}
+
+function buildKnownIngredientLookup(excludeRecipeId) {
+  const lookup = new Map();
+  (AppState.recipes || []).forEach((r) => {
+    if (r.id === excludeRecipeId) return;
+    (r.ingredients || []).forEach((ing) => {
+      const key = ing.name.toLowerCase();
+      if (!lookup.has(key)) lookup.set(key, ing);
+    });
+  });
+  return lookup;
+}
+
+function parseIngredientLine(line, previousIngredients, knownLookup) {
+  let text = line.trim();
+  if (!text) return null;
+
+  let optional = false;
+  if (/\(optional\)\s*$/i.test(text)) {
+    optional = true;
+    text = text.replace(/\(optional\)\s*$/i, '').trim();
+  }
+
+  let quantity = null;
+  let unit = '';
+  const qtyMatch = text.match(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾⅓⅔])\s*(.*)$/);
+  if (qtyMatch) {
+    const parsed = parseQuantity(qtyMatch[1]);
+    if (Number.isFinite(parsed)) {
+      quantity = parsed;
+      text = qtyMatch[2];
+      const unitMatch = text.match(/^([A-Za-z]+)\.?\s+(.+)$/);
+      if (unitMatch && RECIPE_UNIT_ALIASES[unitMatch[1].toLowerCase()]) {
+        unit = RECIPE_UNIT_ALIASES[unitMatch[1].toLowerCase()];
+        text = unitMatch[2];
+      }
+    }
+  }
+
+  let prepNote = '';
+  const comma = text.indexOf(',');
+  if (comma > 0) {
+    prepNote = text.slice(comma + 1).trim();
+    text = text.slice(0, comma).trim();
+  }
+  const name = text.trim();
+  if (!name) return null;
+
+  const key = name.toLowerCase();
+  // Also try the singular form so "2 onions" picks up what's known about "Onion"
+  const singular = key.replace(/(?:es|s)$/, '');
+  const known = previousIngredients.find((p) => p.name.toLowerCase() === key)
+    || knownLookup.get(key) || knownLookup.get(singular) || knownLookup.get(key.replace(/s$/, ''));
+  return normalizeRecipeIngredient({
+    name, quantity, unit, prepNote, optional,
+    category: known ? known.category : 'Other',
+    matchTerms: known ? known.matchTerms : [key],
+    assumedStaple: known ? known.assumedStaple : false
+  });
+}
+
+function openRecipeForm(recipe) {
+  const isEdit = !!recipe;
+  const r = recipe || normalizeRecipe({ mealTypes: ['Dinner'], servings: 4, difficulty: 'Easy', proteinLevel: 'High', fatLevel: 'Low' });
+
+  const segmented = (id, options, selected) => `
+    <div class="segmented" id="${id}">
+      ${options.map((o) => `<button type="button" data-val="${o}" class="${o === selected ? 'selected' : ''}">${o}</button>`).join('')}
+    </div>`;
+  const toggleRow = (id, label, desc, on) => `
+    <div class="staple-toggle-row">
+      <div class="label-group"><span class="label">${label}</span><span class="desc">${desc}</span></div>
+      <button type="button" id="${id}" class="toggle-switch ${on ? 'on' : ''}" data-on="${on ? 'true' : 'false'}"></button>
+    </div>`;
+
+  const html = `
+    <div class="modal-title-row">
+      <h2>${isEdit ? 'Edit recipe' : 'Add recipe'}</h2>
+      <button class="close-btn" id="modal-close">×</button>
+    </div>
+    <form id="recipe-form">
+      <div class="modal-scroll-area">
+        ${isEdit && recipe.source === 'built-in' ? '<p class="recipe-muted" style="margin-top:0;">Editing a built-in recipe keeps your changes. Future app updates won\'t overwrite it.</p>' : ''}
+        <div class="field">
+          <label>Name</label>
+          <input type="text" id="r-name" value="${escapeHtml(r.name)}" placeholder="e.g. Mum's chicken curry" required>
+        </div>
+
+        <div class="field">
+          <label>Cuisine</label>
+          <select id="r-cuisine">
+            ${RECIPE_CUISINES.map((c) => `<option value="${c}" ${r.cuisine === c ? 'selected' : ''}>${c}</option>`).join('')}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Meal <span style="text-transform:none;font-weight:500;">(select all that apply)</span></label>
+          <div class="state-chip-grid" id="r-mealTypes">
+            ${MEAL_TYPES.map((m) => `<button type="button" data-val="${m}" class="state-chip ${r.mealTypes.includes(m) ? 'selected' : ''}">${m}</button>`).join('')}
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field"><label>Serves</label><input type="number" id="r-servings" min="1" value="${r.servings ?? ''}"></div>
+          <div class="field"><label>Prep (min)</label><input type="number" id="r-prep" min="0" value="${r.prepMinutes ?? ''}"></div>
+          <div class="field"><label>Cook (min)</label><input type="number" id="r-cook" min="0" value="${r.cookMinutes ?? ''}"></div>
+        </div>
+
+        <div class="field">
+          <label>Ingredients <span style="text-transform:none;font-weight:500;">(one per line, e.g. "500 g chicken thigh, diced")</span></label>
+          <textarea id="r-ingredients" rows="8" placeholder="500 g chicken thigh, diced&#10;2 onions, sliced&#10;1 tsp turmeric&#10;coriander, to garnish (optional)">${escapeHtml(r.ingredients.map(ingredientToLine).join('\n'))}</textarea>
+        </div>
+
+        <div class="field">
+          <label>Method <span style="text-transform:none;font-weight:500;">(one step per line)</span></label>
+          <textarea id="r-method" rows="6">${escapeHtml(r.method.join('\n'))}</textarea>
+        </div>
+
+        <details class="more-fields" ${isEdit ? 'open' : ''}>
+          <summary>Nutrition & details</summary>
+          <div class="more-fields-inner">
+            <div class="field"><label>Difficulty</label>${segmented('r-difficulty', DIFFICULTIES, r.difficulty)}</div>
+            <div class="field"><label>Protein level</label>${segmented('r-proteinLevel', LEVELS, r.proteinLevel)}</div>
+            <div class="field"><label>Fat level</label>${segmented('r-fatLevel', LEVELS, r.fatLevel)}</div>
+            <div class="field">
+              <label>Main protein</label>
+              <select id="r-primaryProtein">
+                ${PRIMARY_PROTEINS.map((p) => `<option value="${p}" ${r.primaryProtein === p ? 'selected' : ''}>${p}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Calories / serve</label><input type="number" id="r-calories" min="0" value="${r.caloriesPerServing ?? ''}" placeholder="approx."></div>
+              <div class="field"><label>Protein g / serve</label><input type="number" id="r-proteinGrams" min="0" value="${r.proteinGramsPerServing ?? ''}" placeholder="approx."></div>
+            </div>
+            ${toggleRow('r-freezer', 'Freezes well', 'Good for batch cooking and freezer portions', r.freezerFriendly)}
+            ${toggleRow('r-leftover', 'Good as leftovers', 'Keeps well in the fridge for another meal', r.leftoverFriendly)}
+            <div class="field"><label>Notes</label><textarea id="r-notes">${escapeHtml(r.notes)}</textarea></div>
+          </div>
+        </details>
+      </div>
+
+      <div class="modal-action-bar">
+        <button type="submit" class="btn-primary">${isEdit ? 'Save changes' : 'Add recipe'}</button>
+      </div>
+    </form>
+  `;
+
+  openModal(html);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+
+  document.querySelectorAll('#r-difficulty button, #r-proteinLevel button, #r-fatLevel button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      btn.parentElement.querySelectorAll('button').forEach((b) => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+  });
+  document.querySelectorAll('#r-mealTypes button').forEach((btn) => {
+    btn.addEventListener('click', () => btn.classList.toggle('selected'));
+  });
+  document.querySelectorAll('#r-freezer, #r-leftover').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const isOn = btn.dataset.on === 'true';
+      btn.dataset.on = isOn ? 'false' : 'true';
+      btn.classList.toggle('on', !isOn);
+    });
+  });
+
+  document.getElementById('recipe-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await saveRecipeFromForm(recipe);
+  });
+}
+
+async function saveRecipeFromForm(existing) {
+  const name = document.getElementById('r-name').value.trim();
+  if (!name) return;
+
+  const selectedVal = (id) => {
+    const el = document.querySelector(`#${id} button.selected`);
+    return el ? el.dataset.val : null;
+  };
+  const previousIngredients = existing ? existing.ingredients : [];
+  const knownLookup = buildKnownIngredientLookup(existing ? existing.id : null);
+  const ingredients = document.getElementById('r-ingredients').value.split('\n')
+    .map((line) => parseIngredientLine(line, previousIngredients, knownLookup))
+    .filter(Boolean);
+
+  const fields = normalizeRecipe({
+    name,
+    cuisine: document.getElementById('r-cuisine').value,
+    mealTypes: Array.from(document.querySelectorAll('#r-mealTypes button.selected')).map((b) => b.dataset.val),
+    servings: document.getElementById('r-servings').value,
+    prepMinutes: document.getElementById('r-prep').value,
+    cookMinutes: document.getElementById('r-cook').value,
+    difficulty: selectedVal('r-difficulty'),
+    caloriesPerServing: document.getElementById('r-calories').value,
+    proteinGramsPerServing: document.getElementById('r-proteinGrams').value,
+    proteinLevel: selectedVal('r-proteinLevel'),
+    fatLevel: selectedVal('r-fatLevel'),
+    primaryProtein: document.getElementById('r-primaryProtein').value,
+    freezerFriendly: document.getElementById('r-freezer').dataset.on === 'true',
+    leftoverFriendly: document.getElementById('r-leftover').dataset.on === 'true',
+    ingredients,
+    method: document.getElementById('r-method').value.split('\n'),
+    notes: document.getElementById('r-notes').value.trim()
+  });
+
+  const now = new Date().toISOString();
+  const record = existing
+    ? { ...existing, ...fields, userModified: existing.source === 'built-in' ? true : !!existing.userModified, updatedAt: now }
+    : { ...fields, seedId: null, source: 'user', userModified: false, userRating: null, partnerRating: null, isFavourite: false, createdAt: now, updatedAt: now };
+
+  try {
+    const id = await dbPut('recipes', record);
+    showToast(existing ? 'Recipe updated' : 'Recipe added');
+    renderRoute();
+    openRecipeDetail(existing ? existing.id : id);
+  } catch (err) {
+    alert('Couldn\'t save this recipe: ' + (err && err.message ? err.message : 'unknown storage error'));
+  }
+}
+
+/* ============================================================
+   HEALTH GOALS
+   Calories per meal and preferred cuisines. Used to flag recipes
+   inside or over the target and to steer AI meal suggestions.
+   ============================================================ */
+const DEFAULT_HEALTH_GOALS = {
+  key: 'healthGoals',
+  caloriesMin: 450,
+  caloriesMax: 500,
+  preferredCuisines: ['Anglo-Indian', 'Indian', 'Australian', 'Western']
+};
+
+async function getHealthGoals() {
+  const saved = await dbGet('settings', 'healthGoals');
+  return { ...DEFAULT_HEALTH_GOALS, ...(saved || {}) };
+}
+
+// "✓ 480 kcal" inside the target, "590 kcal · over" above it, plain below it
+function calorieBadgeHtml(kcal, goals) {
+  if (!kcal || !goals) return '';
+  if (kcal > goals.caloriesMax) return `<span class="tag kcal-over">${kcal} kcal · over</span>`;
+  if (kcal >= goals.caloriesMin) return `<span class="tag kcal-ok">✓ ${kcal} kcal</span>`;
+  return `<span class="tag">${kcal} kcal</span>`;
+}
+
+/* ============================================================
+   RECIPE MATCHING
+   How much of each recipe is already in the kitchen, and whether it
+   uses food that is about to go off. Staples and optional ingredients
+   don't count against the score.
+   ============================================================ */
+const EXPIRING_SOON_DAYS = 3;
+
+// Lower-case, letters only, crude singular form, so "Tomatoes" matches "tomato"
+function matchWords(text) {
+  return String(text || '').toLowerCase().replace(/[^a-z]+/g, ' ').trim().split(' ')
+    .filter(Boolean)
+    .map((w) => (w.length > 3 && w.endsWith('oes') ? w.slice(0, -2)
+      : w.length > 3 && w.endsWith('ies') ? w.slice(0, -2)
+        : w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w))
+    .join(' ');
+}
+
+// Whole-word containment either way: "chicken" matches "chicken breast", "egg" doesn't match "eggplant"
+function termMatchesItem(term, itemWords) {
+  if (!term || !itemWords) return false;
+  return ` ${itemWords} `.includes(` ${term} `) || ` ${term} `.includes(` ${itemWords} `);
+}
+
+function buildInventoryIndex(items) {
+  return items
+    .filter((i) => i.expiryDate == null || daysUntil(i.expiryDate) >= 0)
+    .map((i) => ({ item: i, words: matchWords(i.name), daysLeft: i.expiryDate ? daysUntil(i.expiryDate) : null }));
+}
+
+function findInventoryMatch(ingredient, index) {
+  const terms = (ingredient.matchTerms && ingredient.matchTerms.length ? ingredient.matchTerms : [ingredient.name]).map(matchWords);
+  const hits = index.filter((entry) => terms.some((t) => termMatchesItem(t, entry.words)));
+  if (!hits.length) return null;
+  // Prefer the one that goes off soonest, so recipes are credited for using it up
+  return hits.sort((a, b) => (a.daysLeft ?? Infinity) - (b.daysLeft ?? Infinity))[0];
+}
+
+function scoreRecipe(recipe, index) {
+  const needed = (recipe.ingredients || []).filter((i) => !i.optional && !i.assumedStaple);
+  const have = [];
+  const missing = [];
+  const expiring = [];
+  needed.forEach((ing) => {
+    const hit = findInventoryMatch(ing, index);
+    if (hit) {
+      have.push(ing.name);
+      if (hit.daysLeft !== null && hit.daysLeft <= EXPIRING_SOON_DAYS && !expiring.some((e) => e.name === hit.item.name)) {
+        expiring.push({ name: hit.item.name, daysLeft: hit.daysLeft });
+      }
+    } else {
+      missing.push(ing.name);
+    }
+  });
+  const pct = needed.length ? Math.round((have.length / needed.length) * 100) : 100;
+  return { pct, have, missing, expiring };
+}
+
+function formatDaysLeft(d) {
+  return d === 0 ? 'today' : d === 1 ? '1 day left' : `${d} days left`;
+}
+
+/* ============================================================
+   AI MEAL SUGGESTIONS (Claude API)
+   The API key is kept in this browser's localStorage only: it is never
+   written to IndexedDB, so it is not included in kitchen backups.
+   ============================================================ */
+const AI_MODEL = 'claude-opus-5-5';
+const AI_SDK_URL = 'https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.131.0/+esm';
+const AI_KEY_STORAGE = 'kitchenCompanion.anthropicApiKey';
+
+function getAiKey() {
+  try { return localStorage.getItem(AI_KEY_STORAGE) || ''; } catch (err) { return ''; }
+}
+function setAiKey(key) {
+  try {
+    if (key) localStorage.setItem(AI_KEY_STORAGE, key);
+    else localStorage.removeItem(AI_KEY_STORAGE);
+    return true;
+  } catch (err) { return false; }
+}
+
+let anthropicModulePromise = null;
+async function getAnthropicClient() {
+  const apiKey = getAiKey();
+  if (!apiKey) throw new Error('NO_KEY');
+  if (!anthropicModulePromise) {
+    anthropicModulePromise = import(AI_SDK_URL).catch((err) => { anthropicModulePromise = null; throw err; });
+  }
+  const mod = await anthropicModulePromise;
+  const Anthropic = mod.default || mod.Anthropic;
+  // The key belongs to this phone's owner and never leaves this browser except to api.anthropic.com
+  return { Anthropic, client: new Anthropic({ apiKey, dangerouslyAllowBrowser: true }) };
+}
+
+// Turns SDK errors into something a person can act on
+function describeAiError(err, Anthropic) {
+  if (err && err.message === 'NO_KEY') return 'Add your Anthropic API key in Settings → AI suggestions first.';
+  if (!navigator.onLine) return 'You\'re offline. AI suggestions need an internet connection.';
+  if (Anthropic) {
+    if (err instanceof Anthropic.AuthenticationError) return 'Your API key wasn\'t accepted. Check it in Settings → AI suggestions.';
+    if (err instanceof Anthropic.PermissionDeniedError) return 'This API key doesn\'t have permission to use Claude. Check your Anthropic Console.';
+    if (err instanceof Anthropic.RateLimitError) return 'Too many requests just now. Wait a minute and try again.';
+    if (err instanceof Anthropic.BadRequestError) return `Anthropic couldn't run this request: ${err.message}. If it mentions credit, add credit under Billing in the Anthropic Console.`;
+    if (err instanceof Anthropic.APIConnectionError) return 'Couldn\'t reach Anthropic. Check your internet connection and try again.';
+    if (err instanceof Anthropic.APIError) return `Anthropic returned an error (${err.status || 'unknown'}). Try again in a moment.`;
+  }
+  return 'Couldn\'t load the AI service. Check your internet connection and try again.';
+}
+
+// Free check: looks up the model with the key, without generating anything
+async function testAiKey() {
+  let Anthropic = null;
+  try {
+    const loaded = await getAnthropicClient();
+    Anthropic = loaded.Anthropic;
+    await loaded.client.models.retrieve(AI_MODEL);
+    return { ok: true, message: 'Key works. AI suggestions are ready.' };
+  } catch (err) {
+    return { ok: false, message: describeAiError(err, Anthropic) };
+  }
+}
+
+function aiSuggestionSchema() {
+  const str = { type: 'string' };
+  const int = { type: 'integer' };
+  const ingredient = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['name', 'quantity', 'unit', 'prepNote', 'category', 'matchTerms', 'optional', 'assumedStaple', 'inKitchen'],
+    properties: {
+      name: str,
+      quantity: { type: 'number' },
+      unit: { type: 'string', enum: ['g', 'kg', 'ml', 'L', 'tsp', 'tbsp', 'cup', 'each', 'clove', 'bunch', 'sprig', 'pinch', 'can', ''] },
+      prepNote: str,
+      category: { type: 'string', enum: CATEGORIES },
+      matchTerms: { type: 'array', items: str },
+      optional: { type: 'boolean' },
+      assumedStaple: { type: 'boolean' },
+      inKitchen: { type: 'boolean' }
+    }
+  };
+  const meal = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['name', 'cuisine', 'mealTypes', 'whyThisMeal', 'usesExpiring', 'servings', 'prepMinutes', 'cookMinutes',
+      'difficulty', 'caloriesPerServing', 'proteinGramsPerServing', 'fatLevel', 'primaryProtein',
+      'freezerFriendly', 'leftoverFriendly', 'ingredients', 'method'],
+    properties: {
+      name: str,
+      cuisine: { type: 'string', enum: RECIPE_CUISINES },
+      mealTypes: { type: 'array', items: { type: 'string', enum: MEAL_TYPES } },
+      whyThisMeal: str,
+      usesExpiring: { type: 'array', items: str },
+      servings: int,
+      prepMinutes: int,
+      cookMinutes: int,
+      difficulty: { type: 'string', enum: DIFFICULTIES },
+      caloriesPerServing: int,
+      proteinGramsPerServing: int,
+      fatLevel: { type: 'string', enum: LEVELS },
+      primaryProtein: { type: 'string', enum: PRIMARY_PROTEINS },
+      freezerFriendly: { type: 'boolean' },
+      leftoverFriendly: { type: 'boolean' },
+      ingredients: { type: 'array', items: ingredient },
+      method: { type: 'array', items: str }
+    }
+  };
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['meals'],
+    properties: { meals: { type: 'array', items: meal } }
+  };
+}
+
+function buildAiPrompt(items, goals, mealType, request) {
+  const kitchen = items.map((i) => ({
+    name: i.name,
+    location: i.location,
+    amount: formatItemQuantity(i),
+    states: i.states || [],
+    staple: !!i.isStaple,
+    daysUntilUseBy: i.expiryDate ? daysUntil(i.expiryDate) : null
+  }));
+  return [
+    'Suggest 3 different meals I can cook, using what is in my kitchen.',
+    '',
+    `Meal: ${mealType}.`,
+    `Calorie target: ${goals.caloriesMin}-${goals.caloriesMax} kcal per serving. Prioritise protein (chicken, fish, lean beef, pork, eggs, legumes, in that order) and keep fat lower where possible.`,
+    `Cuisines I like, in order: ${goals.preferredCuisines.join(', ')}.`,
+    'Use food with the fewest days until its use-by date first, and say which of those items each meal uses in usesExpiring (exact kitchen item names). Skip anything already past its use-by date (negative days).',
+    'Salt, pepper, oil and dried spices count as staples; mark them assumedStaple. Prefer meals that need few or no extra purchases; set inKitchen for each ingredient that is in my kitchen list.',
+    'Use metric quantities. Use quantity 0 with an empty unit for "to taste". matchTerms are lower-case names a kitchen item could be called, most specific first (e.g. "chicken thigh", "chicken").',
+    'Calories and protein are per serving and approximate. whyThisMeal is one short sentence.',
+    request ? `Also: ${request}` : '',
+    '',
+    'My kitchen (JSON):',
+    JSON.stringify(kitchen)
+  ].filter((line) => line !== null).join('\n');
+}
+
+async function requestAiSuggestions(mealType, request) {
+  let Anthropic = null;
+  try {
+    const loaded = await getAnthropicClient();
+    Anthropic = loaded.Anthropic;
+    const [items, goals] = await Promise.all([dbGetAll('inventoryItems'), getHealthGoals()]);
+    const response = await loaded.client.beta.messages.create({
+      model: AI_MODEL,
+      max_tokens: 16000,
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+      output_config: { effort: 'medium', format: { type: 'json_schema', schema: aiSuggestionSchema() } },
+      system: 'You are the meal-suggestion feature of Kitchen Companion, a personal kitchen app for a home cook in Brisbane, Australia who cooks Anglo-Indian, Indian, Australian and Western food. Suggest practical, healthy home-cooked meals with clear, concise methods.',
+      messages: [{ role: 'user', content: buildAiPrompt(items, goals, mealType, request) }]
+    });
+    if (response.stop_reason === 'refusal') {
+      return { error: 'Claude couldn\'t suggest meals for this request. Try rewording the extra request, or leave it blank.' };
+    }
+    if (response.stop_reason === 'max_tokens') {
+      return { error: 'The suggestions were too long to finish. Try again, maybe with a shorter extra request.' };
+    }
+    const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+    const parsed = JSON.parse(text);
+    return { meals: Array.isArray(parsed.meals) ? parsed.meals : [] };
+  } catch (err) {
+    if (err instanceof SyntaxError) return { error: 'Claude\'s reply couldn\'t be read. Please try again.' };
+    return { error: describeAiError(err, Anthropic) };
+  }
+}
+
+function aiMealToRecipe(meal) {
+  const fields = normalizeRecipe({
+    ...meal,
+    proteinLevel: (meal.proteinGramsPerServing || 0) >= 25 ? 'High' : (meal.proteinGramsPerServing || 0) >= 12 ? 'Medium' : 'Low',
+    ingredients: (meal.ingredients || []).map((i) => ({ ...i, quantity: i.quantity ? i.quantity : null })),
+    notes: meal.whyThisMeal || ''
+  });
+  const now = new Date().toISOString();
+  return {
+    ...fields,
+    sourceName: 'Claude suggestion',
+    seedId: null,
+    source: 'ai',
+    userModified: false,
+    userRating: null,
+    partnerRating: null,
+    isFavourite: false,
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+function aiMealCardHtml(meal, idx, goals) {
+  const needToBuy = (meal.ingredients || []).filter((i) => !i.inKitchen && !i.assumedStaple && !i.optional).map((i) => i.name);
+  return `
+    <div class="ai-meal" data-idx="${idx}">
+      <div class="ai-meal-head">
+        <span class="name">${escapeHtml(meal.name)}</span>
+        <span class="qty">${(meal.prepMinutes || 0) + (meal.cookMinutes || 0)} min</span>
+      </div>
+      <div class="meta-row">
+        <span class="tag">${escapeHtml(meal.cuisine)}</span>
+        ${calorieBadgeHtml(meal.caloriesPerServing, goals)}
+        <span class="tag tag-protein">~${escapeHtml(meal.proteinGramsPerServing)} g protein</span>
+      </div>
+      <p class="ai-why">${escapeHtml(meal.whyThisMeal)}</p>
+      ${meal.usesExpiring && meal.usesExpiring.length ? `<p class="match-line uses">Uses up: ${escapeHtml(meal.usesExpiring.join(', '))}</p>` : ''}
+      <p class="match-line">${needToBuy.length ? `Need: ${escapeHtml(needToBuy.join(', '))}` : 'You have everything'}</p>
+      <details class="more-fields">
+        <summary>Ingredients & method</summary>
+        <ul class="ingredient-list">${(meal.ingredients || []).map((ing) => `
+          <li><span class="ing-qty">${escapeHtml(formatIngredientQuantity({ quantity: ing.quantity || null, unit: ing.unit }))}</span>
+          <span class="ing-name">${escapeHtml(ing.name)}${ing.prepNote ? `<span class="ing-note">, ${escapeHtml(ing.prepNote)}</span>` : ''}${ing.inKitchen ? ' <span class="ing-have">✓</span>' : ''}</span></li>`).join('')}
+        </ul>
+        <ol class="method-list" style="margin-top:10px;">${(meal.method || []).map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ol>
+      </details>
+      <button type="button" class="btn-primary ai-save-btn" data-idx="${idx}">Save to my recipes</button>
+    </div>
+  `;
+}
+
+function openAiSuggest() {
+  const hasKey = !!getAiKey();
+  openModal(`
+    <div class="modal-title-row">
+      <h2>✨ Suggest meals</h2>
+      <button class="close-btn" id="modal-close">×</button>
+    </div>
+    <div class="modal-scroll-area" id="ai-body">
+      ${hasKey ? `
+        <p class="recipe-muted" style="margin-top:0;">Claude looks at what's in your kitchen, uses food that's about to go off first, and aims for your calorie target. Takes up to a minute.</p>
+        <div class="field">
+          <label>Meal</label>
+          <div class="segmented" id="ai-mealType">
+            ${['Breakfast', 'Lunch', 'Dinner'].map((m) => `<button type="button" data-val="${m}" class="${m === 'Dinner' ? 'selected' : ''}">${m}</button>`).join('')}
+          </div>
+        </div>
+        <div class="field">
+          <label>Anything in particular? <span style="text-transform:none;font-weight:500;">(optional)</span></label>
+          <input type="text" id="ai-request" placeholder="e.g. quick, use the barramundi, no beef">
+        </div>
+        <button type="button" class="btn-primary" id="ai-go">Suggest 3 meals</button>
+        <div id="ai-results"></div>
+      ` : `
+        <div class="empty-state">
+          <div class="glyph">✨</div>
+          <h3>Add your API key first</h3>
+          <p>AI suggestions use your own Anthropic account. Add your key in Settings → AI suggestions.</p>
+        </div>
+        <button type="button" class="btn-primary" id="ai-to-settings">Go to Settings</button>
+      `}
+    </div>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  if (!hasKey) {
+    document.getElementById('ai-to-settings').addEventListener('click', () => { closeModal(); navigateTo('settings'); });
+    return;
+  }
+  document.querySelectorAll('#ai-mealType button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      btn.parentElement.querySelectorAll('button').forEach((b) => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+  });
+  document.getElementById('ai-go').addEventListener('click', runAiSuggest);
+}
+
+async function runAiSuggest() {
+  const goBtn = document.getElementById('ai-go');
+  const results = document.getElementById('ai-results');
+  const mealType = document.querySelector('#ai-mealType button.selected')?.dataset.val || 'Dinner';
+  const request = document.getElementById('ai-request').value.trim();
+  goBtn.disabled = true;
+  goBtn.textContent = 'Thinking…';
+  results.innerHTML = '<p class="recipe-muted ai-wait">Looking through your kitchen…</p>';
+
+  const [outcome, goals] = await Promise.all([requestAiSuggestions(mealType, request), getHealthGoals()]);
+  if (!document.getElementById('ai-results')) return; // sheet was closed while waiting
+  goBtn.disabled = false;
+  goBtn.textContent = 'Suggest 3 more';
+
+  if (outcome.error) {
+    results.innerHTML = `<p class="ai-error">${escapeHtml(outcome.error)}</p>`;
+    return;
+  }
+  if (!outcome.meals.length) {
+    results.innerHTML = '<p class="ai-error">No suggestions came back. Please try again.</p>';
+    return;
+  }
+  results.innerHTML = outcome.meals.map((m, i) => aiMealCardHtml(m, i, goals)).join('');
+  results.querySelectorAll('.ai-save-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const meal = outcome.meals[parseInt(btn.dataset.idx, 10)];
+      const existing = await dbGetAll('recipes');
+      if (existing.some((r) => r.name.toLowerCase() === meal.name.toLowerCase())) {
+        btn.textContent = 'Already in your recipes';
+        btn.disabled = true;
+        return;
+      }
+      await dbPut('recipes', aiMealToRecipe(meal));
+      btn.textContent = '✓ Saved';
+      btn.disabled = true;
+      showToast('Saved to your recipes');
+      if (AppState.route === 'recipes') renderRoute();
+    });
+  });
+}
+
+/* ============================================================
+   ONLINE RECIPE SEARCH (TheMealDB, free, no account)
+   ============================================================ */
+const MEALDB_BASE = 'https://www.themealdb.com/api/json/v1/1';
+const MEALDB_AREAS = ['Indian', 'British', 'Australian', 'Malaysian', 'Thai', 'Chinese', 'Italian'];
+const MEALDB_CATEGORY_PROTEIN = { Chicken: 'Chicken', Beef: 'Beef', Lamb: 'Lamb', Goat: 'Lamb', Pork: 'Pork', Seafood: 'Fish', Vegetarian: 'None', Vegan: 'None' };
+
+async function mealDbFetch(path) {
+  const res = await fetch(`${MEALDB_BASE}/${path}`);
+  if (!res.ok) throw new Error(`TheMealDB returned ${res.status}`);
+  const data = await res.json();
+  return Array.isArray(data.meals) ? data.meals : [];
+}
+
+// Results from an ingredient filter and a name search, without duplicates
+async function searchMealDb(query) {
+  const q = query.trim();
+  const [byIngredient, byName] = await Promise.all([
+    mealDbFetch(`filter.php?i=${encodeURIComponent(q.toLowerCase().replace(/\s+/g, '_'))}`).catch(() => []),
+    mealDbFetch(`search.php?s=${encodeURIComponent(q)}`).catch(() => [])
+  ]);
+  const seen = new Set();
+  return [...byIngredient, ...byName].filter((m) => !seen.has(m.idMeal) && seen.add(m.idMeal));
+}
+
+// TheMealDB measures are free text ("1 tbs", "1.2 kg", "5 thinly sliced", "to taste"):
+// take a leading amount and a known unit, and keep anything else as the prep note.
+const MEALDB_UNIT_ALIASES = { ...RECIPE_UNIT_ALIASES, tbs: 'tbsp', tbls: 'tbsp', tblsp: 'tbsp', tsps: 'tsp', ml: 'ml', g: 'g', kg: 'kg' };
+function parseMealDbMeasure(measure) {
+  let text = String(measure || '').trim();
+  let quantity = null;
+  let unit = '';
+  const qtyMatch = text.match(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾⅓⅔])\s*(.*)$/);
+  if (qtyMatch) {
+    const parsed = parseQuantity(qtyMatch[1]);
+    if (Number.isFinite(parsed)) {
+      quantity = parsed;
+      text = qtyMatch[2];
+      const unitMatch = text.match(/^([A-Za-z]+)\.?(?:\s+|$)(.*)$/);
+      if (unitMatch && MEALDB_UNIT_ALIASES[unitMatch[1].toLowerCase()]) {
+        unit = MEALDB_UNIT_ALIASES[unitMatch[1].toLowerCase()];
+        text = unitMatch[2];
+      }
+    }
+  }
+  return { quantity, unit, note: text.trim() };
+}
+
+function mealDbToRecipe(meal) {
+  const knownLookup = buildKnownIngredientLookup(null);
+  const ingredients = [];
+  for (let n = 1; n <= 20; n++) {
+    const name = (meal[`strIngredient${n}`] || '').trim();
+    if (!name) continue;
+    const { quantity, unit, note } = parseMealDbMeasure(meal[`strMeasure${n}`]);
+    const key = name.toLowerCase();
+    const known = knownLookup.get(key) || knownLookup.get(key.replace(/(?:es|s)$/, ''));
+    ingredients.push(normalizeRecipeIngredient({
+      name,
+      quantity,
+      unit,
+      prepNote: note,
+      category: known ? known.category : 'Other',
+      matchTerms: known ? known.matchTerms : [key],
+      assumedStaple: known ? known.assumedStaple : false
+    }));
+  }
+  const method = String(meal.strInstructions || '')
+    .split(/\r?\n+/)
+    .map((s) => s.replace(/^\s*(step\s*\d+[:.)]?|\d+[.)])\s*/i, '').trim())
+    .filter((s) => s.length > 1);
+  const cuisine = meal.strArea === 'Indian' ? 'Indian' : meal.strArea === 'Australian' ? 'Australian' : 'Western';
+  const fields = normalizeRecipe({
+    name: meal.strMeal,
+    cuisine,
+    mealTypes: meal.strCategory === 'Breakfast' ? ['Breakfast'] : ['Lunch', 'Dinner'],
+    primaryProtein: MEALDB_CATEGORY_PROTEIN[meal.strCategory] || 'None',
+    ingredients,
+    method,
+    notes: [meal.strArea ? `${meal.strArea} ${meal.strCategory || ''}`.trim() : '', meal.strSource ? `Original: ${meal.strSource}` : '']
+      .filter(Boolean).join('\n')
+  });
+  const now = new Date().toISOString();
+  return {
+    ...fields,
+    sourceName: 'TheMealDB',
+    seedId: null,
+    source: 'online',
+    userModified: false,
+    userRating: null,
+    partnerRating: null,
+    isFavourite: false,
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+async function openOnlineSearch() {
+  const items = await dbGetAll('inventoryItems');
+  const proteinChips = [...new Set(items.filter((i) => i.category === 'Protein').map((i) => i.name))].slice(0, 6);
+  openModal(`
+    <div class="modal-title-row">
+      <h2>🔎 Search online</h2>
+      <button class="close-btn" id="modal-close">×</button>
+    </div>
+    <div class="modal-scroll-area" id="online-body">
+      <p class="recipe-muted" style="margin-top:0;">Free recipes from TheMealDB. Search by an ingredient or dish name. These don't include calories.</p>
+      <div class="st-add">
+        <input type="text" id="online-q" placeholder="e.g. chicken, lamb, dal">
+        <button type="button" class="btn-secondary" id="online-go">Search</button>
+      </div>
+      ${proteinChips.length ? `<div class="st-group-title">From your kitchen</div>
+        <div class="state-chip-grid">${proteinChips.map((n) => `<button type="button" class="state-chip online-chip" data-q="${escapeHtml(n)}">${escapeHtml(n)}</button>`).join('')}</div>` : ''}
+      <div class="st-group-title">Browse by cuisine</div>
+      <div class="state-chip-grid">${MEALDB_AREAS.map((a) => `<button type="button" class="state-chip online-area" data-area="${a}">${a}</button>`).join('')}</div>
+      <div id="online-results" style="margin-top:14px;"></div>
+    </div>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+
+  const show = async (loader, label) => {
+    const out = document.getElementById('online-results');
+    out.innerHTML = `<p class="recipe-muted">Searching ${escapeHtml(label)}…</p>`;
+    try {
+      const meals = await loader();
+      if (!document.getElementById('online-results')) return;
+      if (!meals.length) { out.innerHTML = `<p class="recipe-muted">Nothing found for ${escapeHtml(label)}. Try a simpler word, e.g. "chicken".</p>`; return; }
+      out.innerHTML = meals.slice(0, 40).map((m) => `
+        <button type="button" class="online-result" data-id="${escapeHtml(m.idMeal)}">
+          ${m.strMealThumb ? `<img src="${escapeHtml(m.strMealThumb)}/preview" alt="" loading="lazy">` : ''}
+          <span>${escapeHtml(m.strMeal)}</span>
+        </button>`).join('');
+      out.querySelectorAll('.online-result').forEach((btn) => btn.addEventListener('click', () => openOnlineMeal(btn.dataset.id)));
+    } catch (err) {
+      out.innerHTML = `<p class="ai-error">${navigator.onLine ? 'Couldn\'t reach TheMealDB. Try again in a moment.' : 'You\'re offline. Online search needs an internet connection.'}</p>`;
+    }
+  };
+
+  const runSearch = () => {
+    const q = document.getElementById('online-q').value.trim();
+    if (q) show(() => searchMealDb(q), `"${q}"`);
+  };
+  document.getElementById('online-go').addEventListener('click', runSearch);
+  document.getElementById('online-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
+  document.querySelectorAll('.online-chip').forEach((chip) => chip.addEventListener('click', () => {
+    document.getElementById('online-q').value = chip.dataset.q;
+    runSearch();
+  }));
+  document.querySelectorAll('.online-area').forEach((chip) => chip.addEventListener('click', () => {
+    show(() => mealDbFetch(`filter.php?a=${encodeURIComponent(chip.dataset.area)}`), `${chip.dataset.area} dishes`);
+  }));
+}
+
+async function openOnlineMeal(id) {
+  let meal;
+  try {
+    meal = (await mealDbFetch(`lookup.php?i=${encodeURIComponent(id)}`))[0];
+  } catch (err) {
+    showToast('Couldn\'t load that recipe');
+    return;
+  }
+  if (!meal) return;
+  const recipe = mealDbToRecipe(meal);
+  openModal(`
+    <div class="modal-title-row">
+      <h2>${escapeHtml(recipe.name)}</h2>
+      <button class="close-btn" id="modal-close">×</button>
+    </div>
+    <div class="modal-scroll-area">
+      <div class="field-row" style="margin-bottom:10px;flex-wrap:wrap;gap:6px;">
+        <span class="tag">${escapeHtml(meal.strArea || '')}</span>
+        <span class="tag">${escapeHtml(meal.strCategory || '')}</span>
+        <span class="tag">From TheMealDB</span>
+      </div>
+      <div class="section-heading"><h2>Ingredients</h2></div>
+      <ul class="ingredient-list">${recipe.ingredients.map((ing) => `
+        <li><span class="ing-qty">${escapeHtml(formatIngredientQuantity(ing))}</span>
+        <span class="ing-name">${escapeHtml(ing.name)}${ing.prepNote ? `<span class="ing-note">, ${escapeHtml(ing.prepNote)}</span>` : ''}</span></li>`).join('')}
+      </ul>
+      <div class="section-heading" style="margin-top:18px;"><h2>Method</h2></div>
+      <ol class="method-list">${recipe.method.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ol>
+    </div>
+    <div class="modal-action-bar">
+      <button type="button" class="btn-primary" id="online-save">Save to my recipes</button>
+      <button type="button" class="btn-secondary" id="online-back">Back to search</button>
+    </div>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('online-back').addEventListener('click', openOnlineSearch);
+  document.getElementById('online-save').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const existing = await dbGetAll('recipes');
+    if (existing.some((r) => r.name.toLowerCase() === recipe.name.toLowerCase())) {
+      btn.textContent = 'Already in your recipes';
+      btn.disabled = true;
+      return;
+    }
+    const newId = await dbPut('recipes', recipe);
+    showToast('Saved. Add calories when you can.');
+    renderRoute();
+    openRecipeForm({ ...recipe, id: newId });
+  });
+}
+
+/* ============================================================
    SETTINGS SCREEN
    ============================================================ */
 async function renderSettingsScreen() {
+  const goals = await getHealthGoals();
+  const hasKey = !!getAiKey();
   return `
     <div class="settings-row" id="export-row">
       <div>
@@ -2143,10 +3522,43 @@ async function renderSettingsScreen() {
       <span class="chev">›</span>
     </div>
     <input type="file" id="import-file-input" accept="application/json" style="display:none;">
+    <div class="settings-row" id="import-recipes-row">
+      <div>
+        <div class="label">Import recipes</div>
+        <div class="desc">Add recipes from a file — keeps everything else</div>
+      </div>
+      <span class="chev">›</span>
+    </div>
+    <input type="file" id="import-recipes-input" accept=".json,application/json" style="display:none;">
 
-    <div class="phase-placeholder">
-      <span class="eyebrow">Reserved for later phases</span>
-      <p>Household profiles, spice preference and favourite cuisines for you and your partner will live here once meal planning is built — the data structure is already in place.</p>
+    <div class="section-heading" style="margin-top:22px;"><h2>Health goals</h2></div>
+    <div class="settings-card">
+      <div class="field-row">
+        <div class="field"><label>Min kcal per meal</label><input type="number" id="goal-min" min="100" step="10" value="${goals.caloriesMin}"></div>
+        <div class="field"><label>Max kcal per meal</label><input type="number" id="goal-max" min="100" step="10" value="${goals.caloriesMax}"></div>
+      </div>
+      <div class="field">
+        <label>Cuisines you like</label>
+        <div class="state-chip-grid" id="goal-cuisines">
+          ${RECIPE_CUISINES.map((c) => `<button type="button" data-val="${c}" class="state-chip ${goals.preferredCuisines.includes(c) ? 'selected' : ''}">${c}</button>`).join('')}
+        </div>
+      </div>
+      <p class="recipe-muted" style="margin:0;">Recipes show ✓ when they're inside this range. AI suggestions also put protein first and keep fat lower.</p>
+    </div>
+
+    <div class="section-heading" style="margin-top:22px;"><h2>AI suggestions</h2></div>
+    <div class="settings-card">
+      <p class="recipe-muted" style="margin-top:0;">Uses your own Anthropic account (about 10–15¢ per set of suggestions). Your key is stored only on this phone and isn't included in backups.</p>
+      <div class="field">
+        <label>Anthropic API key</label>
+        <input type="password" id="ai-key" autocomplete="off" placeholder="${hasKey ? 'Key saved (hidden)' : 'Paste your sk-ant-… key'}">
+      </div>
+      <div class="field-row">
+        <button type="button" class="btn-primary" id="ai-key-save" style="margin-top:0;">${hasKey ? 'Replace key' : 'Save key'}</button>
+        <button type="button" class="btn-secondary" id="ai-key-test" style="margin-top:0;" ${hasKey ? '' : 'disabled'}>Test</button>
+      </div>
+      ${hasKey ? '<button type="button" class="btn-danger" id="ai-key-remove">Remove key</button>' : ''}
+      <p class="recipe-muted" id="ai-key-status" style="margin-bottom:0;"></p>
     </div>
   `;
 }
@@ -2157,6 +3569,106 @@ function attachSettingsListeners() {
     document.getElementById('import-file-input').click();
   });
   document.getElementById('import-file-input').addEventListener('change', handleImportFile);
+  document.getElementById('import-recipes-row').addEventListener('click', () => {
+    document.getElementById('import-recipes-input').click();
+  });
+  document.getElementById('import-recipes-input').addEventListener('change', handleImportRecipesFile);
+
+  // Health goals save as soon as they change
+  const saveGoals = async () => {
+    const min = parseInt(document.getElementById('goal-min').value, 10);
+    const max = parseInt(document.getElementById('goal-max').value, 10);
+    if (!(min > 0 && max >= min)) { showToast('"From" must be lower than "to"'); return; }
+    const cuisines = Array.from(document.querySelectorAll('#goal-cuisines button.selected')).map((b) => b.dataset.val);
+    await dbPut('settings', { ...DEFAULT_HEALTH_GOALS, caloriesMin: min, caloriesMax: max, preferredCuisines: cuisines.length ? cuisines : DEFAULT_HEALTH_GOALS.preferredCuisines });
+    showToast('Health goals saved');
+  };
+  document.getElementById('goal-min').addEventListener('change', saveGoals);
+  document.getElementById('goal-max').addEventListener('change', saveGoals);
+  document.querySelectorAll('#goal-cuisines button').forEach((btn) => btn.addEventListener('click', () => {
+    btn.classList.toggle('selected');
+    saveGoals();
+  }));
+
+  const status = document.getElementById('ai-key-status');
+  document.getElementById('ai-key-save').addEventListener('click', async () => {
+    const key = document.getElementById('ai-key').value.trim();
+    if (!key) { status.textContent = 'Paste your key into the box first.'; return; }
+    if (!key.startsWith('sk-ant-')) { status.textContent = 'That doesn\'t look like an Anthropic API key. It should start with sk-ant-'; return; }
+    if (!setAiKey(key)) { status.textContent = 'This browser won\'t let the app store the key (private browsing?).'; return; }
+    await renderRoute();
+    const s = document.getElementById('ai-key-status');
+    s.textContent = 'Saved. Testing…';
+    s.textContent = (await testAiKey()).message;
+  });
+  document.getElementById('ai-key-test').addEventListener('click', async () => {
+    status.textContent = 'Testing…';
+    status.textContent = (await testAiKey()).message;
+  });
+  const removeBtn = document.getElementById('ai-key-remove');
+  if (removeBtn) removeBtn.addEventListener('click', () => {
+    if (!confirm('Remove your API key from this phone?')) return;
+    setAiKey('');
+    showToast('Key removed');
+    renderRoute();
+  });
+}
+
+/* ---- Import recipes (additive) ----
+   Accepts a recipe file ({ recipes: [...] } or a plain array) or a full backup file.
+   Only adds recipes: anything with the same name or built-in id as an existing recipe is skipped. */
+async function handleImportRecipesFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    const parsed = JSON.parse(await file.text());
+    const incoming = Array.isArray(parsed) ? parsed
+      : Array.isArray(parsed.recipes) ? parsed.recipes
+      : (parsed.data && Array.isArray(parsed.data.recipes)) ? parsed.data.recipes
+      : null;
+    if (!incoming) throw new Error('No recipes found');
+
+    const existing = await dbGetAll('recipes');
+    const names = new Set(existing.map((r) => r.name.toLowerCase()));
+    const seedIds = new Set(existing.filter((r) => r.seedId).map((r) => r.seedId));
+    const now = new Date().toISOString();
+
+    const toAdd = [];
+    let skipped = 0;
+    for (const raw of incoming) {
+      const fields = normalizeRecipe(raw || {});
+      const key = fields.name.toLowerCase();
+      if (!fields.name || names.has(key) || (raw.seedId && seedIds.has(raw.seedId))) { skipped++; continue; }
+      names.add(key);
+      toAdd.push({
+        ...fields,
+        sourceName: typeof raw.sourceName === 'string' ? raw.sourceName : '',
+        seedId: null,
+        source: 'user',
+        userModified: false,
+        userRating: toNumberOrNull(raw.userRating),
+        partnerRating: toNumberOrNull(raw.partnerRating),
+        isFavourite: !!raw.isFavourite,
+        createdAt: now,
+        updatedAt: now
+      });
+    }
+
+    if (toAdd.length === 0) {
+      alert(skipped ? `All ${skipped} recipes in this file are already in your app.` : 'No recipes found in this file.');
+      return;
+    }
+    const skippedNote = skipped ? ` (${skipped} already in your app will be skipped)` : '';
+    if (!confirm(`Add ${toAdd.length} recipe${toAdd.length === 1 ? '' : 's'} from this file${skippedNote}?`)) return;
+
+    for (const r of toAdd) await dbPut('recipes', r);
+    showToast(`Added ${toAdd.length} recipe${toAdd.length === 1 ? '' : 's'}`);
+  } catch (err) {
+    alert('Could not read recipes from this file. Make sure it\'s a Kitchen Companion recipe file.');
+  } finally {
+    e.target.value = '';
+  }
 }
 
 async function exportKitchenData() {
@@ -2236,6 +3748,10 @@ window.addEventListener('hashchange', handleHashChange);
     await seedIfEmpty();
     registerServiceWorker();
     handleHashChange();
+    // Built-in recipes load in the background so a slow network never delays opening the app
+    syncRecipeSeed()
+      .then((changed) => { if (changed && AppState.route === 'recipes') renderRoute(); })
+      .catch(() => {});
   } catch (err) {
     showFatalError('Kitchen Companion couldn\'t start because local storage failed to open. This usually happens when opening the file directly from a Files app. Try opening it in Safari or Chrome, or host it online (e.g. GitHub Pages) and open that link instead.<br><br><span style="opacity:0.7;font-size:11px;">' + (err && err.message ? err.message : String(err)) + '</span>');
   }
