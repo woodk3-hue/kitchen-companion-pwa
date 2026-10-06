@@ -54,6 +54,7 @@ manifest.json                 — PWA install metadata
 recipes-seed.json             — built-in recipes, loaded into the app on first open
 icon-192.png, icon-512.png   — app icons, rendered from icon.svg (orange tile, cooking pot with steam and a green leaf inside a green progress ring)
 icon.svg                      — icon source; edit this and re-render the PNGs to change the icon
+fonts/                        — Plus Jakarta Sans (SIL Open Font License), served with the app so it works offline
 ```
 
 ## Data upgrades
@@ -120,6 +121,26 @@ Each ingredient stores `matchTerms` (inventory names that count as having it, e.
 **Settings → Start fresh** clears everything (the kitchen and its history, meal plans, all recipes including the 30 starter recipes, ratings, favourites and settings) after offering a backup download. The use-by and freezer reference data and your API key are kept.
 
 **Settings → Starter recipes** adds the 30 built-in recipes back, or removes them (any you've edited are kept). Once removed they don't come back by themselves.
+
+## Look and feel
+
+A modern theme sits as one layer at the end of the stylesheet ("MODERN THEME"): Plus Jakarta Sans, a brighter palette matching the icon (orange accent, green, blue, gold), white cards with soft shadows instead of borders, pill chips and buttons, a segmented control style, soft filled inputs, rounded bottom sheets, a frosted header, a floating bottom bar with line icons, and a rounded floating + button. Removing that block returns to the original look.
+
+## Food diary (Today tab)
+
+The **Today** tab (formerly Home) is a food diary, like a fitness tracker:
+- **Calorie ring** for the day ("1,120 of 1,600 kcal · 480 left", turning rust when over) and **protein, carbs and fat** meters against your daily targets. Use ‹ › to look at earlier days.
+- **Breakfast, Lunch, Dinner, Snacks**, each with its total and **+ Add**. Tap a logged entry to fix its numbers or remove it.
+- **Planned meals** from the meal plan appear under their meal with **✓ Ate this**.
+- **Ways to log**:
+  - **From my kitchen**: pick an item, enter how much (e.g. 150 g); calories and macros are worked out from its per-100 g values. **Take out of my kitchen** is ticked by default and subtracts what you ate (or removes the item when it runs out), logged in the item's history.
+  - **A recipe**: per-serving calories and protein × servings. Also **🍽️ Log a serving** on every recipe page.
+  - **Scan barcode**: Open Food Facts calories, protein, carbs and fat; starts at the product's serving size. If that product is in your kitchen, it can take one out.
+  - **Photo of my plate**: Claude estimates each food's portion, calories and macros; untick or adjust, then log (uses your API key / an AI credit).
+  - **Quick add**: a name and calories (macros optional).
+- **Daily targets** (Settings → Health goals): **1,600 kcal, 100 g protein, 175 g carbs, 55 g fat** by default, all editable, with a check that shows the protein/carbs/fat split and whether they add up to the calorie target.
+- Kitchen items now also store **protein, carbs and fat per 100 g/ml**, filled from barcodes, label photos and ✨ Estimate, or typed in the item's More details.
+- Diary entries are stored in a new `foodLog` store (database version 3; the upgrade keeps all existing data) and are included in backups and cleared by Start fresh.
 
 ## Suggest recipes from my kitchen
 
