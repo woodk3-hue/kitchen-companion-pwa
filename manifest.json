@@ -1,25 +1,76 @@
 {
+  "id": "./",
   "name": "Kitchen Companion",
   "short_name": "Kitchen",
-  "description": "Personal kitchen inventory, meal planning, and freezer management.",
+  "description": "Kitchen inventory, recipes and meal ideas: stocktake, photo and barcode scanning, calories, and using food before it goes off.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#FAF7F0",
   "theme_color": "#1F2620",
+  "categories": [
+    "food",
+    "lifestyle",
+    "health"
+  ],
   "icons": [
     {
       "src": "./icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Scan barcode",
+      "short_name": "Barcode",
+      "url": "./index.html?action=barcode#kitchen",
+      "icons": [
+        {
+          "src": "./icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Stocktake",
+      "url": "./index.html?action=stocktake#kitchen",
+      "icons": [
+        {
+          "src": "./icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Suggest meals",
+      "url": "./index.html?action=suggest#recipes",
+      "icons": [
+        {
+          "src": "./icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }
