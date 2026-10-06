@@ -887,6 +887,22 @@ h1, h2, h3 {
 .ps-fields select.ps-unit { flex: 0 0 88px; }
 .ps-fields select.ps-cat { flex: 1 1 0; }
 .ps-knote { font-size: 11px; font-weight: 700; color: var(--color-ink-soft); white-space: nowrap; }
+
+/* ============================================================
+   BARCODE SCAN
+   ============================================================ */
+.stocktake-btn.alt2 { border-left-color: var(--color-freezer); }
+.recipe-online-row .stocktake-btn { padding: 10px; }
+.bc-camera { position: relative; width: 100%; aspect-ratio: 4 / 3; background: #000; border-radius: var(--radius-sm); overflow: hidden; }
+.bc-camera video { width: 100%; height: 100%; object-fit: cover; }
+.bc-aim { position: absolute; left: 12%; right: 12%; top: 38%; bottom: 38%; border: 3px solid rgba(255,255,255,0.85); border-radius: 10px; }
+.bc-product { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
+.bc-product img, .bc-noimg { width: 72px; height: 72px; object-fit: contain; border-radius: var(--radius-sm); background: var(--color-paper); border: 1px solid var(--color-line); flex: 0 0 72px; }
+.bc-noimg { display: flex; align-items: center; justify-content: center; font-size: 30px; color: var(--color-ink-soft); }
+.bc-code { font-size: 12px; color: var(--color-ink-soft); margin-bottom: 4px; }
+.bc-product .tag { display: inline-block; }
+#bc-kunit, .ps-fields select.ps-kunit { flex: 0 0 auto; }
+#bc-kcal { flex: 1 1 80px; }
 </style>
  </head>
  <body>
@@ -1395,6 +1411,7 @@ function openModal(html) {
   document.getElementById('modal-overlay').classList.add('open');
 }
 function closeModal() {
+  stopBarcodeCamera();
   document.getElementById('modal-overlay').classList.remove('open');
 }
 document.getElementById('modal-overlay').addEventListener('click', (e) => {
@@ -1554,11 +1571,15 @@ async function renderKitchenScreen() {
     <div class="recipe-online-row">
       <button type="button" class="stocktake-btn" id="stocktake-btn">
         <span class="st-btn-title">📋 Stocktake</span>
-        <span class="st-btn-desc">Tick off what you have</span>
+        <span class="st-btn-desc">Tick off a list</span>
       </button>
       <button type="button" class="stocktake-btn alt" id="photo-scan-btn">
-        <span class="st-btn-title">📸 Scan photo</span>
-        <span class="st-btn-desc">Reads labels &amp; calories</span>
+        <span class="st-btn-title">📸 Photo</span>
+        <span class="st-btn-desc">Reads labels</span>
+      </button>
+      <button type="button" class="stocktake-btn alt2" id="barcode-scan-btn">
+        <span class="st-btn-title">▦ Barcode</span>
+        <span class="st-btn-desc">Look it up</span>
       </button>
     </div>
   `;
@@ -1625,6 +1646,7 @@ async function renderKitchenScreen() {
 function attachKitchenListeners() {
   document.getElementById('stocktake-btn').addEventListener('click', openStocktake);
   document.getElementById('photo-scan-btn').addEventListener('click', openPhotoScan);
+  document.getElementById('barcode-scan-btn').addEventListener('click', openBarcodeScan);
 
   document.querySelectorAll('.loc-tab').forEach((tab) => {
     tab.addEventListener('click', () => {
@@ -1941,6 +1963,7 @@ async function saveItemFromForm(existingItem) {
     expiryDate,
     useByOverrideDays: null,
     cost: document.getElementById('f-cost').value ? parseFloat(document.getElementById('f-cost').value) : null,
+    barcode: existingItem && existingItem.barcode ? existingItem.barcode : null,
     caloriesPer100: parseFloat(document.getElementById('f-kcal').value) || null,
     caloriesUnit: document.getElementById('f-kcal').value ? document.getElementById('f-kcal-unit').value : null,
     caloriesSource: document.getElementById('f-kcal').value ? (document.getElementById('f-kcal').dataset.source || 'manual') : null,
@@ -3601,7 +3624,7 @@ async function openOnlineMeal(id) {
    Stored per item as kcal per 100 g or 100 ml, with where the number
    came from: read off a label, estimated by AI, or typed in.
    ============================================================ */
-const CALORIE_SOURCE_LABELS = { label: 'from label', estimated: 'estimated', manual: 'entered' };
+const CALORIE_SOURCE_LABELS = { label: 'from label', database: 'from barcode database', estimated: 'estimated', manual: 'entered' };
 
 function itemCaloriesText(item) {
   if (!item.caloriesPer100) return '';
@@ -4004,6 +4027,343 @@ async function savePhotoScan() {
     updatePhotoScanButton();
     alert('Couldn\'t save: ' + (err && err.message ? err.message : 'unknown storage error'));
   }
+}
+
+/* ============================================================
+   BARCODE SCAN
+   Camera barcode reading (BarcodeDetector, built into Chrome on Android)
+   or a typed number, looked up in Open Food Facts for the product name,
+   brand, pack size and calories. The person confirms before saving.
+   ============================================================ */
+const OFF_PRODUCT_URL = 'https://world.openfoodfacts.org/api/v2/product/';
+const OFF_FIELDS = 'code,product_name,product_name_en,brands,quantity,product_quantity,product_quantity_unit,nutriments,nutrition_data_per,categories_tags,image_front_small_url';
+const BARCODE_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e'];
+
+// Open Food Facts category tags → app category (first match wins)
+const OFF_CATEGORY_RULES = [
+  [/sauces|condiments|ketchup|mayonnaise|dressings|vinegars|oils/, 'Sauces & Condiments'],
+  [/spices|herbs|seasonings|salts|curry-powders/, 'Spices & Seasonings'],
+  [/canned|tinned/, 'Canned & Jarred'],
+  [/frozen-ready-meals|ready-meals|prepared-meals/, 'Ready Meals'],
+  [/dairies|milks|cheeses|yogurts|creams|butters/, 'Dairy & Refrigerated'],
+  [/meats|poultry|fishes|seafood|eggs|tofu/, 'Protein'],
+  [/rices|pastas|noodles|flours|cereals|breads|grains|legumes|lentils/, 'Carbs & Grains'],
+  [/snacks|chocolates|biscuits|confectioneries|crisps|chips|sweets/, 'Snacks & Treats'],
+  [/fruits/, 'Fruit'],
+  [/vegetables/, 'Vegetables']
+];
+
+function offCategory(tags) {
+  const joined = (tags || []).join(' ');
+  const rule = OFF_CATEGORY_RULES.find(([re]) => re.test(joined));
+  return rule ? rule[1] : 'Other';
+}
+
+// Turn an Open Food Facts product into the fields the confirm screen edits
+function offToScanRow(code, p) {
+  const brand = (p.brands || '').split(',')[0].trim();
+  const baseName = (p.product_name_en || p.product_name || '').trim();
+  const name = brand && baseName && !baseName.toLowerCase().includes(brand.toLowerCase()) ? `${brand} ${baseName}` : (baseName || brand);
+  const category = offCategory(p.categories_tags);
+
+  let sizeQty = Number(p.product_quantity) || null;
+  let sizeUnit = (p.product_quantity_unit || '').toLowerCase();
+  if (!sizeQty && p.quantity) {
+    const m = String(p.quantity).match(/([\d.,]+)\s*(kg|g|ml|l)\b/i);
+    if (m) { sizeQty = parseFloat(m[1].replace(',', '.')); sizeUnit = m[2].toLowerCase(); }
+  }
+  const isVolume = sizeUnit === 'ml' || sizeUnit === 'l' || (p.nutrition_data_per || '').includes('ml');
+  const n = p.nutriments || {};
+  const kcal = n['energy-kcal_100g'] ?? n['energy-kcal_100ml'] ?? (n.energy_100g ? n.energy_100g / 4.184 : null);
+
+  // Cans, jars and bottles are easier to count; everything else starts at its pack size
+  const countUnit = category === 'Canned & Jarred' ? 'can' : (category === 'Sauces & Condiments' && isVolume ? 'bottle' : null);
+  let quantity = 1;
+  let unit = countUnit || 'each';
+  if (!countUnit && sizeQty) {
+    quantity = sizeQty;
+    unit = sizeUnit === 'l' ? 'L' : (sizeUnit === 'kg' ? 'kg' : (sizeUnit === 'ml' ? 'ml' : 'g'));
+  }
+
+  return {
+    barcode: code,
+    name,
+    category,
+    quantity,
+    unit,
+    packSize: p.quantity || (sizeQty ? `${sizeQty} ${sizeUnit}` : ''),
+    caloriesPer100: kcal ? Math.round(kcal) : null,
+    caloriesUnit: isVolume ? 'ml' : 'g',
+    caloriesSource: kcal ? 'database' : null,
+    image: p.image_front_small_url || '',
+    found: true
+  };
+}
+
+async function lookupBarcode(code) {
+  const res = await fetch(`${OFF_PRODUCT_URL}${encodeURIComponent(code)}.json?fields=${OFF_FIELDS}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Open Food Facts returned ${res.status}`);
+  const data = await res.json();
+  if (data.status !== 1 || !data.product) return null;
+  return offToScanRow(code, data.product);
+}
+
+const BarcodeScan = { location: 'pantry', stream: null, timer: null, row: null, busy: false };
+
+function stopBarcodeCamera() {
+  if (BarcodeScan.timer) { clearInterval(BarcodeScan.timer); BarcodeScan.timer = null; }
+  if (BarcodeScan.stream) { BarcodeScan.stream.getTracks().forEach((t) => t.stop()); BarcodeScan.stream = null; }
+}
+
+async function startBarcodeCamera() {
+  const video = document.getElementById('bc-video');
+  const status = document.getElementById('bc-status');
+  if (!video) return;
+  if (!('BarcodeDetector' in window) || !navigator.mediaDevices?.getUserMedia) {
+    status.textContent = 'This browser can\'t read barcodes with the camera. Type the number under the barcode instead.';
+    video.parentElement.style.display = 'none';
+    return;
+  }
+  try {
+    const supported = await window.BarcodeDetector.getSupportedFormats();
+    const formats = BARCODE_FORMATS.filter((f) => supported.includes(f));
+    const detector = new window.BarcodeDetector({ formats: formats.length ? formats : BARCODE_FORMATS });
+    BarcodeScan.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    video.srcObject = BarcodeScan.stream;
+    await video.play();
+    status.textContent = 'Point the camera at a barcode.';
+    BarcodeScan.timer = setInterval(async () => {
+      if (BarcodeScan.busy || video.readyState < 2) return;
+      try {
+        const codes = await detector.detect(video);
+        if (codes.length && codes[0].rawValue) handleBarcode(codes[0].rawValue);
+      } catch (err) { /* a frame that can't be read; keep trying */ }
+    }, 300);
+  } catch (err) {
+    stopBarcodeCamera();
+    video.parentElement.style.display = 'none';
+    status.textContent = err && err.name === 'NotAllowedError'
+      ? 'Camera access was blocked. Allow the camera for this site in Chrome settings, or type the number instead.'
+      : 'Couldn\'t start the camera. Type the number under the barcode instead.';
+  }
+}
+
+async function handleBarcode(rawCode) {
+  const code = String(rawCode).replace(/\D/g, '');
+  if (code.length < 8 || BarcodeScan.busy) return;
+  BarcodeScan.busy = true;
+  stopBarcodeCamera();
+  if (navigator.vibrate) navigator.vibrate(60);
+  const status = document.getElementById('bc-status');
+  if (status) status.textContent = `Looking up ${code}…`;
+
+  let row = null;
+  try {
+    row = await lookupBarcode(code);
+  } catch (err) {
+    if (status) status.textContent = navigator.onLine ? 'Couldn\'t reach Open Food Facts. Try again in a moment.' : 'You\'re offline. Barcode lookup needs an internet connection.';
+    BarcodeScan.busy = false;
+    startBarcodeCamera();
+    return;
+  }
+  if (!document.getElementById('bc-body')) return; // closed while looking up
+  BarcodeScan.row = row || {
+    barcode: code, name: '', category: 'Other', quantity: 1, unit: 'each', packSize: '',
+    caloriesPer100: null, caloriesUnit: 'g', caloriesSource: null, image: '', found: false
+  };
+  await renderBarcodeConfirm();
+}
+
+async function findExistingForBarcode(row) {
+  const items = await dbGetAll('inventoryItems');
+  const here = items.filter((i) => i.location === BarcodeScan.location);
+  return here.find((i) => i.barcode && i.barcode === row.barcode)
+    || (row.name ? here.find((i) => matchWords(i.name) === matchWords(row.name)) : null)
+    || null;
+}
+
+async function renderBarcodeConfirm() {
+  const row = BarcodeScan.row;
+  const existing = await findExistingForBarcode(row);
+  BarcodeScan.existingId = existing ? existing.id : null;
+  const canAddUp = existing && existing.quantity && existing.unit === row.unit;
+  const units = ITEM_UNITS.map((u) => `<option value="${u}" ${row.unit === u ? 'selected' : ''}>${u}</option>`).join('');
+  const cats = CATEGORIES.map((c) => `<option value="${c}" ${row.category === c ? 'selected' : ''}>${c}</option>`).join('');
+
+  document.getElementById('bc-body').innerHTML = `
+    <div class="bc-product">
+      ${row.image ? `<img src="${escapeHtml(row.image)}" alt="">` : '<div class="bc-noimg">▦</div>'}
+      <div>
+        <div class="bc-code">Barcode ${escapeHtml(row.barcode)}</div>
+        ${row.found ? `<div class="tag kcal-ok">Found in Open Food Facts</div>` : '<div class="tag kcal-over">Not in the online database: fill it in below</div>'}
+        ${row.packSize ? `<div class="recipe-muted" style="margin:4px 0 0;">Pack: ${escapeHtml(row.packSize)}</div>` : ''}
+      </div>
+    </div>
+    <div class="field"><label>Name</label><input type="text" id="bc-name" value="${escapeHtml(row.name)}" placeholder="e.g. Mutti Crushed Tomatoes"></div>
+    <div class="field">
+      <label>Amount</label>
+      <div class="ps-fields" style="margin:0;">
+        <input type="number" id="bc-qty" min="0" step="any" inputmode="decimal" value="${row.quantity ?? ''}">
+        <select id="bc-unit" class="ps-unit">${units}</select>
+        <select id="bc-cat" class="ps-cat">${cats}</select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Calories <span style="text-transform:none;font-weight:500;" id="bc-kcal-src">${row.caloriesSource ? `(${CALORIE_SOURCE_LABELS[row.caloriesSource]})` : '(optional)'}</span></label>
+      <div class="ps-fields" style="margin:0;">
+        <input type="number" id="bc-kcal" min="0" step="any" inputmode="decimal" placeholder="kcal" value="${row.caloriesPer100 ?? ''}">
+        <select id="bc-kunit"><option value="g" ${row.caloriesUnit !== 'ml' ? 'selected' : ''}>per 100 g</option><option value="ml" ${row.caloriesUnit === 'ml' ? 'selected' : ''}>per 100 ml</option></select>
+        ${!row.caloriesPer100 && getAiKey() ? '<button type="button" class="btn-secondary" id="bc-estimate" style="margin-top:0;width:auto;">✨ Estimate</button>' : ''}
+      </div>
+    </div>
+    ${existing ? `<p class="recipe-muted">Already in your ${LOCATION_LABELS[BarcodeScan.location].toLowerCase()}: ${escapeHtml(existing.name)} (${escapeHtml(formatItemQuantity(existing))}). ${canAddUp ? 'Saving adds this amount to it.' : 'Saving updates its details.'}</p>` : ''}
+  `;
+
+  const kcal = document.getElementById('bc-kcal');
+  kcal.addEventListener('input', () => { row.caloriesSource = 'manual'; document.getElementById('bc-kcal-src').textContent = '(entered)'; });
+  const est = document.getElementById('bc-estimate');
+  if (est) est.addEventListener('click', async () => {
+    const name = document.getElementById('bc-name').value.trim();
+    if (!name) { showToast('Enter the name first'); return; }
+    est.disabled = true; est.textContent = 'Estimating…';
+    const result = await estimateItemCalories(name, document.getElementById('bc-cat').value);
+    est.disabled = false; est.textContent = '✨ Estimate';
+    if (result.error) { showToast(result.error); return; }
+    kcal.value = Math.round(result.caloriesPer100);
+    document.getElementById('bc-kunit').value = result.caloriesUnit === 'ml' ? 'ml' : 'g';
+    row.caloriesSource = 'estimated';
+    document.getElementById('bc-kcal-src').textContent = '(estimated)';
+  });
+
+  const action = document.getElementById('bc-action');
+  action.textContent = existing && canAddUp ? 'Add to existing' : 'Save to kitchen';
+  action.disabled = false;
+  document.getElementById('bc-again').style.display = 'block';
+}
+
+async function saveBarcodeItem() {
+  const row = BarcodeScan.row;
+  const name = document.getElementById('bc-name').value.trim();
+  if (!name) { showToast('Enter a name first'); document.getElementById('bc-name').focus(); return; }
+  const quantity = parseFloat(document.getElementById('bc-qty').value) || null;
+  const unit = document.getElementById('bc-unit').value;
+  const category = document.getElementById('bc-cat').value;
+  const kcalValue = parseFloat(document.getElementById('bc-kcal').value) || null;
+  const calories = kcalValue
+    ? { caloriesPer100: kcalValue, caloriesUnit: document.getElementById('bc-kunit').value, caloriesSource: row.caloriesSource || 'manual' }
+    : {};
+  const now = new Date().toISOString();
+
+  try {
+    const existing = BarcodeScan.existingId ? await dbGet('inventoryItems', BarcodeScan.existingId) : null;
+    if (existing) {
+      const addsUp = existing.quantity && quantity && existing.unit === unit;
+      if (addsUp) existing.quantity = Math.round((existing.quantity + quantity) * 100) / 100;
+      else if (!existing.quantity && quantity) { existing.quantity = quantity; existing.unit = unit; }
+      Object.assign(existing, calories, { barcode: row.barcode, updatedAt: now });
+      await dbPut('inventoryItems', existing);
+      await logHistory(existing.id, 'adjusted', addsUp ? quantity : null, existing.location, existing.location, addsUp ? `Scanned barcode: +${quantity} ${unit}` : 'Updated from barcode scan');
+      showToast(addsUp ? `${existing.name}: now ${formatItemQuantity(existing)}` : 'Item updated');
+    } else {
+      const states = BarcodeScan.location === 'freezer' ? ['Frozen'] : (BarcodeScan.location === 'fridge' ? ['Fresh'] : ['Raw']);
+      const newId = await dbPut('inventoryItems', {
+        name,
+        quantity,
+        unit,
+        portionCount: null,
+        portionSize: null,
+        location: BarcodeScan.location,
+        subLocation: null,
+        states,
+        category,
+        isStaple: ['Spices & Seasonings', 'Sauces & Condiments'].includes(category),
+        purchaseDate: localDateString(new Date()),
+        expiryDate: null,
+        useByOverrideDays: null,
+        cost: null,
+        notes: row.packSize ? `Pack: ${row.packSize}` : '',
+        freezerFriendlyRating: null,
+        linkedPurchaseEventId: null,
+        barcode: row.barcode,
+        caloriesPer100: null,
+        caloriesUnit: null,
+        caloriesSource: null,
+        ...calories,
+        createdAt: now,
+        updatedAt: now
+      });
+      await logHistory(newId, 'created', quantity, null, BarcodeScan.location, 'Added by barcode scan');
+      showToast(`Added ${name}`);
+    }
+    renderRoute();
+    scanNextBarcode();
+  } catch (err) {
+    alert('Couldn\'t save: ' + (err && err.message ? err.message : 'unknown storage error'));
+  }
+}
+
+function barcodeScannerHtml() {
+  return `
+    <div class="bc-camera"><video id="bc-video" playsinline muted></video><div class="bc-aim"></div></div>
+    <p class="recipe-muted" id="bc-status">Starting camera…</p>
+    <div class="st-add">
+      <input type="text" id="bc-manual" inputmode="numeric" placeholder="Or type the barcode number">
+      <button type="button" class="btn-secondary" id="bc-manual-go">Look up</button>
+    </div>
+  `;
+}
+
+function attachBarcodeScannerListeners() {
+  const go = () => {
+    const code = document.getElementById('bc-manual').value;
+    if (code.replace(/\D/g, '').length < 8) { showToast('Barcodes have 8 to 13 digits'); return; }
+    handleBarcode(code);
+  };
+  document.getElementById('bc-manual-go').addEventListener('click', go);
+  document.getElementById('bc-manual').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+}
+
+function scanNextBarcode() {
+  BarcodeScan.row = null;
+  BarcodeScan.existingId = null;
+  BarcodeScan.busy = false;
+  const body = document.getElementById('bc-body');
+  if (!body) return;
+  body.innerHTML = barcodeScannerHtml();
+  const action = document.getElementById('bc-action');
+  action.textContent = 'Scan a barcode';
+  action.disabled = true;
+  document.getElementById('bc-again').style.display = 'none';
+  attachBarcodeScannerListeners();
+  startBarcodeCamera();
+}
+
+function openBarcodeScan() {
+  openModal(`
+    <div class="modal-title-row">
+      <h2>▦ Scan barcode</h2>
+      <button class="close-btn" id="modal-close">×</button>
+    </div>
+    <div class="segmented" id="bc-location" style="margin-bottom:10px;">
+      ${['pantry', 'fridge', 'freezer'].map((loc) => `<button type="button" data-val="${loc}" class="${loc === BarcodeScan.location ? 'selected' : ''}">${LOCATION_LABELS[loc]}</button>`).join('')}
+    </div>
+    <div class="modal-scroll-area st-body" id="bc-body"></div>
+    <div class="modal-action-bar">
+      <button type="button" class="btn-primary" id="bc-action" disabled>Scan a barcode</button>
+      <button type="button" class="btn-secondary" id="bc-again" style="display:none;">Skip, scan another</button>
+    </div>
+  `);
+  document.getElementById('modal-sheet').classList.add('tall');
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.querySelectorAll('#bc-location button').forEach((btn) => btn.addEventListener('click', async () => {
+    BarcodeScan.location = btn.dataset.val;
+    btn.parentElement.querySelectorAll('button').forEach((b) => b.classList.toggle('selected', b === btn));
+    if (BarcodeScan.row) await renderBarcodeConfirm();
+  }));
+  document.getElementById('bc-action').addEventListener('click', saveBarcodeItem);
+  document.getElementById('bc-again').addEventListener('click', scanNextBarcode);
+  scanNextBarcode();
 }
 
 /* ============================================================
