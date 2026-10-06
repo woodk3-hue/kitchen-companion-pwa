@@ -7,6 +7,8 @@
   <meta name="theme-color" content="#1F2620">
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="./icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="./icon.svg">
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <style>
@@ -733,14 +735,14 @@ h1, h2, h3 {
   color: var(--color-ink);
 }
 .recipe-filter-row { margin-bottom: 16px; }
-.recipe-card.cuisine-indian .edge { background: var(--color-accent); }
-.recipe-card.cuisine-anglo-indian .edge { background: var(--color-leftovers); }
-.recipe-card.cuisine-australian .edge { background: var(--color-fridge); }
-.recipe-card.cuisine-western .edge { background: var(--color-freezer); }
-.recipe-card.cuisine-chinese .edge,
-.recipe-card.cuisine-indo-chinese .edge,
-.recipe-card.cuisine-korean .edge,
-.recipe-card.cuisine-vietnamese .edge { background: var(--color-warn); }
+.recipe-card.region-south-asian .edge { background: var(--color-accent); }
+.recipe-card.region-east-asian .edge,
+.recipe-card.region-southeast-asian .edge { background: var(--color-warn); }
+.recipe-card.region-mideast-africa .edge { background: var(--color-leftovers); }
+.recipe-card.region-european .edge,
+.recipe-card.region-other .edge { background: var(--color-freezer); }
+.recipe-card.region-americas .edge,
+.recipe-card.region-oceania .edge { background: var(--color-fridge); }
 .fav-star { color: var(--color-accent); }
 .tag.tag-protein { color: var(--color-fridge); }
 .recipe-stats { display: flex; gap: 8px; margin-bottom: 10px; }
@@ -957,6 +959,20 @@ h1, h2, h3 {
 .plan-pick-slots .state-chip { padding: 6px 10px; font-size: 12px; }
 .plan-pick-slots .state-chip.dim { opacity: 0.75; }
 .plan-pick-slots .state-chip:disabled { opacity: 0.4; cursor: default; }
+
+.cuisine-group { border-bottom: 1px solid var(--color-line); padding: 6px 0; }
+.cuisine-group summary { font-size: 13px; font-weight: 700; cursor: pointer; padding: 4px 0; }
+.cuisine-group .state-chip-grid { padding: 6px 0 4px; }
+
+.suggest-kitchen-btn {
+  display: flex; flex-direction: column; align-items: flex-start; width: 100%;
+  padding: 12px 14px; margin-bottom: 12px; border-radius: var(--radius-sm);
+  background: var(--color-accent); color: white; border: none;
+  font-family: inherit; text-align: left; cursor: pointer;
+}
+.suggest-kitchen-btn .st-btn-title { font-size: 15px; font-weight: 800; }
+.suggest-kitchen-btn .st-btn-desc { font-size: 12px; opacity: 0.9; margin-top: 2px; }
+.suggest-kitchen-btn:active { background: var(--color-accent-dark); }
 </style>
  </head>
  <body>
@@ -1431,7 +1447,13 @@ async function renderRoute() {
   const content = document.getElementById('app-content');
 
   switch (AppState.route) {
-    case 'home': content.innerHTML = await renderHomeScreen(); attachInstallListener('home'); break;
+    case 'home': {
+      content.innerHTML = await renderHomeScreen();
+      attachInstallListener('home');
+      const homeSuggest = document.getElementById('home-suggest-btn');
+      if (homeSuggest) homeSuggest.addEventListener('click', openKitchenSuggestions);
+      break;
+    }
     case 'kitchen': content.innerHTML = await renderKitchenScreen(); attachKitchenListeners(); break;
     case 'settings': content.innerHTML = await renderSettingsScreen(); attachSettingsListeners(); break;
     case 'planner': content.innerHTML = await renderPlannerScreen(); attachPlannerListeners(); break;
@@ -1588,6 +1610,7 @@ async function renderHomeScreen() {
   return `
     ${installCardHtml('home')}
     ${todayPlanHtml}
+    ${totalItems ? kitchenSuggestButtonHtml('home-suggest-btn') : ''}
     <div class="stat-grid">${statCardsHtml}</div>
     ${totalItems === 0 ? `
       <div class="empty-state">
@@ -1652,7 +1675,7 @@ async function renderKitchenScreen() {
   `;
 
   if (filtered.length === 0) {
-    return tabsHtml + stocktakeHtml + quickAddHtml + `
+    return tabsHtml + stocktakeHtml + (items.length ? kitchenSuggestButtonHtml('kitchen-suggest-btn') : '') + quickAddHtml + `
       <div class="empty-state">
         <div class="glyph">🧺</div>
         <h3>No items here yet</h3>
@@ -1699,13 +1722,15 @@ async function renderKitchenScreen() {
     `;
   }).join('');
 
-  return tabsHtml + stocktakeHtml + quickAddHtml + itemsHtml;
+  return tabsHtml + stocktakeHtml + kitchenSuggestButtonHtml('kitchen-suggest-btn') + quickAddHtml + itemsHtml;
 }
 
 function attachKitchenListeners() {
   document.getElementById('stocktake-btn').addEventListener('click', openStocktake);
   document.getElementById('photo-scan-btn').addEventListener('click', openPhotoScan);
   document.getElementById('barcode-scan-btn').addEventListener('click', openBarcodeScan);
+  const suggestBtn = document.getElementById('kitchen-suggest-btn');
+  if (suggestBtn) suggestBtn.addEventListener('click', openKitchenSuggestions);
 
   document.querySelectorAll('.loc-tab').forEach((tab) => {
     tab.addEventListener('click', () => {
@@ -2434,7 +2459,23 @@ async function saveStocktake() {
    RECIPES
    ============================================================ */
 const RECIPE_SEED_URL = './recipes-seed.json';
-const RECIPE_CUISINES = ['Indian', 'Anglo-Indian', 'Australian', 'Western', 'Chinese', 'Indo-Chinese', 'Korean', 'Vietnamese'];
+// Cuisines grouped by region. Order within each region is the order shown in pickers.
+const CUISINE_GROUPS = [
+  { region: 'South Asian', key: 'south-asian', cuisines: ['Indian', 'Anglo-Indian', 'Indo-Chinese', 'Sri Lankan', 'Pakistani', 'Bangladeshi', 'Nepalese'] },
+  { region: 'East Asian', key: 'east-asian', cuisines: ['Chinese', 'Japanese', 'Korean', 'Taiwanese'] },
+  { region: 'Southeast Asian', key: 'southeast-asian', cuisines: ['Thai', 'Vietnamese', 'Malaysian', 'Singaporean', 'Indonesian', 'Filipino'] },
+  { region: 'Middle Eastern & African', key: 'mideast-africa', cuisines: ['Lebanese', 'Turkish', 'Persian', 'Middle Eastern', 'North African', 'Ethiopian', 'East African', 'West African', 'South African'] },
+  { region: 'European', key: 'european', cuisines: ['Italian', 'Greek', 'French', 'Spanish', 'Portuguese', 'British', 'Irish', 'German', 'Eastern European', 'Mediterranean'] },
+  { region: 'Americas', key: 'americas', cuisines: ['American', 'Mexican', 'Caribbean', 'Latin American', 'Canadian'] },
+  { region: 'Oceania', key: 'oceania', cuisines: ['Australian', 'Pacific Islander'] },
+  { region: 'Other', key: 'other', cuisines: ['Western', 'Fusion'] }
+];
+const RECIPE_CUISINES = CUISINE_GROUPS.flatMap((g) => g.cuisines);
+const CUISINE_REGION_KEY = Object.fromEntries(CUISINE_GROUPS.flatMap((g) => g.cuisines.map((c) => [c, g.key])));
+
+function cuisineOptionsHtml(selected) {
+  return CUISINE_GROUPS.map((g) => `<optgroup label="${g.region}">${g.cuisines.map((c) => `<option value="${c}" ${selected === c ? 'selected' : ''}>${c}</option>`).join('')}</optgroup>`).join('');
+}
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
 const LEVELS = ['Low', 'Medium', 'High'];
@@ -2515,6 +2556,7 @@ async function syncRecipeSeed() {
   if (!seed || !Array.isArray(seed.recipes) || !seed.version) return false;
 
   const meta = (await dbGet('settings', 'recipeSeed')) || { key: 'recipeSeed', version: 0, deletedSeedIds: [] };
+  if (meta.builtInsOff) return false;
   if (meta.version >= seed.version) return false;
 
   const existing = await dbGetAll('recipes');
@@ -2580,7 +2622,7 @@ function renderRecipeList() {
       <div class="empty-state">
         <div class="glyph">📖</div>
         <h3>${none ? 'No recipes yet' : 'No recipes match'}</h3>
-        <p>${none ? 'Tap + to add your own. Built-in recipes load when the app is opened from its web address.' : 'Try clearing a filter or the search.'}</p>
+        <p>${none ? 'Get ideas with <strong>✨ Suggest meals</strong> or <strong>🔎 Search online</strong> above, tap <strong>+</strong> to add your own, or add the 30 starter recipes in Settings.' : 'Try clearing a filter or the search.'}</p>
       </div>
     `;
   }
@@ -2588,7 +2630,7 @@ function renderRecipeList() {
   return recipes.map((r) => {
     const sc = scores.get(r.id);
     const total = recipeTotalMinutes(r);
-    const cuisineClass = 'cuisine-' + r.cuisine.toLowerCase().replace(/[^a-z]+/g, '-');
+    const cuisineClass = 'region-' + (CUISINE_REGION_KEY[r.cuisine] || 'other');
     return `
       <div class="item-card recipe-card ${cuisineClass}" data-recipe-id="${r.id}">
         <div class="edge"></div>
@@ -2636,7 +2678,7 @@ async function renderRecipesScreen() {
       <input type="search" id="recipe-search" placeholder="Search recipes or ingredients" value="${escapeHtml(f.search)}">
     </div>
     <div class="location-tabs">
-      ${['all', ...RECIPE_CUISINES].map((c) => `
+      ${['all', ...RECIPE_CUISINES.filter((c) => c === f.cuisine || AppState.recipes.some((r) => r.cuisine === c))].map((c) => `
         <button class="loc-tab recipe-cuisine-tab ${f.cuisine === c ? 'active' : ''}" data-cuisine="${c}">${c === 'all' ? 'All' : c}</button>
       `).join('')}
     </div>
@@ -2943,7 +2985,7 @@ function openRecipeForm(recipe) {
         <div class="field">
           <label>Cuisine</label>
           <select id="r-cuisine">
-            ${RECIPE_CUISINES.map((c) => `<option value="${c}" ${r.cuisine === c ? 'selected' : ''}>${c}</option>`).join('')}
+            ${cuisineOptionsHtml(r.cuisine)}
           </select>
         </div>
 
@@ -3298,7 +3340,7 @@ function buildAiPrompt(items, goals, mealType, request) {
     '',
     `Meal: ${mealType}.`,
     `Calorie target: ${goals.caloriesMin}-${goals.caloriesMax} kcal per serving. Prioritise protein (chicken, fish, lean beef, pork, eggs, legumes, in that order) and keep fat lower where possible.`,
-    `Cuisines I like, in order: ${goals.preferredCuisines.join(', ')}.`,
+    goals.preferredCuisines.length ? `Cuisines I like: ${goals.preferredCuisines.join(', ')}. Mostly suggest these.` : 'Any cuisine is fine; vary them.',
     'Use food with the fewest days until its use-by date first, and say which of those items each meal uses in usesExpiring (exact kitchen item names). Skip anything already past its use-by date (negative days).',
     'Salt, pepper, oil and dried spices count as staples; mark them assumedStaple. Prefer meals that need few or no extra purchases; set inKitchen for each ingredient that is in my kitchen list.',
     'Use metric quantities. Use quantity 0 with an empty unit for "to taste". matchTerms are lower-case names a kitchen item could be called, most specific first (e.g. "chicken thigh", "chicken").',
@@ -3322,7 +3364,7 @@ async function requestAiSuggestions(mealType, request) {
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
       output_config: { effort: 'medium', format: { type: 'json_schema', schema: aiSuggestionSchema() } },
-      system: 'You are the meal-suggestion feature of Kitchen Companion, a personal kitchen app for a home cook in Brisbane, Australia who cooks Anglo-Indian, Indian, Australian, Western, Chinese, Indo-Chinese, Korean and Vietnamese food. Suggest practical, healthy home-cooked meals with clear, concise methods.',
+      system: 'You are the meal-suggestion feature of Kitchen Companion, a personal kitchen app for a home cook in Australia. Suggest practical, healthy home-cooked meals with clear, concise methods, in the cuisines they say they like.',
       messages: [{ role: 'user', content: buildAiPrompt(items, goals, mealType, request) }]
     });
     if (response.stop_reason === 'refusal') {
@@ -3482,7 +3524,13 @@ async function runAiSuggest() {
    ONLINE RECIPE SEARCH (TheMealDB, free, no account)
    ============================================================ */
 const MEALDB_BASE = 'https://www.themealdb.com/api/json/v1/1';
-const MEALDB_AREAS = ['Indian', 'British', 'Australian', 'Chinese', 'Vietnamese', 'Malaysian', 'Thai', 'Japanese', 'Italian'];
+const MEALDB_AREAS = ['Indian', 'Chinese', 'Japanese', 'Thai', 'Vietnamese', 'Malaysian', 'Filipino', 'Turkish', 'Moroccan', 'Greek', 'Italian', 'French', 'Spanish', 'British', 'Mexican', 'Jamaican', 'American', 'Australian'];
+// TheMealDB areas that don't share a name with an app cuisine
+const MEALDB_AREA_TO_CUISINE = {
+  Jamaican: 'Caribbean', Moroccan: 'North African', Egyptian: 'North African', Tunisian: 'North African', Algerian: 'North African',
+  Kenyan: 'East African', Polish: 'Eastern European', Russian: 'Eastern European', Ukrainian: 'Eastern European', Croatian: 'Eastern European',
+  Slovakian: 'Eastern European', Argentinian: 'Latin American', Uruguayan: 'Latin American', Venezulan: 'Latin American', Dutch: 'Western', Norwegian: 'Western'
+};
 const MEALDB_CATEGORY_PROTEIN = { Chicken: 'Chicken', Beef: 'Beef', Lamb: 'Lamb', Goat: 'Lamb', Pork: 'Pork', Seafood: 'Fish', Vegetarian: 'None', Vegan: 'None' };
 
 async function mealDbFetch(path) {
@@ -3549,7 +3597,7 @@ function mealDbToRecipe(meal) {
     .split(/\r?\n+/)
     .map((s) => s.replace(/^\s*(step\s*\d+[:.)]?|\d+[.)])\s*/i, '').trim())
     .filter((s) => s.length > 1);
-  const cuisine = RECIPE_CUISINES.includes(meal.strArea) ? meal.strArea : 'Western';
+  const cuisine = RECIPE_CUISINES.includes(meal.strArea) ? meal.strArea : (MEALDB_AREA_TO_CUISINE[meal.strArea] || 'Western');
   const fields = normalizeRecipe({
     name: meal.strMeal,
     cuisine,
@@ -4852,12 +4900,31 @@ async function todaysMealsHtml() {
 }
 
 /* ============================================================
+   STARTER RECIPES ON / OFF
+   ============================================================ */
+// Removes the built-in recipes (except ones the person has edited) and stops them coming back
+async function removeStarterRecipes() {
+  const recipes = await dbGetAll('recipes');
+  let removed = 0;
+  for (const r of recipes.filter((x) => x.source === 'built-in' && !x.userModified)) { await dbDelete('recipes', r.id); removed++; }
+  const meta = (await dbGet('settings', 'recipeSeed')) || { key: 'recipeSeed', version: 0, deletedSeedIds: [] };
+  await dbPut('settings', { ...meta, key: 'recipeSeed', builtInsOff: true });
+  return removed;
+}
+
+async function addStarterRecipes() {
+  const meta = (await dbGet('settings', 'recipeSeed')) || { key: 'recipeSeed', deletedSeedIds: [] };
+  await dbPut('settings', { ...meta, key: 'recipeSeed', builtInsOff: false, version: 0, deletedSeedIds: [] });
+  return syncRecipeSeed();
+}
+
+/* ============================================================
    START FRESH
    Clears kitchen, history, plans, own recipes and settings so the app is
    like new. Keeps built-in reference data and the API key (stored separately).
    ============================================================ */
 async function startFresh() {
-  if (!confirm('Start fresh?\n\nThis deletes everything in your kitchen, its history, your meal plans, recipes you added or saved, ratings, favourites and health goals.\n\nThe 30 built-in recipes come back as new. Your API key stays.')) return;
+  if (!confirm('Start fresh?\n\nThis deletes everything: your kitchen and its history, meal plans, all recipes (including the 30 starter recipes), ratings, favourites and settings.\n\nYou can add the starter recipes back from Settings. Your API key stays.')) return;
   if (confirm('Download a backup of your current data first? (Recommended)')) await exportKitchenData();
   if (!confirm('Last check: delete everything now?')) return;
 
@@ -4868,9 +4935,71 @@ async function startFresh() {
   AppState.recipeFilters = { search: '', cuisine: 'all', favourites: false, quick: false, highProtein: false, freezer: false };
   AppState.activeLocationFilter = 'all';
   await seedIfEmpty();
-  await syncRecipeSeed();
+  await dbPut('settings', { key: 'recipeSeed', version: 0, deletedSeedIds: [], builtInsOff: true });
   showToast('All clear. Start with the Kitchen tab.');
   navigateTo('home');
+}
+
+/* ============================================================
+   SUGGEST RECIPES FROM MY KITCHEN
+   One sheet that brings together: food going off soon, saved recipes
+   that can be made now, AI ideas and free online ideas.
+   ============================================================ */
+function kitchenSuggestButtonHtml(id) {
+  return `
+    <button type="button" class="suggest-kitchen-btn" id="${id}">
+      <span class="st-btn-title">🍳 Suggest recipes from my kitchen</span>
+      <span class="st-btn-desc">What can I make with what I've got?</span>
+    </button>`;
+}
+
+async function openKitchenSuggestions() {
+  const [items, recipes, goals] = await Promise.all([dbGetAll('inventoryItems'), dbGetAll('recipes'), getHealthGoals()]);
+  const index = buildInventoryIndex(items);
+  const goingOff = index
+    .filter((e) => e.daysLeft !== null && e.daysLeft <= EXPIRING_SOON_DAYS)
+    .sort((a, b) => a.daysLeft - b.daysLeft);
+  const matches = recipes
+    .map((r) => ({ r, sc: scoreRecipe(r, index) }))
+    .filter((x) => x.sc.pct >= 50)
+    .sort((a, b) => (b.sc.pct + (b.sc.expiring.length ? 30 : 0)) - (a.sc.pct + (a.sc.expiring.length ? 30 : 0)))
+    .slice(0, 6);
+
+  openModal(`
+    <div class="modal-title-row">
+      <h2>🍳 From my kitchen</h2>
+      <button class="close-btn" id="modal-close">×</button>
+    </div>
+    <div class="modal-scroll-area">
+      ${goingOff.length ? `<p class="match-line uses" style="margin:0 0 10px;font-size:13px;">Use soon: ${goingOff.slice(0, 5).map((e) => `${escapeHtml(e.item.name)} (${formatDaysLeft(e.daysLeft)})`).join(', ')}</p>` : ''}
+
+      <div class="st-group-title" style="margin-top:4px;">Your recipes you can make</div>
+      ${matches.length ? matches.map(({ r, sc }) => `
+        <button type="button" class="pick-row" data-recipe-id="${r.id}">
+          <span class="pick-name">${escapeHtml(r.name)}</span>
+          <span class="pick-tags">
+            <span class="tag match-pct ${sc.pct >= 80 ? 'high' : ''}">${sc.pct}% match</span>
+            ${calorieBadgeHtml(r.caloriesPerServing, goals)}
+            ${sc.expiring.length ? `<span class="tag kcal-over">Uses ${escapeHtml(sc.expiring[0].name)}</span>` : ''}
+          </span>
+          ${sc.missing.length ? `<span class="match-line" style="margin:0;">Need: ${escapeHtml(sc.missing.slice(0, 4).join(', '))}</span>` : '<span class="match-line" style="margin:0;">You have everything</span>'}
+        </button>`).join('') : `<p class="recipe-muted">${recipes.length ? 'None of your saved recipes are a good match yet.' : 'Your recipe book is empty.'} Try the ideas below.</p>`}
+
+      <div class="st-group-title">New ideas</div>
+      <button type="button" class="pick-row" id="ks-ai">
+        <span class="pick-name">✨ AI ideas from my kitchen</span>
+        <span class="match-line" style="margin:0;">${getAiKey() ? 'Claude suggests 3 meals using what you have, food going off first, around your calorie target' : 'Needs your API key in Settings → AI suggestions'}</span>
+      </button>
+      <button type="button" class="pick-row" id="ks-online">
+        <span class="pick-name">🔎 Free ideas online</span>
+        <span class="match-line" style="margin:0;">Search TheMealDB by what's in your kitchen</span>
+      </button>
+    </div>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.querySelectorAll('.pick-row[data-recipe-id]').forEach((btn) => btn.addEventListener('click', () => openRecipeDetail(parseInt(btn.dataset.recipeId, 10))));
+  document.getElementById('ks-ai').addEventListener('click', openAiSuggest);
+  document.getElementById('ks-online').addEventListener('click', openOnlineSearch);
 }
 
 /* ============================================================
@@ -4879,6 +5008,7 @@ async function startFresh() {
 async function renderSettingsScreen() {
   const goals = await getHealthGoals();
   const planSettings = await getPlanSettings();
+  const starterCount = (await dbGetAll('recipes')).filter((r) => r.source === 'built-in').length;
   const hasKey = !!getAiKey();
   return `
     ${installCardHtml('settings')}
@@ -4912,11 +5042,15 @@ async function renderSettingsScreen() {
         <div class="field"><label>Min kcal per meal</label><input type="number" id="goal-min" min="100" step="10" value="${goals.caloriesMin}"></div>
         <div class="field"><label>Max kcal per meal</label><input type="number" id="goal-max" min="100" step="10" value="${goals.caloriesMax}"></div>
       </div>
-      <div class="field">
-        <label>Cuisines you like</label>
-        <div class="state-chip-grid" id="goal-cuisines">
-          ${RECIPE_CUISINES.map((c) => `<button type="button" data-val="${c}" class="state-chip ${goals.preferredCuisines.includes(c) ? 'selected' : ''}">${c}</button>`).join('')}
-        </div>
+      <div class="field" id="goal-cuisines">
+        <label>Cuisines you like <span style="text-transform:none;font-weight:500;">(${goals.preferredCuisines.length ? `${goals.preferredCuisines.length} chosen` : 'none chosen = any cuisine'})</span></label>
+        ${CUISINE_GROUPS.map((g) => {
+          const chosen = g.cuisines.filter((c) => goals.preferredCuisines.includes(c)).length;
+          return `<details class="cuisine-group" ${chosen ? 'open' : ''}>
+            <summary>${g.region}${chosen ? ` · ${chosen}` : ''}</summary>
+            <div class="state-chip-grid">${g.cuisines.map((c) => `<button type="button" data-val="${c}" class="state-chip ${goals.preferredCuisines.includes(c) ? 'selected' : ''}">${c}</button>`).join('')}</div>
+          </details>`;
+        }).join('')}
       </div>
       <p class="recipe-muted" style="margin:0;">Recipes show ✓ when they're inside this range. AI suggestions also put protein first and keep fat lower.</p>
     </div>
@@ -4945,6 +5079,14 @@ async function renderSettingsScreen() {
       <p class="recipe-muted" id="ai-key-status" style="margin-bottom:0;"></p>
     </div>
 
+    <div class="section-heading" style="margin-top:22px;"><h2>Starter recipes</h2></div>
+    <div class="settings-card">
+      <p class="recipe-muted" style="margin-top:0;">${starterCount ? `${starterCount} starter recipes are in your recipe book.` : 'Your recipe book has no starter recipes. Add the 30 built-in recipes (Indian, Anglo-Indian, Australian, Western) any time.'}</p>
+      ${starterCount
+        ? '<button type="button" class="btn-secondary" id="starter-remove" style="margin-top:0;">Remove starter recipes</button>'
+        : '<button type="button" class="btn-secondary" id="starter-add" style="margin-top:0;">Add the 30 starter recipes</button>'}
+    </div>
+
     <div class="section-heading" style="margin-top:22px;"><h2>Start fresh</h2></div>
     <div class="settings-card">
       <p class="recipe-muted" style="margin-top:0;">Clear your kitchen, meal plans and the recipes you added, to set the app up again from scratch. You'll be offered a backup first.</p>
@@ -4971,7 +5113,7 @@ function attachSettingsListeners() {
     const max = parseInt(document.getElementById('goal-max').value, 10);
     if (!(min > 0 && max >= min)) { showToast('"From" must be lower than "to"'); return; }
     const cuisines = Array.from(document.querySelectorAll('#goal-cuisines button.selected')).map((b) => b.dataset.val);
-    await dbPut('settings', { ...DEFAULT_HEALTH_GOALS, caloriesMin: min, caloriesMax: max, preferredCuisines: cuisines.length ? cuisines : DEFAULT_HEALTH_GOALS.preferredCuisines });
+    await dbPut('settings', { ...DEFAULT_HEALTH_GOALS, caloriesMin: min, caloriesMax: max, preferredCuisines: cuisines });
     showToast('Health goals saved');
   };
   document.getElementById('goal-min').addEventListener('change', saveGoals);
@@ -4995,6 +5137,21 @@ function attachSettingsListeners() {
     savePlanSettings();
   });
   document.getElementById('start-fresh-btn').addEventListener('click', startFresh);
+  const starterRemove = document.getElementById('starter-remove');
+  if (starterRemove) starterRemove.addEventListener('click', async () => {
+    if (!confirm('Remove the starter recipes from your recipe book? Any you have edited are kept. Your own and saved recipes aren\'t affected.')) return;
+    const n = await removeStarterRecipes();
+    showToast(`Removed ${n} starter recipe${n === 1 ? '' : 's'}`);
+    renderRoute();
+  });
+  const starterAdd = document.getElementById('starter-add');
+  if (starterAdd) starterAdd.addEventListener('click', async () => {
+    starterAdd.disabled = true;
+    starterAdd.textContent = 'Adding…';
+    const ok = await addStarterRecipes();
+    showToast(ok ? 'Starter recipes added' : 'Couldn\'t load the starter recipes. Check your internet connection.');
+    renderRoute();
+  });
 
   const status = document.getElementById('ai-key-status');
   document.getElementById('ai-key-save').addEventListener('click', async () => {
