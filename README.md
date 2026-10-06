@@ -132,9 +132,25 @@ Each ingredient stores `matchTerms` (inventory names that count as having it, e.
 4. **Bug catching**: Sentry crash reports (free tier) that can open GitHub issues; Dependabot for library updates; Play pre-launch reports and Apple TestFlight crash reports.
 
 ### Pricing plan (if offered to other people)
-- **Running costs**: AI features cost per use (meal suggestions ~A$0.10–0.15, photo scan ~A$0.08–0.15 per photo, calorie estimate ~A$0.01–0.02); everything else is free to run. Fixed costs ~A$200–300 in year one (Apple, Google, domain, a small server). Apple and Google keep 15% of subscriptions for small developers and handle GST.
-- **Free tier**: kitchen inventory, stocktake, barcode scanning with calories, use-by reminders, recipes, match %, online recipe search, manual meal plan, plus 5 AI uses a month.
-- **Premium**: **A$4.99/month or A$39.99/year**, 7-day free trial: AI meal suggestions, Fill my week with new ideas, photo scanning and calorie estimates, about 30 AI uses a month with optional top-ups (e.g. 20 for A$1.99). Using a cheaper Claude model for photo scans and calorie estimates, plus prompt caching, could raise that to ~80–100 uses at the same price.
-- **Break-even**: about 6–8 yearly subscribers cover fixed costs.
-- **Needed before charging**: a small server holding the Anthropic key and counting each subscriber's AI uses; in-app subscriptions through Apple and Google (e.g. via RevenueCat); accounts or cloud backup; privacy policy and terms.
-- **Approach**: use the app personally for a month first to measure real AI use, then set the cap and price.
+
+**Model: buy once, then pay only for the AI you use.** Anything that costs money to run is paid for by whoever uses it; everything else is included.
+
+| | Price | What it covers |
+|---|---|---|
+| **App unlock** | A$7.99 one-off (A$4.99–7.99 range) | Everything non-AI: pantry/fridge/freezer inventory, stocktake, **barcode scanning with calories**, use-by reminders, recipes, match %, online recipe search, meal planner and Fill my week (non-AI), shopping list |
+| **AI credits** | 10 for A$2.99 · 30 for A$7.99 · 100 for A$19.99 | ✨ Suggest meals (1 credit), ✨ Fill my week with new ideas (1 credit), 📸 photo scan (1 credit per photo). Calorie estimates free or 10 per credit |
+| **Welcome credits** | 5 included with the unlock | Lets new users try the AI |
+
+- **How it's sold**: free to download with a short trial, then a one-off **Unlock** in-app purchase. It brings in the same money as an upfront price, but more people try the app. Credits are in-app "consumable" purchases, as Apple and Google require for digital goods; RevenueCat handles both stores.
+- **Money in**: in Australia the store price includes 10% GST and Apple/Google keep 15%, so about **77% of the sticker price** is received. A$7.99 unlock ≈ A$6.15 received.
+- **AI costs per use**: meal suggestions ~A$0.10–0.15, photo scan ~A$0.08–0.15, calorie estimate ~A$0.01. Credit prices (A$0.20–0.30 each) cover this with margin.
+- **Cost savings to make before launch**: run photo scans and calorie estimates on a cheaper Claude model (test quality on real labels first) and use prompt caching. Together these should roughly halve AI costs, which keeps the 100-credit pack comfortably profitable.
+- **Fixed costs**: ~A$200–300 a year (Apple US$99/yr, Google US$25 once, domain, small server). About **40–65 unlocks a year** covers them.
+- **Needed before charging**:
+  - a small server that holds the Anthropic key, checks each person's credit balance and deducts a credit per AI use (users never see a key);
+  - sign-in with Apple/Google so credits and data survive a new phone;
+  - RevenueCat for the unlock and credit purchases;
+  - TheMealDB supporter key (its free key is for personal/development use);
+  - privacy policy and terms (photos and food lists are sent to Anthropic to process).
+- **Owner use**: Kim keeps using her own API key in Settings, without credits.
+- **Approach**: use the app personally for a month first to see real AI use, then confirm the prices.
