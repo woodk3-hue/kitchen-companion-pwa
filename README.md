@@ -105,8 +105,36 @@ Each ingredient stores `matchTerms` (inventory names that count as having it, e.
 - For the most accurate calories, photograph the nutrition panel on the back of jars and packets.
 - **▦ Barcode** (Kitchen tab): point the camera at a barcode (uses Chrome on Android's built-in barcode reader), or type the number. The product is looked up in [Open Food Facts](https://world.openfoodfacts.org) for its name, brand, pack size and calories per 100 g/ml, and you confirm or edit before saving. Cans, jars and sauce bottles start as a count ("1 can"), other products as their pack size. Scanning something already in that location adds to it (e.g. 1 can → 2 cans). Products not in the database can be filled in on the same screen, with ✨ Estimate for calories. The camera keeps going for the next item until you close the sheet. Barcodes are saved on items.
 
-## Next
+## Step 3: Meal plan
 
-- **Step 3**: Meal plan, built around food expiring soonest and your calorie target.
-- **Step 4**: Shopping list and running low.
-- **Step 5**: "I cooked this" (e.g. cooked 4 portions, ate 2, 2 left over), then barcode scanning.
+- **Planner tab**: the week from Monday to Sunday, with lunch and dinner for each day (turn on **Plan breakfast too** in Settings). Use ‹ › to move between weeks. Each planned meal shows its kcal (✓ inside your target), food it uses up ("Uses Spinach") and how many ingredients you'd need to buy, with a daily kcal total.
+- **+ Add** on a meal opens a picker: things already made (leftovers, cooked portions, ready meals in your kitchen), your recipes ranked best match first, or "Eating out / skip".
+- **Leftovers**: when a recipe makes more portions than you cook for (Settings → Meal plan, default 2), the app offers to plan the spare portions as the next meal (dinner → next day's lunch). Removing the dinner removes its leftovers.
+- **🪄 Fill my week**: fills empty meals from today onwards, choosing recipes that use food closest to its use-by first, then best match, inside your calorie target, with a mix of cuisines and no repeats. Dinners with enough spare portions fill the next lunch. **✨ Include new ideas from Claude** first adds 3 fresh AI recipes to choose from (uses your API key).
+- **📅 Add to meal plan** on any recipe page picks a free slot in the next 10 days.
+- **Home** shows today's meals.
+
+## Start fresh
+
+**Settings → Start fresh** clears the kitchen, its history, meal plans, recipes you added or saved, ratings, favourites and settings, after offering a backup download. The 30 built-in recipes come back as new; the use-by and freezer reference data and your API key are kept.
+
+## Roadmap
+
+### Still to build (for personal use)
+- **Step 4**: Shopping list (missing ingredients from the meal plan) and running low.
+- **Step 5**: "I cooked this" (e.g. cooked 4 portions, ate 2, 2 left over), taking ingredients out of the kitchen.
+- **Automatic checks**: run the browser tests on every pull request with GitHub Actions; a "Report a problem" button.
+
+### Publishing to app stores (later)
+1. **Own domain** (e.g. kitchencompanion.app, ~A$20–40/year) pointed at GitHub Pages. Android needs it for its verification file.
+2. **Android / Google Play**: package with PWABuilder (Trusted Web Activity); Play Console account US$25 once; store listing, privacy policy, data safety form; new personal accounts currently need a ~14-day closed test with ~12 testers. Web updates reach Play users automatically.
+3. **iPhone / App Store**: wrap with Capacitor for native camera and barcode scanning (Safari has no built-in barcode reader); Apple Developer Program US$99/year; build with Xcode on a Mac or a cloud build service; test with TestFlight; App Store review.
+4. **Bug catching**: Sentry crash reports (free tier) that can open GitHub issues; Dependabot for library updates; Play pre-launch reports and Apple TestFlight crash reports.
+
+### Pricing plan (if offered to other people)
+- **Running costs**: AI features cost per use (meal suggestions ~A$0.10–0.15, photo scan ~A$0.08–0.15 per photo, calorie estimate ~A$0.01–0.02); everything else is free to run. Fixed costs ~A$200–300 in year one (Apple, Google, domain, a small server). Apple and Google keep 15% of subscriptions for small developers and handle GST.
+- **Free tier**: kitchen inventory, stocktake, barcode scanning with calories, use-by reminders, recipes, match %, online recipe search, manual meal plan, plus 5 AI uses a month.
+- **Premium**: **A$4.99/month or A$39.99/year**, 7-day free trial: AI meal suggestions, Fill my week with new ideas, photo scanning and calorie estimates, about 30 AI uses a month with optional top-ups (e.g. 20 for A$1.99). Using a cheaper Claude model for photo scans and calorie estimates, plus prompt caching, could raise that to ~80–100 uses at the same price.
+- **Break-even**: about 6–8 yearly subscribers cover fixed costs.
+- **Needed before charging**: a small server holding the Anthropic key and counting each subscriber's AI uses; in-app subscriptions through Apple and Google (e.g. via RevenueCat); accounts or cloud backup; privacy policy and terms.
+- **Approach**: use the app personally for a month first to measure real AI use, then set the cap and price.

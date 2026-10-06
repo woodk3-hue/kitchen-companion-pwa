@@ -915,6 +915,48 @@ h1, h2, h3 {
 }
 .install-card .install-title { font-size: 15px; font-weight: 800; }
 .install-card .install-desc { font-size: 12px; opacity: 0.85; margin-top: 3px; }
+
+/* ============================================================
+   MEAL PLANNER
+   ============================================================ */
+.plan-week-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.plan-week-label { font-size: 16px; font-weight: 800; text-align: center; }
+.link-btn { background: none; border: none; color: var(--color-accent); font-weight: 700; font-size: 13px; cursor: pointer; padding: 0 0 0 6px; }
+.plan-ai-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin: 4px 0 6px; }
+.plan-ai-toggle input { width: 18px; height: 18px; accent-color: var(--color-accent); }
+.plan-day { background: var(--color-paper); border: 1px solid var(--color-line); border-radius: var(--radius-sm); padding: 10px 12px; margin-top: 10px; }
+.plan-day.today { border-color: var(--color-accent); box-shadow: 0 0 0 1px var(--color-accent); }
+.plan-day.past { opacity: 0.6; }
+.plan-day-head { display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; margin-bottom: 6px; }
+.plan-total { color: var(--color-ink-soft); font-weight: 700; }
+.plan-slot {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; width: 100%;
+  padding: 9px 10px; margin-top: 6px; border-radius: var(--radius-sm);
+  border: 1px solid var(--color-line); background: var(--color-bg); color: var(--color-ink);
+  font-family: inherit; text-align: left; cursor: pointer;
+}
+.plan-slot.empty { border-style: dashed; }
+.plan-slot:disabled { cursor: default; }
+.plan-meal { flex: 0 0 72px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-ink-soft); }
+.plan-add { color: var(--color-accent); font-weight: 700; font-size: 14px; }
+.plan-title { flex: 1; min-width: 0; font-size: 14px; font-weight: 700; }
+.plan-tags { display: flex; gap: 4px; flex-wrap: wrap; flex-basis: 100%; padding-left: 82px; }
+.plan-tags:empty { display: none; }
+.plan-slot.type-leftover { background: #F3EFE2; }
+.plan-slot.type-out .plan-title { color: var(--color-ink-soft); font-weight: 600; }
+.pick-row {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%;
+  padding: 10px 12px; margin-bottom: 6px; border-radius: var(--radius-sm);
+  border: 1px solid var(--color-line); background: var(--color-paper); color: var(--color-ink);
+  font-family: inherit; text-align: left; cursor: pointer;
+}
+.pick-name { font-size: 14px; font-weight: 700; }
+.pick-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.plan-pick-day { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--color-line); font-size: 13px; font-weight: 700; }
+.plan-pick-slots { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.plan-pick-slots .state-chip { padding: 6px 10px; font-size: 12px; }
+.plan-pick-slots .state-chip.dim { opacity: 0.75; }
+.plan-pick-slots .state-chip:disabled { opacity: 0.4; cursor: default; }
 </style>
  </head>
  <body>
@@ -1343,6 +1385,8 @@ const AppState = {
   activeLocationFilter: 'all',
   editingItemId: null,
   recipes: [],
+  planWeekStart: null,
+  planUseAi: false,
   recipeFilters: { search: '', cuisine: 'all', favourites: false, quick: false, highProtein: false, freezer: false }
 };
 
@@ -1374,7 +1418,7 @@ async function renderRoute() {
 
   const titleMap = {
     home: ['Kitchen Companion', "Know what you've got"],
-    planner: ['Meal Planner', 'Coming in Phase 2'],
+    planner: ['Meal Planner', 'Plan the week around what you have'],
     recipes: ['Recipes', 'Indian · Anglo-Indian · Australian · Western'],
     kitchen: ['Kitchen', 'Pantry · Fridge · Freezer · Leftovers'],
     shopping: ['Shopping', 'Coming in Phase 3'],
@@ -1390,7 +1434,7 @@ async function renderRoute() {
     case 'home': content.innerHTML = await renderHomeScreen(); attachInstallListener('home'); break;
     case 'kitchen': content.innerHTML = await renderKitchenScreen(); attachKitchenListeners(); break;
     case 'settings': content.innerHTML = await renderSettingsScreen(); attachSettingsListeners(); break;
-    case 'planner': content.innerHTML = renderPlaceholder('Meal Planner', 'Weekly breakfast, lunch and dinner planning — built around what\'s already in your kitchen, expiry dates, and your protein targets.'); break;
+    case 'planner': content.innerHTML = await renderPlannerScreen(); attachPlannerListeners(); break;
     case 'recipes': content.innerHTML = await renderRecipesScreen(); attachRecipesListeners(); break;
     case 'shopping': content.innerHTML = renderPlaceholder('Shopping', 'Budget tracking, purchase events, and shopping lists built from your meal plan.'); break;
   }
@@ -1539,9 +1583,11 @@ async function renderHomeScreen() {
   }
 
   const totalItems = items.length;
+  const todayPlanHtml = await todaysMealsHtml();
 
   return `
     ${installCardHtml('home')}
+    ${todayPlanHtml}
     <div class="stat-grid">${statCardsHtml}</div>
     ${totalItems === 0 ? `
       <div class="empty-state">
@@ -2733,8 +2779,11 @@ async function openRecipeDetail(id) {
       ${recipe.notes ? `<div class="section-heading" style="margin-top:18px;"><h2>Notes</h2></div><p class="recipe-notes">${escapeHtml(recipe.notes)}</p>` : ''}
     </div>
     <div class="modal-action-bar">
-      <button type="button" class="btn-primary" id="edit-recipe-btn">Edit recipe</button>
-      <button type="button" class="btn-danger" id="delete-recipe-btn">Delete recipe</button>
+      <button type="button" class="btn-primary" id="plan-recipe-btn">📅 Add to meal plan</button>
+      <div class="field-row" style="gap:8px;">
+        <button type="button" class="btn-secondary" id="edit-recipe-btn">Edit recipe</button>
+        <button type="button" class="btn-danger" id="delete-recipe-btn">Delete</button>
+      </div>
     </div>
   `;
 
@@ -2764,6 +2813,7 @@ async function openRecipeDetail(id) {
   });
 
   document.getElementById('edit-recipe-btn').addEventListener('click', () => openRecipeForm(recipe));
+  document.getElementById('plan-recipe-btn').addEventListener('click', () => openAddRecipeToPlan(recipe));
   document.getElementById('delete-recipe-btn').addEventListener('click', () => deleteRecipe(recipe));
 }
 
@@ -4380,10 +4430,455 @@ function openBarcodeScan() {
 }
 
 /* ============================================================
+   MEAL PLANNER
+   One mealPlans record per planned meal:
+   { date: 'YYYY-MM-DD', meal: 'breakfast'|'lunch'|'dinner',
+     type: 'recipe'|'kitchen'|'leftover'|'out',
+     recipeId?, itemId?, title, kcal?, servings?, leftoverOf?, createdAt }
+   Weeks start on Monday.
+   ============================================================ */
+const PLAN_MEALS = ['breakfast', 'lunch', 'dinner'];
+const PLAN_MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner' };
+const DEFAULT_PLAN_SETTINGS = { key: 'mealPlanSettings', householdSize: 2, planBreakfast: false };
+
+async function getPlanSettings() {
+  return { ...DEFAULT_PLAN_SETTINGS, ...((await dbGet('settings', 'mealPlanSettings')) || {}) };
+}
+
+function plannedMeals(settings) {
+  return settings.planBreakfast ? PLAN_MEALS : ['lunch', 'dinner'];
+}
+
+function parseLocalDate(str) {
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function startOfWeek(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const offset = (d.getDay() + 6) % 7; // Monday = 0
+  d.setDate(d.getDate() - offset);
+  return d;
+}
+
+function weekDates(weekStart) {
+  return Array.from({ length: 7 }, (_, i) => localDateString(addDays(weekStart, i)));
+}
+
+function formatDayLabel(dateStr) {
+  const d = parseLocalDate(dateStr);
+  const today = localDateString(new Date());
+  const tomorrow = localDateString(addDays(new Date(), 1));
+  const label = d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+  return dateStr === today ? `Today · ${label}` : dateStr === tomorrow ? `Tomorrow · ${label}` : label;
+}
+
+async function getPlanEntries(dates) {
+  const all = await dbGetAll('mealPlans');
+  const wanted = new Set(dates);
+  return all.filter((e) => wanted.has(e.date));
+}
+
+function entryKcal(entry, recipesById) {
+  if (entry.kcal) return entry.kcal;
+  const r = entry.recipeId ? recipesById.get(entry.recipeId) : null;
+  return r && r.caloriesPerServing ? r.caloriesPerServing : null;
+}
+
+async function addPlanEntry(entry) {
+  return dbPut('mealPlans', { ...entry, createdAt: new Date().toISOString() });
+}
+
+// Removing a cooked meal also removes the leftovers planned from it
+async function removePlanEntry(id) {
+  const all = await dbGetAll('mealPlans');
+  for (const e of all.filter((x) => x.leftoverOf === id)) await dbDelete('mealPlans', e.id);
+  await dbDelete('mealPlans', id);
+}
+
+// The next slot after this one, used for leftovers: dinner → next day's lunch, lunch → same day's dinner
+function nextSlot(date, meal) {
+  if (meal === 'lunch') return { date, meal: 'dinner' };
+  if (meal === 'dinner') return { date: localDateString(addDays(parseLocalDate(date), 1)), meal: 'lunch' };
+  return { date, meal: 'lunch' };
+}
+
+/* ---- Planner screen ---- */
+async function renderPlannerScreen() {
+  if (!AppState.planWeekStart) AppState.planWeekStart = localDateString(startOfWeek(new Date()));
+  const weekStart = parseLocalDate(AppState.planWeekStart);
+  const dates = weekDates(weekStart);
+  const [entries, recipes, goals, settings, items] = await Promise.all([
+    getPlanEntries(dates), dbGetAll('recipes'), getHealthGoals(), getPlanSettings(), dbGetAll('inventoryItems')
+  ]);
+  const recipesById = new Map(recipes.map((r) => [r.id, r]));
+  const index = buildInventoryIndex(items);
+  const meals = plannedMeals(settings);
+  const today = localDateString(new Date());
+  const isThisWeek = AppState.planWeekStart === localDateString(startOfWeek(new Date()));
+  const weekLabel = `${parseLocalDate(dates[0]).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – ${parseLocalDate(dates[6]).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`;
+  const plannedCount = entries.length;
+
+  const slotHtml = (date, meal) => {
+    const entry = entries.find((e) => e.date === date && e.meal === meal);
+    const past = date < today;
+    if (!entry) {
+      return `<button type="button" class="plan-slot empty" data-date="${date}" data-meal="${meal}" ${past ? 'disabled' : ''}>
+        <span class="plan-meal">${PLAN_MEAL_LABELS[meal]}</span><span class="plan-add">${past ? '—' : '+ Add'}</span></button>`;
+    }
+    const kcal = entryKcal(entry, recipesById);
+    const recipe = entry.recipeId ? recipesById.get(entry.recipeId) : null;
+    const sc = recipe && index.length && entry.type === 'recipe' ? scoreRecipe(recipe, index) : null;
+    const icon = entry.type === 'leftover' ? '🍱 ' : entry.type === 'kitchen' ? '🧊 ' : entry.type === 'out' ? '🍽️ ' : '';
+    return `<button type="button" class="plan-slot filled type-${entry.type}" data-entry-id="${entry.id}">
+      <span class="plan-meal">${PLAN_MEAL_LABELS[meal]}</span>
+      <span class="plan-title">${icon}${escapeHtml(entry.title)}</span>
+      <span class="plan-tags">
+        ${kcal ? calorieBadgeHtml(kcal, goals) : ''}
+        ${sc && sc.expiring.length ? `<span class="tag kcal-over">Uses ${escapeHtml(sc.expiring[0].name)}</span>` : ''}
+        ${sc && sc.missing.length ? `<span class="tag">Need ${sc.missing.length}</span>` : ''}
+      </span>
+    </button>`;
+  };
+
+  const daysHtml = dates.map((date) => {
+    const dayEntries = entries.filter((e) => e.date === date);
+    const total = dayEntries.reduce((sum, e) => sum + (entryKcal(e, recipesById) || 0), 0);
+    return `
+      <div class="plan-day ${date === today ? 'today' : ''} ${date < today ? 'past' : ''}">
+        <div class="plan-day-head">
+          <span>${formatDayLabel(date)}</span>
+          ${total ? `<span class="plan-total">~${total} kcal</span>` : ''}
+        </div>
+        ${meals.map((m) => slotHtml(date, m)).join('')}
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="plan-week-nav">
+      <button type="button" class="loc-tab" id="plan-prev" aria-label="Previous week">‹</button>
+      <div class="plan-week-label">${weekLabel}${isThisWeek ? '' : ' <button type="button" class="link-btn" id="plan-today">This week</button>'}</div>
+      <button type="button" class="loc-tab" id="plan-next" aria-label="Next week">›</button>
+    </div>
+    <div class="recipe-online-row" style="margin-bottom:6px;">
+      <button type="button" class="stocktake-btn" id="plan-fill">
+        <span class="st-btn-title">🪄 Fill my week</span>
+        <span class="st-btn-desc">Uses food going off first</span>
+      </button>
+      <button type="button" class="stocktake-btn alt" id="plan-clear" ${plannedCount ? '' : 'disabled'}>
+        <span class="st-btn-title">🧹 Clear week</span>
+        <span class="st-btn-desc">${plannedCount} planned</span>
+      </button>
+    </div>
+    <label class="plan-ai-toggle"><input type="checkbox" id="plan-ai" ${AppState.planUseAi ? 'checked' : ''}> ✨ Include new ideas from Claude <span class="recipe-muted">(uses your API key)</span></label>
+    ${plannedCount === 0 ? '<p class="recipe-muted" style="margin:8px 0 0;">Nothing planned yet. Tap <strong>+ Add</strong> on any meal, or let <strong>Fill my week</strong> do it.</p>' : ''}
+    ${daysHtml}
+  `;
+}
+
+function attachPlannerListeners() {
+  const shift = (days) => {
+    AppState.planWeekStart = localDateString(addDays(parseLocalDate(AppState.planWeekStart), days));
+    renderRoute();
+  };
+  document.getElementById('plan-prev').addEventListener('click', () => shift(-7));
+  document.getElementById('plan-next').addEventListener('click', () => shift(7));
+  const todayBtn = document.getElementById('plan-today');
+  if (todayBtn) todayBtn.addEventListener('click', () => { AppState.planWeekStart = null; renderRoute(); });
+  document.getElementById('plan-ai').addEventListener('change', (e) => { AppState.planUseAi = e.target.checked; });
+  document.getElementById('plan-fill').addEventListener('click', fillMyWeek);
+  document.getElementById('plan-clear').addEventListener('click', clearPlanWeek);
+  document.querySelectorAll('.plan-slot.empty').forEach((btn) => {
+    btn.addEventListener('click', () => openSlotPicker(btn.dataset.date, btn.dataset.meal));
+  });
+  document.querySelectorAll('.plan-slot.filled').forEach((btn) => {
+    btn.addEventListener('click', () => openPlanEntry(parseInt(btn.dataset.entryId, 10)));
+  });
+}
+
+async function clearPlanWeek() {
+  if (!confirm('Clear every meal planned for this week?')) return;
+  const entries = await getPlanEntries(weekDates(parseLocalDate(AppState.planWeekStart)));
+  for (const e of entries) await dbDelete('mealPlans', e.id);
+  showToast('Week cleared');
+  renderRoute();
+}
+
+/* ---- Choosing what goes in a slot ---- */
+async function openSlotPicker(date, meal) {
+  const [recipes, items, goals, settings] = await Promise.all([dbGetAll('recipes'), dbGetAll('inventoryItems'), getHealthGoals(), getPlanSettings()]);
+  const index = buildInventoryIndex(items);
+  const mealType = PLAN_MEAL_LABELS[meal];
+  const ranked = recipes
+    .map((r) => ({ r, sc: index.length ? scoreRecipe(r, index) : null }))
+    .sort((a, b) => {
+      const fits = (x) => ((x.r.mealTypes || []).includes(mealType) ? 1 : 0);
+      const rank = (x) => (x.sc ? x.sc.pct + (x.sc.expiring.length ? 30 : 0) : 0) + (x.r.isFavourite ? 10 : 0);
+      return fits(b) - fits(a) || rank(b) - rank(a) || a.r.name.localeCompare(b.r.name);
+    });
+  // Already-made food: leftovers, cooked or prepared portions, ready meals
+  const ready = items.filter((i) => i.location === 'leftovers' || i.category === 'Ready Meals'
+    || (i.states || []).some((s) => s === 'Cooked' || s === 'Leftover'));
+
+  const recipeRow = ({ r, sc }) => `
+    <button type="button" class="pick-row" data-recipe-id="${r.id}" data-name="${escapeHtml(r.name.toLowerCase())}">
+      <span class="pick-name">${r.isFavourite ? '★ ' : ''}${escapeHtml(r.name)}</span>
+      <span class="pick-tags">
+        ${sc ? `<span class="tag match-pct ${sc.pct >= 80 ? 'high' : ''}">${sc.pct}%</span>` : ''}
+        ${calorieBadgeHtml(r.caloriesPerServing, goals)}
+        ${sc && sc.expiring.length ? `<span class="tag kcal-over">Uses ${escapeHtml(sc.expiring[0].name)}</span>` : ''}
+        ${(r.mealTypes || []).includes(mealType) ? '' : `<span class="tag">not usually ${mealType.toLowerCase()}</span>`}
+      </span>
+    </button>`;
+
+  openModal(`
+    <div class="modal-title-row">
+      <h2>${mealType} · ${formatDayLabel(date)}</h2>
+      <button class="close-btn" id="modal-close">×</button>
+    </div>
+    <div class="modal-scroll-area">
+      ${ready.length ? `<div class="st-group-title">Already made</div>
+        ${ready.map((i) => `<button type="button" class="pick-row" data-item-id="${i.id}">
+          <span class="pick-name">🧊 ${escapeHtml(i.name)}</span>
+          <span class="pick-tags"><span class="tag">${LOCATION_LABELS[i.location]}</span><span class="tag">${escapeHtml(formatItemQuantity(i))}</span></span>
+        </button>`).join('')}` : ''}
+      <div class="st-group-title">Your recipes</div>
+      <div class="field recipe-search" style="margin-bottom:8px;"><input type="search" id="pick-search" placeholder="Search recipes"></div>
+      <div id="pick-recipes">${ranked.length ? ranked.map(recipeRow).join('') : '<p class="recipe-muted">No recipes yet. Add some on the Recipes tab.</p>'}</div>
+      <div class="st-group-title">Other</div>
+      <button type="button" class="pick-row" id="pick-out"><span class="pick-name">🍽️ Eating out / skip</span></button>
+    </div>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('pick-search').addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('#pick-recipes .pick-row').forEach((row) => { row.style.display = !q || row.dataset.name.includes(q) ? '' : 'none'; });
+  });
+  document.querySelectorAll('.pick-row[data-recipe-id]').forEach((btn) => btn.addEventListener('click', async () => {
+    const recipe = recipes.find((r) => r.id === parseInt(btn.dataset.recipeId, 10));
+    await planRecipe(recipe, date, meal, settings);
+  }));
+  document.querySelectorAll('.pick-row[data-item-id]').forEach((btn) => btn.addEventListener('click', async () => {
+    const item = items.find((i) => i.id === parseInt(btn.dataset.itemId, 10));
+    await addPlanEntry({ date, meal, type: 'kitchen', itemId: item.id, title: item.name, kcal: null });
+    closeModal();
+    showToast(`Planned ${item.name}`);
+    renderRoute();
+  }));
+  document.getElementById('pick-out').addEventListener('click', async () => {
+    await addPlanEntry({ date, meal, type: 'out', title: 'Eating out / skip' });
+    closeModal();
+    renderRoute();
+  });
+}
+
+// Plan a recipe; if it makes more portions than the household eats, offer the rest as the next meal
+async function planRecipe(recipe, date, meal, settings, { askLeftovers = true } = {}) {
+  const household = settings.householdSize || 2;
+  const id = await addPlanEntry({ date, meal, type: 'recipe', recipeId: recipe.id, title: recipe.name, kcal: recipe.caloriesPerServing || null, servings: household });
+  let leftoverNote = '';
+  const spare = (recipe.servings || 0) - household;
+  if (askLeftovers && spare >= household && recipe.leftoverFriendly !== false) {
+    const next = nextSlot(date, meal);
+    const nextTaken = (await getPlanEntries([next.date])).some((e) => e.meal === next.meal);
+    if (!nextTaken && confirm(`${recipe.name} serves ${recipe.servings}. Plan the ${spare} leftover portions for ${PLAN_MEAL_LABELS[next.meal].toLowerCase()} on ${formatDayLabel(next.date)}?`)) {
+      await addPlanEntry({ date: next.date, meal: next.meal, type: 'leftover', recipeId: recipe.id, title: `Leftover ${recipe.name}`, kcal: recipe.caloriesPerServing || null, leftoverOf: id });
+      leftoverNote = ' + leftovers';
+    }
+  }
+  closeModal();
+  showToast(`Planned ${recipe.name}${leftoverNote}`);
+  renderRoute();
+  return id;
+}
+
+async function openPlanEntry(id) {
+  const entry = await dbGet('mealPlans', id);
+  if (!entry) return;
+  openModal(`
+    <div class="modal-title-row">
+      <h2>${escapeHtml(entry.title)}</h2>
+      <button class="close-btn" id="modal-close">×</button>
+    </div>
+    <p class="recipe-muted" style="margin-top:0;">${PLAN_MEAL_LABELS[entry.meal]} · ${formatDayLabel(entry.date)}${entry.type === 'leftover' ? ' · leftovers' : ''}</p>
+    ${entry.recipeId ? '<button type="button" class="btn-primary" id="pe-view">View recipe</button>' : ''}
+    <button type="button" class="btn-secondary" id="pe-swap">Swap for something else</button>
+    <button type="button" class="btn-danger" id="pe-remove">Remove from plan</button>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  const view = document.getElementById('pe-view');
+  if (view) view.addEventListener('click', () => openRecipeDetail(entry.recipeId));
+  document.getElementById('pe-swap').addEventListener('click', async () => {
+    await removePlanEntry(entry.id);
+    renderRoute();
+    openSlotPicker(entry.date, entry.meal);
+  });
+  document.getElementById('pe-remove').addEventListener('click', async () => {
+    await removePlanEntry(entry.id);
+    closeModal();
+    showToast('Removed');
+    renderRoute();
+  });
+}
+
+/* ---- Add to plan from a recipe page ---- */
+async function openAddRecipeToPlan(recipe) {
+  const settings = await getPlanSettings();
+  const meals = plannedMeals(settings);
+  const start = new Date();
+  const dates = Array.from({ length: 10 }, (_, i) => localDateString(addDays(start, i)));
+  const entries = await getPlanEntries(dates);
+  const preferred = meals.find((m) => (recipe.mealTypes || []).includes(PLAN_MEAL_LABELS[m])) || 'dinner';
+  openModal(`
+    <div class="modal-title-row">
+      <h2>📅 Add to plan</h2>
+      <button class="close-btn" id="modal-close">×</button>
+    </div>
+    <p class="recipe-muted" style="margin-top:0;">${escapeHtml(recipe.name)}: pick a free slot.</p>
+    <div class="modal-scroll-area">
+      ${dates.map((d) => `
+        <div class="plan-pick-day"><span>${formatDayLabel(d)}</span>
+          <span class="plan-pick-slots">${meals.map((m) => {
+            const taken = entries.find((e) => e.date === d && e.meal === m);
+            return `<button type="button" class="state-chip plan-pick ${m === preferred ? '' : 'dim'}" data-date="${d}" data-meal="${m}" ${taken ? 'disabled title="Already planned"' : ''}>${taken ? '✓ ' : ''}${PLAN_MEAL_LABELS[m]}</button>`;
+          }).join('')}</span>
+        </div>`).join('')}
+    </div>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.querySelectorAll('.plan-pick:not([disabled])').forEach((btn) => btn.addEventListener('click', () => {
+    planRecipe(recipe, btn.dataset.date, btn.dataset.meal, settings);
+  }));
+}
+
+/* ---- Fill my week ----
+   Goes through the empty slots from today onwards, earliest first, and picks
+   the best recipe for each: food closest to its use-by first, then best match,
+   inside the calorie target, a mix of cuisines, no repeats. Dinners that make
+   enough spare portions fill the next lunch with leftovers. */
+async function fillMyWeek() {
+  const btn = document.getElementById('plan-fill');
+  const settings = await getPlanSettings();
+  const meals = plannedMeals(settings);
+  const today = localDateString(new Date());
+  const dates = weekDates(parseLocalDate(AppState.planWeekStart)).filter((d) => d >= today);
+  if (!dates.length) { showToast('This week is over. Go to this week or next.'); return; }
+
+  if (AppState.planUseAi) {
+    if (!getAiKey()) { showToast('Add your API key in Settings to include new ideas'); return; }
+    btn.disabled = true;
+    btn.querySelector('.st-btn-title').textContent = '✨ Getting new ideas…';
+    const outcome = await requestAiSuggestions('Dinner', 'These are for a weekly meal plan; make them different from each other.');
+    if (outcome.error) { showToast(outcome.error); }
+    else {
+      const existing = new Set((await dbGetAll('recipes')).map((r) => r.name.toLowerCase()));
+      for (const m of outcome.meals) if (!existing.has(m.name.toLowerCase())) await dbPut('recipes', aiMealToRecipe(m));
+    }
+  }
+
+  const [recipes, items, goals, existingEntries] = await Promise.all([
+    dbGetAll('recipes'), dbGetAll('inventoryItems'), getHealthGoals(), getPlanEntries(dates)
+  ]);
+  if (!recipes.length) { showToast('Add some recipes first'); renderRoute(); return; }
+  const index = buildInventoryIndex(items);
+  const usedRecipeIds = new Set(existingEntries.filter((e) => e.recipeId).map((e) => e.recipeId));
+  const usedUpItems = new Set();
+  const taken = new Set(existingEntries.map((e) => `${e.date}|${e.meal}`));
+  let lastCuisine = null;
+  let added = 0;
+
+  const scoreFor = (recipe, mealType) => {
+    if (!(recipe.mealTypes || []).includes(mealType) && !(mealType !== 'Breakfast' && !(recipe.mealTypes || []).length)) return -Infinity;
+    let score = 0;
+    if (index.length) {
+      const sc = scoreRecipe(recipe, index);
+      score += sc.pct;
+      const freshExpiring = sc.expiring.filter((e) => !usedUpItems.has(e.name));
+      score += freshExpiring.reduce((s, e) => s + Math.max(10, 40 - e.daysLeft * 10), 0);
+    }
+    const k = recipe.caloriesPerServing;
+    if (k && k >= goals.caloriesMin && k <= goals.caloriesMax) score += 15;
+    else if (k && k > goals.caloriesMax) score -= 10;
+    if (goals.preferredCuisines.includes(recipe.cuisine)) score += 5;
+    if (recipe.cuisine === lastCuisine) score -= 15;
+    if (recipe.isFavourite) score += 10;
+    score += ((recipe.userRating || 0) + (recipe.partnerRating || 0)) * 2;
+    return score;
+  };
+
+  for (const date of dates) {
+    for (const meal of meals) {
+      if (taken.has(`${date}|${meal}`)) continue;
+      const mealType = PLAN_MEAL_LABELS[meal];
+      const best = recipes
+        .filter((r) => !usedRecipeIds.has(r.id))
+        .map((r) => ({ r, s: scoreFor(r, mealType) }))
+        .filter((x) => x.s > -Infinity)
+        .sort((a, b) => b.s - a.s)[0];
+      if (!best) continue;
+      const recipe = best.r;
+      const id = await addPlanEntry({ date, meal, type: 'recipe', recipeId: recipe.id, title: recipe.name, kcal: recipe.caloriesPerServing || null, servings: settings.householdSize });
+      taken.add(`${date}|${meal}`);
+      usedRecipeIds.add(recipe.id);
+      lastCuisine = recipe.cuisine;
+      added++;
+      if (index.length) scoreRecipe(recipe, index).expiring.forEach((e) => usedUpItems.add(e.name));
+
+      const spare = (recipe.servings || 0) - settings.householdSize;
+      const next = nextSlot(date, meal);
+      if (meal === 'dinner' && spare >= settings.householdSize && recipe.leftoverFriendly !== false
+        && dates.includes(next.date) && meals.includes(next.meal) && !taken.has(`${next.date}|${next.meal}`)) {
+        await addPlanEntry({ date: next.date, meal: next.meal, type: 'leftover', recipeId: recipe.id, title: `Leftover ${recipe.name}`, kcal: recipe.caloriesPerServing || null, leftoverOf: id });
+        taken.add(`${next.date}|${next.meal}`);
+        added++;
+      }
+    }
+  }
+  showToast(added ? `Planned ${added} meal${added === 1 ? '' : 's'}` : 'Nothing to fill: the week is already planned');
+  renderRoute();
+}
+
+/* ---- Home: today's meals ---- */
+async function todaysMealsHtml() {
+  const today = localDateString(new Date());
+  const entries = await getPlanEntries([today]);
+  if (!entries.length) return '';
+  const sorted = entries.sort((a, b) => PLAN_MEALS.indexOf(a.meal) - PLAN_MEALS.indexOf(b.meal));
+  return `
+    <div class="section-heading"><h2>Today's meals</h2></div>
+    <div class="expiry-list">${sorted.map((e) => `
+      <div class="expiry-row"><span class="name">${escapeHtml(e.title)}</span><span class="when">${PLAN_MEAL_LABELS[e.meal]}</span></div>`).join('')}
+    </div>`;
+}
+
+/* ============================================================
+   START FRESH
+   Clears kitchen, history, plans, own recipes and settings so the app is
+   like new. Keeps built-in reference data and the API key (stored separately).
+   ============================================================ */
+async function startFresh() {
+  if (!confirm('Start fresh?\n\nThis deletes everything in your kitchen, its history, your meal plans, recipes you added or saved, ratings, favourites and health goals.\n\nThe 30 built-in recipes come back as new. Your API key stays.')) return;
+  if (confirm('Download a backup of your current data first? (Recommended)')) await exportKitchenData();
+  if (!confirm('Last check: delete everything now?')) return;
+
+  for (const store of ['inventoryItems', 'inventoryHistory', 'mealPlans', 'batchCookEvents', 'purchaseEvents', 'recipes', 'quickAddTemplates', 'settings']) {
+    await dbClearAndBulkPut(store, []);
+  }
+  AppState.planWeekStart = null;
+  AppState.recipeFilters = { search: '', cuisine: 'all', favourites: false, quick: false, highProtein: false, freezer: false };
+  AppState.activeLocationFilter = 'all';
+  await seedIfEmpty();
+  await syncRecipeSeed();
+  showToast('All clear. Start with the Kitchen tab.');
+  navigateTo('home');
+}
+
+/* ============================================================
    SETTINGS SCREEN
    ============================================================ */
 async function renderSettingsScreen() {
   const goals = await getHealthGoals();
+  const planSettings = await getPlanSettings();
   const hasKey = !!getAiKey();
   return `
     ${installCardHtml('settings')}
@@ -4426,6 +4921,15 @@ async function renderSettingsScreen() {
       <p class="recipe-muted" style="margin:0;">Recipes show ✓ when they're inside this range. AI suggestions also put protein first and keep fat lower.</p>
     </div>
 
+    <div class="section-heading" style="margin-top:22px;"><h2>Meal plan</h2></div>
+    <div class="settings-card">
+      <div class="field" style="margin:0;"><label>How many people you cook for</label><input type="number" id="plan-household" min="1" max="12" inputmode="numeric" value="${planSettings.householdSize}"></div>
+      <div class="staple-toggle-row" style="margin:12px 0 0;">
+        <div class="label-group"><span class="label">Plan breakfast too</span><span class="desc">Otherwise the planner shows lunch and dinner</span></div>
+        <button type="button" id="plan-breakfast" class="toggle-switch ${planSettings.planBreakfast ? 'on' : ''}" data-on="${planSettings.planBreakfast ? 'true' : 'false'}"></button>
+      </div>
+    </div>
+
     <div class="section-heading" style="margin-top:22px;"><h2>AI suggestions</h2></div>
     <div class="settings-card">
       <p class="recipe-muted" style="margin-top:0;">Uses your own Anthropic account (about 10–15¢ per set of suggestions). Your key is stored only on this phone and isn't included in backups.</p>
@@ -4439,6 +4943,12 @@ async function renderSettingsScreen() {
       </div>
       ${hasKey ? '<button type="button" class="btn-danger" id="ai-key-remove">Remove key</button>' : ''}
       <p class="recipe-muted" id="ai-key-status" style="margin-bottom:0;"></p>
+    </div>
+
+    <div class="section-heading" style="margin-top:22px;"><h2>Start fresh</h2></div>
+    <div class="settings-card">
+      <p class="recipe-muted" style="margin-top:0;">Clear your kitchen, meal plans and the recipes you added, to set the app up again from scratch. You'll be offered a backup first.</p>
+      <button type="button" class="btn-danger" id="start-fresh-btn" style="margin-top:0;">Start fresh</button>
     </div>
   `;
 }
@@ -4470,6 +4980,21 @@ function attachSettingsListeners() {
     btn.classList.toggle('selected');
     saveGoals();
   }));
+
+  const savePlanSettings = async () => {
+    const size = Math.max(1, Math.min(12, parseInt(document.getElementById('plan-household').value, 10) || 2));
+    await dbPut('settings', { ...DEFAULT_PLAN_SETTINGS, householdSize: size, planBreakfast: document.getElementById('plan-breakfast').dataset.on === 'true' });
+    showToast('Meal plan settings saved');
+  };
+  document.getElementById('plan-household').addEventListener('change', savePlanSettings);
+  document.getElementById('plan-breakfast').addEventListener('click', (e) => {
+    const b = e.currentTarget;
+    const on = b.dataset.on !== 'true';
+    b.dataset.on = on ? 'true' : 'false';
+    b.classList.toggle('on', on);
+    savePlanSettings();
+  });
+  document.getElementById('start-fresh-btn').addEventListener('click', startFresh);
 
   const status = document.getElementById('ai-key-status');
   document.getElementById('ai-key-save').addEventListener('click', async () => {
