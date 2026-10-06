@@ -853,6 +853,40 @@ h1, h2, h3 {
   cursor: pointer;
 }
 .online-result img { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; flex: 0 0 48px; }
+
+/* ============================================================
+   PHOTO SCAN & ITEM CALORIES
+   ============================================================ */
+.tag.kcal-tag { color: var(--color-warn); }
+.ps-thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
+.ps-thumb { position: relative; width: 96px; height: 96px; }
+.ps-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius-sm); }
+.ps-remove {
+  position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%;
+  border: none; background: rgba(31,38,32,0.7); color: white; font-size: 16px; line-height: 1; cursor: pointer;
+}
+.ps-add {
+  width: 96px; height: 96px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  border: 2px dashed var(--color-line); border-radius: var(--radius-sm); background: var(--color-paper);
+  font-size: 26px; cursor: pointer;
+}
+.ps-add span { font-size: 12px; font-weight: 700; color: var(--color-ink-soft); }
+.ps-row { padding: 10px 12px; }
+.ps-top { display: flex; align-items: center; gap: 10px; }
+.ps-top .st-box { cursor: pointer; padding: 0; }
+.st-row.ticked .ps-tick { background: var(--color-accent); border-color: var(--color-accent); }
+.ps-name, .ps-fields input, .ps-fields select {
+  padding: 8px 10px; border: 1px solid var(--color-line); border-radius: var(--radius-sm);
+  font-size: 15px; font-family: var(--font-body); background: var(--color-bg); color: var(--color-ink); min-width: 0;
+}
+.ps-name { flex: 1; font-weight: 700; }
+.ps-tags { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 0 32px; }
+.ps-fields { display: flex; gap: 6px; align-items: center; margin: 8px 0 0 32px; }
+.ps-fields input { flex: 1 1 70px; }
+.ps-fields select { flex: 0 1 auto; }
+.ps-fields select.ps-unit { flex: 0 0 88px; }
+.ps-fields select.ps-cat { flex: 1 1 0; }
+.ps-knote { font-size: 11px; font-weight: 700; color: var(--color-ink-soft); white-space: nowrap; }
 </style>
  </head>
  <body>
@@ -1366,6 +1400,7 @@ function closeModal() {
 document.getElementById('modal-overlay').addEventListener('click', (e) => {
   if (e.target.id !== 'modal-overlay') return;
   if (document.getElementById('st-body')) closeStocktake();
+  else if (document.getElementById('ps-body')) closePhotoScan();
   else closeModal();
 });
 
@@ -1516,10 +1551,16 @@ async function renderKitchenScreen() {
   `;
 
   const stocktakeHtml = `
-    <button type="button" class="stocktake-btn" id="stocktake-btn">
-      <span class="st-btn-title">📋 Stocktake</span>
-      <span class="st-btn-desc">Tick off what's in your pantry, fridge and freezer</span>
-    </button>
+    <div class="recipe-online-row">
+      <button type="button" class="stocktake-btn" id="stocktake-btn">
+        <span class="st-btn-title">📋 Stocktake</span>
+        <span class="st-btn-desc">Tick off what you have</span>
+      </button>
+      <button type="button" class="stocktake-btn alt" id="photo-scan-btn">
+        <span class="st-btn-title">📸 Scan photo</span>
+        <span class="st-btn-desc">Reads labels &amp; calories</span>
+      </button>
+    </div>
   `;
 
   const templates = await dbGetAll('quickAddTemplates');
@@ -1570,6 +1611,7 @@ async function renderKitchenScreen() {
             ${stateTagsHtml}
             ${item.category ? `<span class="tag">${item.category}</span>` : ''}
             ${stapleBadge}
+            ${item.caloriesPer100 ? `<span class="tag kcal-tag">${itemCaloriesText(item)}</span>` : ''}
           </div>
           ${expiryFlag}
         </div>
@@ -1582,6 +1624,7 @@ async function renderKitchenScreen() {
 
 function attachKitchenListeners() {
   document.getElementById('stocktake-btn').addEventListener('click', openStocktake);
+  document.getElementById('photo-scan-btn').addEventListener('click', openPhotoScan);
 
   document.querySelectorAll('.loc-tab').forEach((tab) => {
     tab.addEventListener('click', () => {
@@ -1729,6 +1772,18 @@ function openItemForm(item, prefill) {
             </div>
 
             <div class="field">
+              <label>Calories <span style="text-transform:none;font-weight:500;" id="f-kcal-source">${seed && seed.caloriesPer100 && seed.caloriesSource ? '(' + (CALORIE_SOURCE_LABELS[seed.caloriesSource] || 'entered') + ')' : '(optional)'}</span></label>
+              <div class="ps-fields" style="padding:0;">
+                <input type="number" id="f-kcal" min="0" step="any" inputmode="decimal" placeholder="kcal" value="${seed && seed.caloriesPer100 ? seed.caloriesPer100 : ''}">
+                <select id="f-kcal-unit">
+                  <option value="g" ${!seed || seed.caloriesUnit !== 'ml' ? 'selected' : ''}>per 100 g</option>
+                  <option value="ml" ${seed && seed.caloriesUnit === 'ml' ? 'selected' : ''}>per 100 ml</option>
+                </select>
+                <button type="button" class="btn-secondary" id="f-kcal-estimate" style="margin-top:0;width:auto;">✨ Estimate</button>
+              </div>
+            </div>
+
+            <div class="field">
               <label>Cost</label>
               <input type="number" id="f-cost" value="${seed && seed.cost ? seed.cost : ''}" min="0" step="0.01" placeholder="$">
             </div>
@@ -1779,6 +1834,30 @@ function openItemForm(item, prefill) {
   });
 
   document.getElementById('modal-close').addEventListener('click', closeModal);
+
+  // Calories: typing marks them as entered by hand; the Estimate button asks Claude from the item's name
+  const kcalInput = document.getElementById('f-kcal');
+  kcalInput.dataset.source = (seed && seed.caloriesSource) || '';
+  kcalInput.addEventListener('input', () => {
+    kcalInput.dataset.source = 'manual';
+    document.getElementById('f-kcal-source').textContent = '(entered)';
+  });
+  document.getElementById('f-kcal-estimate').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const name = document.getElementById('f-name').value.trim();
+    if (!name) { showToast('Enter the item name first'); return; }
+    if (!getAiKey()) { showToast('Add your API key in Settings → AI suggestions'); return; }
+    btn.disabled = true;
+    btn.textContent = 'Estimating…';
+    const result = await estimateItemCalories(name, document.getElementById('f-category').value);
+    btn.disabled = false;
+    btn.textContent = '✨ Estimate';
+    if (result.error) { showToast(result.error); return; }
+    kcalInput.value = Math.round(result.caloriesPer100);
+    kcalInput.dataset.source = 'estimated';
+    document.getElementById('f-kcal-unit').value = result.caloriesUnit === 'ml' ? 'ml' : 'g';
+    document.getElementById('f-kcal-source').textContent = '(estimated)';
+  });
 
   document.getElementById('item-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1862,6 +1941,9 @@ async function saveItemFromForm(existingItem) {
     expiryDate,
     useByOverrideDays: null,
     cost: document.getElementById('f-cost').value ? parseFloat(document.getElementById('f-cost').value) : null,
+    caloriesPer100: parseFloat(document.getElementById('f-kcal').value) || null,
+    caloriesUnit: document.getElementById('f-kcal').value ? document.getElementById('f-kcal-unit').value : null,
+    caloriesSource: document.getElementById('f-kcal').value ? (document.getElementById('f-kcal').dataset.source || 'manual') : null,
     notes: document.getElementById('f-notes').value.trim(),
     freezerFriendlyRating: null,
     linkedPurchaseEventId: null,
@@ -1934,7 +2016,8 @@ async function openItemDetail(id) {
     </div>
     <p style="font-size:15px;font-weight:700;margin:0 0 4px;">${qtyLabel}</p>
     ${item.expiryDate ? `<p style="font-size:13px;color:var(--color-warn);font-weight:700;margin:0 0 14px;">${formatExpiry(item.expiryDate)}</p>` : '<div style="margin-bottom:14px;"></div>'}
-    ${item.notes ? `<p style="font-size:13px;color:var(--color-ink-soft);margin:0 0 14px;">${item.notes}</p>` : ''}
+    ${item.caloriesPer100 ? `<p style="font-size:13px;margin:0 0 14px;">🔥 ${itemCaloriesText(item)} <span style="color:var(--color-ink-soft);">(${CALORIE_SOURCE_LABELS[item.caloriesSource] || 'entered'})</span></p>` : ''}
+    ${item.notes ? `<p style="font-size:13px;color:var(--color-ink-soft);margin:0 0 14px;">${escapeHtml(item.notes)}</p>` : ''}
 
     <button class="btn-primary" id="edit-item-btn">Edit item</button>
 
@@ -3511,6 +3594,416 @@ async function openOnlineMeal(id) {
     renderRoute();
     openRecipeForm({ ...recipe, id: newId });
   });
+}
+
+/* ============================================================
+   ITEM CALORIES
+   Stored per item as kcal per 100 g or 100 ml, with where the number
+   came from: read off a label, estimated by AI, or typed in.
+   ============================================================ */
+const CALORIE_SOURCE_LABELS = { label: 'from label', estimated: 'estimated', manual: 'entered' };
+
+function itemCaloriesText(item) {
+  if (!item.caloriesPer100) return '';
+  return `${Math.round(item.caloriesPer100)} kcal/100${item.caloriesUnit === 'ml' ? 'ml' : 'g'}`;
+}
+
+// Estimate calories from the item's name alone (no photo). Returns { caloriesPer100, caloriesUnit } or { error }.
+async function estimateItemCalories(name, category) {
+  let Anthropic = null;
+  try {
+    const loaded = await getAnthropicClient();
+    Anthropic = loaded.Anthropic;
+    const response = await loaded.client.beta.messages.create({
+      model: AI_MODEL,
+      max_tokens: 2000,
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+      output_config: {
+        effort: 'low',
+        format: {
+          type: 'json_schema',
+          schema: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['caloriesPer100', 'caloriesUnit'],
+            properties: {
+              caloriesPer100: { type: 'number' },
+              caloriesUnit: { type: 'string', enum: ['g', 'ml'] }
+            }
+          }
+        }
+      },
+      messages: [{
+        role: 'user',
+        content: `Typical energy content of this food as sold in Australian supermarkets, in kcal per 100 g (or per 100 ml for liquids and sauces sold by volume). Use 0 if it isn't a food or you can't tell.\nItem: ${name}\nCategory: ${category || 'unknown'}`
+      }]
+    });
+    if (response.stop_reason === 'refusal') return { error: 'Claude couldn\'t estimate this one. Enter it from the label instead.' };
+    const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+    const parsed = JSON.parse(text);
+    if (!parsed.caloriesPer100) return { error: 'Claude couldn\'t tell for this item. Enter it from the label instead.' };
+    return parsed;
+  } catch (err) {
+    if (err instanceof SyntaxError) return { error: 'Claude\'s reply couldn\'t be read. Please try again.' };
+    return { error: describeAiError(err, Anthropic) };
+  }
+}
+
+/* ============================================================
+   PHOTO SCAN
+   Photos of a shelf, fridge or a few jars go to Claude, which lists the
+   items it can see (reading labels for names, sizes and calories where
+   visible). Nothing is saved until the person confirms the list.
+   ============================================================ */
+const PHOTO_MAX_EDGE = 1568; // larger images cost more and aren't read any better
+const PHOTO_MAX_COUNT = 5;
+
+// Shrink a photo on the phone and return base64 JPEG (without the data: prefix)
+function photoToBase64Jpeg(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, PHOTO_MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      resolve({ data: dataUrl.split(',')[1], preview: dataUrl });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Couldn\'t read that photo')); };
+    img.src = url;
+  });
+}
+
+function photoScanSchema() {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['items'],
+    properties: {
+      items: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['name', 'category', 'quantity', 'unit', 'states', 'isStaple', 'caloriesPer100', 'caloriesUnit', 'caloriesSource', 'confidence'],
+          properties: {
+            name: { type: 'string' },
+            category: { type: 'string', enum: CATEGORIES },
+            quantity: { type: 'number' },
+            unit: { type: 'string', enum: ITEM_UNITS },
+            states: { type: 'array', items: { type: 'string', enum: STATES_V2 } },
+            isStaple: { type: 'boolean' },
+            caloriesPer100: { type: 'number' },
+            caloriesUnit: { type: 'string', enum: ['g', 'ml'] },
+            caloriesSource: { type: 'string', enum: ['label', 'estimated', 'unknown'] },
+            confidence: { type: 'string', enum: ['high', 'medium', 'low'] }
+          }
+        }
+      }
+    }
+  };
+}
+
+async function requestPhotoScan(photos, location) {
+  let Anthropic = null;
+  try {
+    const loaded = await getAnthropicClient();
+    Anthropic = loaded.Anthropic;
+    const instructions = [
+      `These photos show food in my ${LOCATION_LABELS[location].toLowerCase()} in Brisbane, Australia. List each distinct food item you can see.`,
+      '- name: what I would call it, with the brand if the label shows one, e.g. "Kikkoman Soy Sauce", "Mutti Crushed Tomatoes", "Basmati rice".',
+      '- quantity and unit: how many of that item (e.g. 3 cans, 2 bottles, 1 jar), or the pack size in metric if there is just one (e.g. 1 kg, 500 g, 750 ml). Count identical items once with the total.',
+      '- states: Frozen for freezer items; Opened if clearly opened; Fresh for fresh produce; otherwise Raw.',
+      '- isStaple: true for salt, pepper, oils, dried spices, rice, flour, dals, soy sauce and similar basics.',
+      '- caloriesPer100: energy in kcal per 100 g, or per 100 ml (caloriesUnit "ml") for liquids and sauces sold by volume. If a nutrition panel is readable, use it and set caloriesSource "label" (convert kJ to kcal by dividing by 4.184). Otherwise give a typical value and set "estimated". Use 0 with "unknown" if you can\'t tell.',
+      '- confidence: low if the item is partly hidden or you are guessing what it is.',
+      'Skip non-food items. If the photos show nothing you can identify, return an empty list.'
+    ].join('\n');
+    const content = [
+      ...photos.map((p) => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: p.data } })),
+      { type: 'text', text: instructions }
+    ];
+    const response = await loaded.client.beta.messages.create({
+      model: AI_MODEL,
+      max_tokens: 16000,
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+      output_config: { effort: 'medium', format: { type: 'json_schema', schema: photoScanSchema() } },
+      messages: [{ role: 'user', content }]
+    });
+    if (response.stop_reason === 'refusal') return { error: 'Claude couldn\'t read these photos. Try different photos.' };
+    if (response.stop_reason === 'max_tokens') return { error: 'Too many items to list in one go. Try fewer photos at a time.' };
+    const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+    const parsed = JSON.parse(text);
+    return { items: Array.isArray(parsed.items) ? parsed.items : [] };
+  } catch (err) {
+    if (err instanceof SyntaxError) return { error: 'Claude\'s reply couldn\'t be read. Please try again.' };
+    return { error: describeAiError(err, Anthropic) };
+  }
+}
+
+const PhotoScan = { location: 'pantry', photos: [], rows: [] };
+
+function photoScanRowHtml(row, i) {
+  const units = ITEM_UNITS.map((u) => `<option value="${u}" ${row.unit === u ? 'selected' : ''}>${u}</option>`).join('');
+  const cats = CATEGORIES.map((c) => `<option value="${c}" ${row.category === c ? 'selected' : ''}>${c}</option>`).join('');
+  const kcalNote = row.caloriesPer100 ? (row.caloriesSource === 'label' ? 'from label' : 'estimated') : '';
+  return `
+    <div class="st-row ps-row ${row.selected ? 'ticked' : ''}" data-i="${i}">
+      <div class="ps-top">
+        <button type="button" class="st-box ps-tick" aria-label="Include">${row.selected ? '✓' : ''}</button>
+        <input type="text" class="ps-name" value="${escapeHtml(row.name)}">
+      </div>
+      <div class="ps-tags">
+        ${row.existingId ? '<span class="tag">Already in kitchen: updates it</span>' : '<span class="tag kcal-ok">New</span>'}
+        ${row.confidence === 'low' ? '<span class="tag kcal-over">Check this one</span>' : ''}
+      </div>
+      <div class="ps-fields">
+        <input type="number" class="ps-qty" min="0" step="any" inputmode="decimal" placeholder="Amount" value="${row.quantity ?? ''}">
+        <select class="ps-unit">${units}</select>
+        <select class="ps-cat">${cats}</select>
+      </div>
+      <div class="ps-fields">
+        <input type="number" class="ps-kcal" min="0" step="any" inputmode="decimal" placeholder="kcal" value="${row.caloriesPer100 || ''}">
+        <select class="ps-kunit"><option value="g" ${row.caloriesUnit !== 'ml' ? 'selected' : ''}>kcal / 100 g</option><option value="ml" ${row.caloriesUnit === 'ml' ? 'selected' : ''}>kcal / 100 ml</option></select>
+        <span class="ps-knote">${kcalNote}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderPhotoScanBody() {
+  const body = document.getElementById('ps-body');
+  if (!body) return;
+  const thumbs = PhotoScan.photos.map((p, i) => `
+    <div class="ps-thumb"><img src="${p.preview}" alt="Photo ${i + 1}"><button type="button" class="ps-remove" data-i="${i}" aria-label="Remove photo">×</button></div>`).join('');
+
+  if (!PhotoScan.rows.length) {
+    body.innerHTML = `
+      <p class="st-intro">Photograph a shelf, the fridge door, or a few jars. For calories, include the nutrition panels on the back. Up to ${PHOTO_MAX_COUNT} photos.</p>
+      <div class="ps-thumbs">${thumbs}
+        ${PhotoScan.photos.length < PHOTO_MAX_COUNT ? '<label class="ps-add">📷<span>Add photo</span><input type="file" id="ps-file" accept="image/*" multiple hidden></label>' : ''}
+      </div>
+      <p class="ai-error" id="ps-error"></p>
+    `;
+  } else {
+    const selected = PhotoScan.rows.filter((r) => r.selected).length;
+    body.innerHTML = `
+      <p class="st-intro">Here's what Claude found. Untick anything wrong and fix names, amounts or calories before adding.</p>
+      ${PhotoScan.rows.map(photoScanRowHtml).join('')}
+      <p class="recipe-muted">${selected} of ${PhotoScan.rows.length} ticked.</p>
+    `;
+  }
+  attachPhotoScanListeners();
+  updatePhotoScanButton();
+}
+
+function updatePhotoScanButton() {
+  const btn = document.getElementById('ps-action');
+  if (!btn) return;
+  if (!PhotoScan.rows.length) {
+    btn.textContent = PhotoScan.photos.length ? `Read ${PhotoScan.photos.length} photo${PhotoScan.photos.length === 1 ? '' : 's'}` : 'Add a photo first';
+    btn.disabled = !PhotoScan.photos.length;
+  } else {
+    const n = PhotoScan.rows.filter((r) => r.selected).length;
+    btn.textContent = n ? `Save ${n} item${n === 1 ? '' : 's'}` : 'Tick items to save';
+    btn.disabled = !n;
+  }
+}
+
+function attachPhotoScanListeners() {
+  const file = document.getElementById('ps-file');
+  if (file) {
+    file.addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files || []).slice(0, PHOTO_MAX_COUNT - PhotoScan.photos.length);
+      for (const f of files) {
+        try { PhotoScan.photos.push(await photoToBase64Jpeg(f)); } catch (err) { showToast(err.message); }
+      }
+      renderPhotoScanBody();
+    });
+  }
+  document.querySelectorAll('.ps-remove').forEach((btn) => btn.addEventListener('click', () => {
+    PhotoScan.photos.splice(parseInt(btn.dataset.i, 10), 1);
+    renderPhotoScanBody();
+  }));
+
+  document.querySelectorAll('.ps-row').forEach((rowEl) => {
+    const row = PhotoScan.rows[parseInt(rowEl.dataset.i, 10)];
+    rowEl.querySelector('.ps-tick').addEventListener('click', () => {
+      row.selected = !row.selected;
+      const scroll = document.getElementById('ps-body').scrollTop;
+      renderPhotoScanBody();
+      document.getElementById('ps-body').scrollTop = scroll;
+    });
+    rowEl.querySelector('.ps-name').addEventListener('input', (e) => { row.name = e.target.value; });
+    rowEl.querySelector('.ps-qty').addEventListener('input', (e) => { row.quantity = e.target.value === '' ? null : parseFloat(e.target.value); });
+    rowEl.querySelector('.ps-unit').addEventListener('change', (e) => { row.unit = e.target.value; });
+    rowEl.querySelector('.ps-cat').addEventListener('change', (e) => { row.category = e.target.value; });
+    rowEl.querySelector('.ps-kcal').addEventListener('input', (e) => {
+      row.caloriesPer100 = e.target.value === '' ? null : parseFloat(e.target.value);
+      row.caloriesSource = 'manual';
+      rowEl.querySelector('.ps-knote').textContent = '';
+    });
+    rowEl.querySelector('.ps-kunit').addEventListener('change', (e) => { row.caloriesUnit = e.target.value; });
+  });
+}
+
+async function openPhotoScan() {
+  PhotoScan.photos = [];
+  PhotoScan.rows = [];
+  if (!getAiKey()) {
+    openModal(`
+      <div class="modal-title-row"><h2>📸 Scan photo</h2><button class="close-btn" id="modal-close">×</button></div>
+      <div class="empty-state"><div class="glyph">📸</div><h3>Add your API key first</h3>
+        <p>Photo scanning uses your Anthropic account, like AI meal suggestions. Add your key in Settings → AI suggestions.</p></div>
+      <button type="button" class="btn-primary" id="ps-to-settings">Go to Settings</button>
+    `);
+    document.getElementById('modal-close').addEventListener('click', closeModal);
+    document.getElementById('ps-to-settings').addEventListener('click', () => { closeModal(); navigateTo('settings'); });
+    return;
+  }
+
+  openModal(`
+    <div class="modal-title-row">
+      <h2>📸 Scan photo</h2>
+      <button class="close-btn" id="modal-close">×</button>
+    </div>
+    <div class="segmented" id="ps-location" style="margin-bottom:10px;">
+      ${['pantry', 'fridge', 'freezer'].map((loc) => `<button type="button" data-val="${loc}" class="${loc === PhotoScan.location ? 'selected' : ''}">${LOCATION_LABELS[loc]}</button>`).join('')}
+    </div>
+    <div class="modal-scroll-area st-body" id="ps-body"></div>
+    <div class="modal-action-bar">
+      <button type="button" class="btn-primary" id="ps-action" disabled>Add a photo first</button>
+    </div>
+  `);
+  document.getElementById('modal-sheet').classList.add('tall');
+  document.getElementById('modal-close').addEventListener('click', closePhotoScan);
+  document.querySelectorAll('#ps-location button').forEach((btn) => btn.addEventListener('click', async () => {
+    PhotoScan.location = btn.dataset.val;
+    btn.parentElement.querySelectorAll('button').forEach((b) => b.classList.toggle('selected', b === btn));
+    if (PhotoScan.rows.length) await markExistingRows();
+    renderPhotoScanBody();
+  }));
+  document.getElementById('ps-action').addEventListener('click', () => (PhotoScan.rows.length ? savePhotoScan() : readPhotos()));
+  renderPhotoScanBody();
+}
+
+function closePhotoScan() {
+  if ((PhotoScan.rows.some((r) => r.selected) || PhotoScan.photos.length) && !confirm('Close without saving?')) return;
+  PhotoScan.photos = [];
+  PhotoScan.rows = [];
+  closeModal();
+}
+
+// Items already in the kitchen at this location get updated (calories, and amount if it had none) instead of duplicated
+async function markExistingRows() {
+  const items = await dbGetAll('inventoryItems');
+  PhotoScan.rows.forEach((row) => {
+    const words = matchWords(row.name);
+    const match = items.find((i) => i.location === PhotoScan.location && matchWords(i.name) === words);
+    row.existingId = match ? match.id : null;
+  });
+}
+
+async function readPhotos() {
+  const btn = document.getElementById('ps-action');
+  btn.disabled = true;
+  btn.textContent = 'Reading photos… (up to a minute)';
+  const outcome = await requestPhotoScan(PhotoScan.photos, PhotoScan.location);
+  if (!document.getElementById('ps-body')) return; // closed while waiting
+  if (outcome.error || !outcome.items.length) {
+    renderPhotoScanBody();
+    document.getElementById('ps-error').textContent = outcome.error || 'No food items were recognised. Try a closer, brighter photo.';
+    return;
+  }
+  PhotoScan.rows = outcome.items.map((it) => ({
+    name: it.name,
+    category: it.category,
+    quantity: it.quantity || null,
+    unit: it.unit,
+    states: it.states && it.states.length ? it.states : (PhotoScan.location === 'freezer' ? ['Frozen'] : ['Raw']),
+    isStaple: !!it.isStaple,
+    caloriesPer100: it.caloriesSource === 'unknown' ? null : (it.caloriesPer100 || null),
+    caloriesUnit: it.caloriesUnit,
+    caloriesSource: it.caloriesSource === 'unknown' ? null : it.caloriesSource,
+    confidence: it.confidence,
+    selected: true
+  }));
+  await markExistingRows();
+  renderPhotoScanBody();
+  document.getElementById('ps-body').scrollTop = 0;
+}
+
+async function savePhotoScan() {
+  const rows = PhotoScan.rows.filter((r) => r.selected && r.name.trim());
+  const btn = document.getElementById('ps-action');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  const now = new Date().toISOString();
+  let added = 0;
+  let updated = 0;
+  try {
+    for (const row of rows) {
+      const calories = row.caloriesPer100
+        ? { caloriesPer100: row.caloriesPer100, caloriesUnit: row.caloriesUnit === 'ml' ? 'ml' : 'g', caloriesSource: row.caloriesSource || 'manual' }
+        : {};
+      if (row.existingId) {
+        const item = await dbGet('inventoryItems', row.existingId);
+        if (!item) continue;
+        Object.assign(item, calories, { updatedAt: now });
+        if ((item.quantity === null || item.quantity === undefined || item.quantity === 0) && row.quantity) {
+          item.quantity = row.quantity;
+          item.unit = row.unit;
+        }
+        await dbPut('inventoryItems', item);
+        await logHistory(item.id, 'adjusted', null, item.location, item.location, 'Updated from photo scan');
+        updated++;
+      } else {
+        const suggestion = await getSuggestedUseBy(row.name, row.states);
+        const newId = await dbPut('inventoryItems', {
+          name: row.name.trim(),
+          quantity: row.quantity || null,
+          unit: row.unit,
+          portionCount: null,
+          portionSize: null,
+          location: PhotoScan.location,
+          subLocation: null,
+          states: row.states,
+          category: row.category,
+          isStaple: row.isStaple,
+          purchaseDate: null,
+          expiryDate: suggestion ? localDateString(addDays(new Date(), suggestion.suggestedDaysMax)) : null,
+          useByOverrideDays: null,
+          cost: null,
+          notes: '',
+          freezerFriendlyRating: null,
+          linkedPurchaseEventId: null,
+          caloriesPer100: null,
+          caloriesUnit: null,
+          caloriesSource: null,
+          ...calories,
+          createdAt: now,
+          updatedAt: now
+        });
+        await logHistory(newId, 'created', row.quantity || null, null, PhotoScan.location, 'Added from photo scan');
+        added++;
+      }
+    }
+    PhotoScan.photos = [];
+    PhotoScan.rows = [];
+    closeModal();
+    const summary = [added ? `added ${added}` : '', updated ? `updated ${updated}` : ''].filter(Boolean).join(', ');
+    showToast(summary ? summary[0].toUpperCase() + summary.slice(1) : 'Nothing saved');
+    renderRoute();
+  } catch (err) {
+    updatePhotoScanButton();
+    alert('Couldn\'t save: ' + (err && err.message ? err.message : 'unknown storage error'));
+  }
 }
 
 /* ============================================================

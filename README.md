@@ -90,6 +90,12 @@ Each ingredient stores `matchTerms` (inventory names that count as having it, e.
 3. **API keys → Create key**: name it "Kitchen Companion" and copy the `sk-ant-…` key. Skip workload identity federation; that is for servers, not phone apps.
 4. In the app: **Settings → AI suggestions**, paste the key, **Save key**. It is tested automatically.
 
+## Photo scan & item calories
+
+- **📸 Scan photo** (Kitchen tab): pick Pantry, Fridge or Freezer and take or choose up to 5 photos (a shelf, the fridge door, a few jars). Photos are shrunk on the phone (longest edge 1568 px) and sent to Claude, which lists each food item it can see, reading brand names, pack sizes and nutrition panels where visible. You get an editable list: untick anything wrong, fix names, amounts, categories and calories, then **Save**. Items already in the kitchen at that location are updated (calories, plus amount if it had none) instead of duplicated. Uses the same API key as AI suggestions; roughly 8–15 Australian cents per photo. Photos aren't stored.
+- **Calories per item**: each item can hold kcal per 100 g or 100 ml, shown on its card, marked "from label", "estimated" or "entered". Edit it in the item's More details, or tap **✨ Estimate** to fill it from the item's name.
+- For the most accurate calories, photograph the nutrition panel on the back of jars and packets.
+
 ## Next
 
 - **Step 3**: Meal plan, built around food expiring soonest and your calorie target.
