@@ -87,7 +87,7 @@ Each ingredient stores `matchTerms` (inventory names that count as having it, e.
 ## Step 2: What can I make?
 
 - **Match %**: each recipe shows how much of it is already in your kitchen ("71% match"), what you'd need to buy, and which food about to go off it uses ("Uses Spinach (2 days left)"). Staples (salt, oil, dried spices) and optional ingredients don't count against the score. With food in the kitchen, the list is sorted by best match, with a boost for recipes that use up expiring food.
-- **Health goals** (Settings): calories per meal (default 450–500 kcal) and the cuisines you like (Indian, Anglo-Indian, Australian, Western, Chinese, Indo-Chinese, Korean, Vietnamese). Recipes show **✓ 480 kcal** inside the range and **590 kcal · over** above it.
+- **Health goals** (Settings): calories per meal (default 450–500 kcal) and the cuisines you like (see Cuisines below). Recipes show **✓ 480 kcal** inside the range and **590 kcal · over** above it.
 - **✨ Suggest meals** (Recipes tab): sends your kitchen list, use-by dates and health goals to Claude (`claude-opus-5-5`), which suggests 3 meals that use expiring food first and aim for your calorie target, each with ingredients, method, approximate kcal and protein, and what you'd need to buy. **Save to my recipes** keeps one. Needs your own Anthropic API key, pasted into **Settings → AI suggestions** (stored only in this browser's localStorage, not in backups). Roughly 10–15 Australian cents per set of suggestions.
 - **🔎 Search online** (Recipes tab): free search of TheMealDB by ingredient or dish name, or browse by cuisine. Saved recipes have no calories, so the edit form opens to let you add them.
 - The service worker now leaves API calls (Anthropic, TheMealDB) to the network instead of caching them.
@@ -116,7 +116,13 @@ Each ingredient stores `matchTerms` (inventory names that count as having it, e.
 
 ## Start fresh
 
-**Settings → Start fresh** clears the kitchen, its history, meal plans, recipes you added or saved, ratings, favourites and settings, after offering a backup download. The 30 built-in recipes come back as new; the use-by and freezer reference data and your API key are kept.
+**Settings → Start fresh** clears everything (the kitchen and its history, meal plans, all recipes including the 30 starter recipes, ratings, favourites and settings) after offering a backup download. The use-by and freezer reference data and your API key are kept.
+
+**Settings → Starter recipes** adds the 30 built-in recipes back, or removes them (any you've edited are kept). Once removed they don't come back by themselves.
+
+## Cuisines
+
+45 cuisines in 8 regions: South Asian, East Asian, Southeast Asian, Middle Eastern & African, European, Americas, Oceania, and Other. The Recipes tab only shows tabs for cuisines you have recipes in. **Settings → Health goals → Cuisines you like** lists them by region; choosing none means any cuisine, and AI suggestions follow whatever is chosen. Online search results keep their cuisine (e.g. TheMealDB Jamaican → Caribbean).
 
 ## Roadmap
 
