@@ -120,6 +120,10 @@ Each ingredient stores `matchTerms` (inventory names that count as having it, e.
 
 **Settings → Starter recipes** adds the 30 built-in recipes back, or removes them (any you've edited are kept). Once removed they don't come back by themselves.
 
+## Suggest recipes from my kitchen
+
+Once the kitchen has food in it, **🍳 Suggest recipes from my kitchen** appears on the Kitchen tab and the Home screen. It opens one sheet with: food to use soon (expiring within 3 days); your saved recipes that are at least a 50% match, best first and favouring ones that use food going off, each showing what you'd still need; **✨ AI ideas from my kitchen** (Claude, needs your API key); and **🔎 Free ideas online** (TheMealDB, with quick buttons for meat and fish you have).
+
 ## Cuisines
 
 45 cuisines in 8 regions: South Asian, East Asian, Southeast Asian, Middle Eastern & African, European, Americas, Oceania, and Other. The Recipes tab only shows tabs for cuisines you have recipes in. **Settings → Health goals → Cuisines you like** lists them by region; choosing none means any cuisine, and AI suggestions follow whatever is chosen. Online search results keep their cuisine (e.g. TheMealDB Jamaican → Caribbean).

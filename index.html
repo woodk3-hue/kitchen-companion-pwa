@@ -961,6 +961,16 @@ h1, h2, h3 {
 .cuisine-group { border-bottom: 1px solid var(--color-line); padding: 6px 0; }
 .cuisine-group summary { font-size: 13px; font-weight: 700; cursor: pointer; padding: 4px 0; }
 .cuisine-group .state-chip-grid { padding: 6px 0 4px; }
+
+.suggest-kitchen-btn {
+  display: flex; flex-direction: column; align-items: flex-start; width: 100%;
+  padding: 12px 14px; margin-bottom: 12px; border-radius: var(--radius-sm);
+  background: var(--color-accent); color: white; border: none;
+  font-family: inherit; text-align: left; cursor: pointer;
+}
+.suggest-kitchen-btn .st-btn-title { font-size: 15px; font-weight: 800; }
+.suggest-kitchen-btn .st-btn-desc { font-size: 12px; opacity: 0.9; margin-top: 2px; }
+.suggest-kitchen-btn:active { background: var(--color-accent-dark); }
 </style>
  </head>
  <body>
@@ -1435,7 +1445,13 @@ async function renderRoute() {
   const content = document.getElementById('app-content');
 
   switch (AppState.route) {
-    case 'home': content.innerHTML = await renderHomeScreen(); attachInstallListener('home'); break;
+    case 'home': {
+      content.innerHTML = await renderHomeScreen();
+      attachInstallListener('home');
+      const homeSuggest = document.getElementById('home-suggest-btn');
+      if (homeSuggest) homeSuggest.addEventListener('click', openKitchenSuggestions);
+      break;
+    }
     case 'kitchen': content.innerHTML = await renderKitchenScreen(); attachKitchenListeners(); break;
     case 'settings': content.innerHTML = await renderSettingsScreen(); attachSettingsListeners(); break;
     case 'planner': content.innerHTML = await renderPlannerScreen(); attachPlannerListeners(); break;
@@ -1592,6 +1608,7 @@ async function renderHomeScreen() {
   return `
     ${installCardHtml('home')}
     ${todayPlanHtml}
+    ${totalItems ? kitchenSuggestButtonHtml('home-suggest-btn') : ''}
     <div class="stat-grid">${statCardsHtml}</div>
     ${totalItems === 0 ? `
       <div class="empty-state">
@@ -1656,7 +1673,7 @@ async function renderKitchenScreen() {
   `;
 
   if (filtered.length === 0) {
-    return tabsHtml + stocktakeHtml + quickAddHtml + `
+    return tabsHtml + stocktakeHtml + (items.length ? kitchenSuggestButtonHtml('kitchen-suggest-btn') : '') + quickAddHtml + `
       <div class="empty-state">
         <div class="glyph">🧺</div>
         <h3>No items here yet</h3>
@@ -1703,13 +1720,15 @@ async function renderKitchenScreen() {
     `;
   }).join('');
 
-  return tabsHtml + stocktakeHtml + quickAddHtml + itemsHtml;
+  return tabsHtml + stocktakeHtml + kitchenSuggestButtonHtml('kitchen-suggest-btn') + quickAddHtml + itemsHtml;
 }
 
 function attachKitchenListeners() {
   document.getElementById('stocktake-btn').addEventListener('click', openStocktake);
   document.getElementById('photo-scan-btn').addEventListener('click', openPhotoScan);
   document.getElementById('barcode-scan-btn').addEventListener('click', openBarcodeScan);
+  const suggestBtn = document.getElementById('kitchen-suggest-btn');
+  if (suggestBtn) suggestBtn.addEventListener('click', openKitchenSuggestions);
 
   document.querySelectorAll('.loc-tab').forEach((tab) => {
     tab.addEventListener('click', () => {
@@ -4917,6 +4936,68 @@ async function startFresh() {
   await dbPut('settings', { key: 'recipeSeed', version: 0, deletedSeedIds: [], builtInsOff: true });
   showToast('All clear. Start with the Kitchen tab.');
   navigateTo('home');
+}
+
+/* ============================================================
+   SUGGEST RECIPES FROM MY KITCHEN
+   One sheet that brings together: food going off soon, saved recipes
+   that can be made now, AI ideas and free online ideas.
+   ============================================================ */
+function kitchenSuggestButtonHtml(id) {
+  return `
+    <button type="button" class="suggest-kitchen-btn" id="${id}">
+      <span class="st-btn-title">🍳 Suggest recipes from my kitchen</span>
+      <span class="st-btn-desc">What can I make with what I've got?</span>
+    </button>`;
+}
+
+async function openKitchenSuggestions() {
+  const [items, recipes, goals] = await Promise.all([dbGetAll('inventoryItems'), dbGetAll('recipes'), getHealthGoals()]);
+  const index = buildInventoryIndex(items);
+  const goingOff = index
+    .filter((e) => e.daysLeft !== null && e.daysLeft <= EXPIRING_SOON_DAYS)
+    .sort((a, b) => a.daysLeft - b.daysLeft);
+  const matches = recipes
+    .map((r) => ({ r, sc: scoreRecipe(r, index) }))
+    .filter((x) => x.sc.pct >= 50)
+    .sort((a, b) => (b.sc.pct + (b.sc.expiring.length ? 30 : 0)) - (a.sc.pct + (a.sc.expiring.length ? 30 : 0)))
+    .slice(0, 6);
+
+  openModal(`
+    <div class="modal-title-row">
+      <h2>🍳 From my kitchen</h2>
+      <button class="close-btn" id="modal-close">×</button>
+    </div>
+    <div class="modal-scroll-area">
+      ${goingOff.length ? `<p class="match-line uses" style="margin:0 0 10px;font-size:13px;">Use soon: ${goingOff.slice(0, 5).map((e) => `${escapeHtml(e.item.name)} (${formatDaysLeft(e.daysLeft)})`).join(', ')}</p>` : ''}
+
+      <div class="st-group-title" style="margin-top:4px;">Your recipes you can make</div>
+      ${matches.length ? matches.map(({ r, sc }) => `
+        <button type="button" class="pick-row" data-recipe-id="${r.id}">
+          <span class="pick-name">${escapeHtml(r.name)}</span>
+          <span class="pick-tags">
+            <span class="tag match-pct ${sc.pct >= 80 ? 'high' : ''}">${sc.pct}% match</span>
+            ${calorieBadgeHtml(r.caloriesPerServing, goals)}
+            ${sc.expiring.length ? `<span class="tag kcal-over">Uses ${escapeHtml(sc.expiring[0].name)}</span>` : ''}
+          </span>
+          ${sc.missing.length ? `<span class="match-line" style="margin:0;">Need: ${escapeHtml(sc.missing.slice(0, 4).join(', '))}</span>` : '<span class="match-line" style="margin:0;">You have everything</span>'}
+        </button>`).join('') : `<p class="recipe-muted">${recipes.length ? 'None of your saved recipes are a good match yet.' : 'Your recipe book is empty.'} Try the ideas below.</p>`}
+
+      <div class="st-group-title">New ideas</div>
+      <button type="button" class="pick-row" id="ks-ai">
+        <span class="pick-name">✨ AI ideas from my kitchen</span>
+        <span class="match-line" style="margin:0;">${getAiKey() ? 'Claude suggests 3 meals using what you have, food going off first, around your calorie target' : 'Needs your API key in Settings → AI suggestions'}</span>
+      </button>
+      <button type="button" class="pick-row" id="ks-online">
+        <span class="pick-name">🔎 Free ideas online</span>
+        <span class="match-line" style="margin:0;">Search TheMealDB by what's in your kitchen</span>
+      </button>
+    </div>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.querySelectorAll('.pick-row[data-recipe-id]').forEach((btn) => btn.addEventListener('click', () => openRecipeDetail(parseInt(btn.dataset.recipeId, 10))));
+  document.getElementById('ks-ai').addEventListener('click', openAiSuggest);
+  document.getElementById('ks-online').addEventListener('click', openOnlineSearch);
 }
 
 /* ============================================================
