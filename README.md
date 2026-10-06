@@ -1,4 +1,6 @@
-# Kitchen Companion
+# PantryFit: Kitchen & Food Tracker
+
+*(Formerly PantryFit.)*
 
 Personal kitchen inventory PWA. Offline-capable, no backend, all data stored locally in IndexedDB on your device.
 
@@ -28,7 +30,7 @@ No build step. Two ways to use it:
 ```
 git init
 git add .
-git commit -m "Kitchen Companion Phase 1"
+git commit -m "PantryFit"
 git remote add origin <your-repo-url>
 git push -u origin main
 ```
@@ -39,8 +41,8 @@ Then in repo Settings → Pages, set source to the branch/folder containing thes
 
 ## Installing on your phone
 
-Kitchen Companion installs like a normal app (home-screen icon, full screen, works offline), with no app store needed:
-- **Chrome on Android**: open the site and tap **📲 Install Kitchen Companion** on the Home screen (or in Settings), then **Install**. If that button only shows instructions, use Chrome's ⋮ menu → **Add to home screen** / **Install app**.
+PantryFit installs like a normal app (home-screen icon, full screen, works offline), with no app store needed:
+- **Chrome on Android**: open the site and tap **📲 Install PantryFit** on the Home screen (or in Settings), then **Install**. If that button only shows instructions, use Chrome's ⋮ menu → **Add to home screen** / **Install app**.
 - **Long-press the app icon** for shortcuts: Scan barcode, Stocktake, Suggest meals.
 - Once installed, the Install button is replaced by "Installed as an app" in Settings.
 - Your data stays in that browser's storage on the phone, so keep exporting backups from Settings.
@@ -68,7 +70,7 @@ Not yet converted: quick-add templates saved by a v1 install, and backups export
 
 ## Data safety
 
-IndexedDB is local to the browser/device. Clearing browser data, switching browsers, or a new phone will lose everything. **Use Settings → Export Kitchen Data** regularly — it downloads a single `kitchen_backup_YYYY-MM-DD.json` you can keep on your NAS or wherever. Import restores from that file (it fully replaces current data, so it'll ask you to confirm first).
+IndexedDB is local to the browser/device. Clearing browser data, switching browsers, or a new phone will lose everything. **Use Settings → Export Kitchen Data** regularly — it downloads a single `pantryfit_backup_YYYY-MM-DD.json` you can keep on your NAS or wherever. Import restores from that file (it fully replaces current data, so it'll ask you to confirm first).
 
 ## Phase 2a: Recipes
 
@@ -97,7 +99,7 @@ Each ingredient stores `matchTerms` (inventory names that count as having it, e.
 ### Getting an Anthropic API key
 1. Sign in at console.anthropic.com (same email as your Claude account works, but API billing is separate from a Claude subscription).
 2. **Billing**: add a small prepaid credit (e.g. US$5–10). Under **Limits**, set a monthly spend limit.
-3. **API keys → Create key**: name it "Kitchen Companion" and copy the `sk-ant-…` key. Skip workload identity federation; that is for servers, not phone apps.
+3. **API keys → Create key**: name it "PantryFit" and copy the `sk-ant-…` key. Skip workload identity federation; that is for servers, not phone apps.
 4. In the app: **Settings → AI suggestions**, paste the key, **Save key**. It is tested automatically.
 
 ## Photo scan & item calories

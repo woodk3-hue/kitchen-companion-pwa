@@ -3,7 +3,10 @@
  <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Kitchen Companion</title>
+  <title>PantryFit</title>
+  <meta name="apple-mobile-web-app-title" content="PantryFit">
+  <meta name="application-name" content="PantryFit">
+  <meta name="description" content="PantryFit: kitchen and food tracker. Track your pantry, fridge and freezer, plan meals, and log calories and macros.">
   <meta name="theme-color" content="#1F2620">
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="./icon-192.png">
@@ -1225,7 +1228,7 @@ h1, h2, h3 { letter-spacing: -0.02em; }
  </head>
  <body>
   <header class="app-header">
-   <h1 id="header-title">Kitchen Companion</h1>
+   <h1 id="header-title">PantryFit</h1>
    <div class="subtitle" id="header-subtitle">Know what you've got</div>
   </header>
   <main id="app-content"></main>
@@ -1246,6 +1249,7 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 /* ============================================================
    DATABASE
    ============================================================ */
+// The app was called Kitchen Companion; the database keeps that name so existing data stays put.
 const DB_NAME = 'KitchenCompanionDB';
 const DB_VERSION = 3;
 let db = null;
@@ -3649,7 +3653,7 @@ async function requestAiSuggestions(mealType, request) {
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
       output_config: { effort: 'medium', format: { type: 'json_schema', schema: aiSuggestionSchema() } },
-      system: 'You are the meal-suggestion feature of Kitchen Companion, a personal kitchen app for a home cook in Australia. Suggest practical, healthy home-cooked meals with clear, concise methods, in the cuisines they say they like.',
+      system: 'You are the meal-suggestion feature of PantryFit, a personal kitchen app for a home cook in Australia. Suggest practical, healthy home-cooked meals with clear, concise methods, in the cuisines they say they like.',
       messages: [{ role: 'user', content: buildAiPrompt(items, goals, mealType, request) }]
     });
     if (response.stop_reason === 'refusal') {
@@ -6174,7 +6178,7 @@ async function handleImportRecipesFile(e) {
     for (const r of toAdd) await dbPut('recipes', r);
     showToast(`Added ${toAdd.length} recipe${toAdd.length === 1 ? '' : 's'}`);
   } catch (err) {
-    alert('Could not read recipes from this file. Make sure it\'s a Kitchen Companion recipe file.');
+    alert('Could not read recipes from this file. Make sure it\'s a PantryFit recipe file.');
   } finally {
     e.target.value = '';
   }
@@ -6191,9 +6195,9 @@ async function exportKitchenData() {
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const dateStamp = new Date().toISOString().slice(0, 10);
+  const dateStamp = localDateString(new Date());
   a.href = url;
-  a.download = `kitchen_backup_${dateStamp}.json`;
+  a.download = `pantryfit_backup_${dateStamp}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -6221,7 +6225,7 @@ async function handleImportFile(e) {
     showToast('Kitchen data restored');
     renderRoute();
   } catch (err) {
-    alert('Could not read this backup file. Make sure it was exported from Kitchen Companion.');
+    alert('Could not read this backup file. Make sure it was exported from PantryFit.');
   } finally {
     e.target.value = '';
   }
@@ -6246,7 +6250,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 window.addEventListener('appinstalled', () => {
   deferredInstallPrompt = null;
-  showToast('Installed. Open Kitchen Companion from your home screen.');
+  showToast('Installed. Open PantryFit from your home screen.');
   if (AppState.route === 'home' || AppState.route === 'settings') renderRoute();
 });
 
@@ -6270,7 +6274,7 @@ function installCardHtml(place) {
   }
   return `
     <button type="button" class="install-card" id="install-btn-${place}">
-      <span class="install-title">📲 Install Kitchen Companion</span>
+      <span class="install-title">📲 Install PantryFit</span>
       <span class="install-desc">${deferredInstallPrompt ? 'Add it to your home screen as an app. Works offline.' : 'Add it to your home screen: tap here for how.'}</span>
     </button>`;
 }
@@ -6314,7 +6318,7 @@ window.addEventListener('hashchange', handleHashChange);
 (async function init() {
   try {
     if (!window.indexedDB) {
-      showFatalError('This browser doesn\'t support local storage (IndexedDB), so Kitchen Companion can\'t save data here. Try opening this file in Safari or Chrome instead of the app you\'re currently using — or better, host it online and open that link.');
+      showFatalError('This browser doesn\'t support local storage (IndexedDB), so PantryFit can\'t save data here. Try opening this file in Safari or Chrome instead of the app you\'re currently using — or better, host it online and open that link.');
       return;
     }
     await openDatabase();
@@ -6327,7 +6331,7 @@ window.addEventListener('hashchange', handleHashChange);
       .then((changed) => { if (changed && AppState.route === 'recipes') renderRoute(); })
       .catch(() => {});
   } catch (err) {
-    showFatalError('Kitchen Companion couldn\'t start because local storage failed to open. This usually happens when opening the file directly from a Files app. Try opening it in Safari or Chrome, or host it online (e.g. GitHub Pages) and open that link instead.<br><br><span style="opacity:0.7;font-size:11px;">' + (err && err.message ? err.message : String(err)) + '</span>');
+    showFatalError('PantryFit couldn\'t start because local storage failed to open. This usually happens when opening the file directly from a Files app. Try opening it in Safari or Chrome, or host it online (e.g. GitHub Pages) and open that link instead.<br><br><span style="opacity:0.7;font-size:11px;">' + (err && err.message ? err.message : String(err)) + '</span>');
   }
 })();
 

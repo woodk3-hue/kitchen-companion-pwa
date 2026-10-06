@@ -1,8 +1,8 @@
-# Kitchen Companion - Project Vision
+# PantryFit - Project Vision
 
 ## Purpose
 
-Kitchen Companion is a personal kitchen management system designed to reduce food waste, improve meal planning, track grocery spending, manage freezer inventory, and help create meals from ingredients already owned.
+PantryFit (formerly Kitchen Companion) is a personal kitchen management system designed to reduce food waste, improve meal planning, track grocery spending, manage freezer inventory, and help create meals from ingredients already owned.
 
 The app is built primarily for personal use and supports Indian, Anglo-Indian, Australian, and Western cooking styles.
 
