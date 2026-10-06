@@ -54,6 +54,7 @@ manifest.json                 — PWA install metadata
 recipes-seed.json             — built-in recipes, loaded into the app on first open
 icon-192.png, icon-512.png   — app icons, rendered from icon.svg (orange tile, cooking pot with steam and a green leaf inside a green progress ring)
 icon.svg                      — icon source; edit this and re-render the PNGs to change the icon
+fonts/                        — Plus Jakarta Sans (SIL Open Font License), served with the app so it works offline
 ```
 
 ## Data upgrades
@@ -120,6 +121,10 @@ Each ingredient stores `matchTerms` (inventory names that count as having it, e.
 **Settings → Start fresh** clears everything (the kitchen and its history, meal plans, all recipes including the 30 starter recipes, ratings, favourites and settings) after offering a backup download. The use-by and freezer reference data and your API key are kept.
 
 **Settings → Starter recipes** adds the 30 built-in recipes back, or removes them (any you've edited are kept). Once removed they don't come back by themselves.
+
+## Look and feel
+
+A modern theme sits as one layer at the end of the stylesheet ("MODERN THEME"): Plus Jakarta Sans, a brighter palette matching the icon (orange accent, green, blue, gold), white cards with soft shadows instead of borders, pill chips and buttons, a segmented control style, soft filled inputs, rounded bottom sheets, a frosted header, a floating bottom bar with line icons, and a rounded floating + button. Removing that block returns to the original look.
 
 ## Food diary (Today tab)
 

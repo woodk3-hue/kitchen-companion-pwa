@@ -11,6 +11,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="preload" href="./fonts/plus-jakarta-sans.woff2" as="font" type="font/woff2" crossorigin>
   <style>
 /* ============================================================
    DESIGN TOKENS
@@ -1042,6 +1043,184 @@ h1, h2, h3 {
 .goal-macros { gap: 6px; }
 .goal-macros .field label { font-size: 11px; }
 .macro-fields { margin-top: 6px; }
+
+/* ============================================================
+   MODERN THEME
+   A layer over the base styles: brighter palette matching the app
+   icon, white cards with soft shadows instead of borders, pill
+   controls, a floating bottom bar. Remove this block to go back.
+   Font: Plus Jakarta Sans (SIL Open Font License, fonts/), served
+   with the app so it works offline.
+   ============================================================ */
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  src: url('./fonts/plus-jakarta-sans.woff2') format('woff2');
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+:root {
+  --color-bg: #F5F4F1;
+  --color-ink: #17191C;
+  --color-ink-soft: #62666D;
+  --color-paper: #FFFFFF;
+  --color-line: #ECEAE6;
+  --color-fill: #F0EFEB;
+  --color-accent: #EE6A2F;
+  --color-accent-dark: #D4541C;
+  --color-accent-tint: #FDEBE2;
+  --color-fridge: #2E9E72;
+  --color-freezer: #3F86D8;
+  --color-leftovers: #D69A12;
+  --color-warn: #D8443A;
+  --color-warn-bg: #FCE9E7;
+  --font-display: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --radius-card: 20px;
+  --radius-sm: 14px;
+  --shadow-card: 0 1px 2px rgba(23, 25, 28, 0.04), 0 6px 20px rgba(23, 25, 28, 0.06);
+  --shadow-float: 0 8px 30px rgba(23, 25, 28, 0.14);
+  --nav-height: 68px;
+}
+body { padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 28px); }
+button, input, select, textarea { font-family: inherit; }
+.ingredient-list .ing-flag { text-transform: none; border: none; background: var(--color-fill); font-size: 11px; font-weight: 600; padding: 1px 8px; }
+.recipe-stat .l { text-transform: none; letter-spacing: 0; font-size: 12px; }
+h1, h2, h3 { letter-spacing: -0.02em; }
+
+/* Header: large title on a frosted bar */
+.app-header {
+  background: rgba(245, 244, 241, 0.86);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: none;
+  padding: 20px 20px 12px;
+}
+.app-header h1 { font-size: 28px; font-weight: 800; }
+.app-header .subtitle { font-size: 13px; font-weight: 500; }
+#app-content { padding: 8px 16px 16px; }
+
+/* Cards: white, rounded, soft shadow, no outline */
+.item-card, .stat-card, .settings-row, .settings-card, .diary-summary, .diary-meal, .plan-day,
+.st-row, .pick-row, .ai-meal, .online-result, .recipe-stat, .stocktake-btn, .phase-placeholder {
+  border: none;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  background: var(--color-paper);
+}
+.item-card { margin-bottom: 10px; overflow: hidden; }
+.item-card .edge { width: 6px; margin: 12px 0 12px 12px; border-radius: 6px; }
+.item-card .body { padding: 14px 16px 14px 12px; }
+.item-card .name { font-size: 16px; font-weight: 700; }
+.stat-card { padding: 16px; }
+.stat-card.loc-pantry, .stat-card.loc-fridge, .stat-card.loc-freezer, .stat-card.loc-leftovers { border-left: none; position: relative; }
+.stat-card::before { content: ''; position: absolute; left: 16px; top: 16px; width: 10px; height: 10px; border-radius: 50%; }
+.stat-card.loc-pantry::before { background: var(--color-accent); }
+.stat-card.loc-fridge::before { background: var(--color-fridge); }
+.stat-card.loc-freezer::before { background: var(--color-freezer); }
+.stat-card.loc-leftovers::before { background: var(--color-leftovers); }
+.stat-card .count { margin-top: 14px; }
+.st-row.ticked, .plan-day.today { box-shadow: 0 0 0 2px var(--color-accent), var(--shadow-card); }
+.plan-slot { border: none; background: var(--color-fill); border-radius: var(--radius-sm); }
+.plan-slot.empty { border: 1.5px dashed #D9D6D0; background: transparent; }
+.plan-slot.type-leftover { background: #FFF4DF; }
+.diary-entry, .diary-planned { border-top-color: var(--color-line); }
+.recipe-stat { box-shadow: none; background: var(--color-fill); }
+
+/* Section headings: sentence case, bolder */
+.section-heading h2 { font-size: 18px; font-weight: 800; }
+.st-group-title, .goal-subhead, .field label, .plan-meal {
+  text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 700; color: var(--color-ink-soft);
+}
+
+/* Tags: soft tinted pills */
+.tag {
+  border: none; background: var(--color-fill); color: var(--color-ink-soft);
+  text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 600; padding: 3px 10px;
+}
+.tag.kcal-ok, .tag.tag-protein { background: #E3F4EC; color: #1E7A55; }
+.tag.kcal-over, .tag.state-defrosting, .tag.state-opened { background: var(--color-warn-bg); color: #B2332A; }
+.tag.state-frozen { background: #E5EFFB; color: #2B6CB8; }
+.tag.state-leftover, .tag.state-cooked { background: #FFF2D9; color: #9A6B00; }
+.tag.match-pct { background: var(--color-fill); color: var(--color-ink); }
+.tag.match-pct.high { background: #E3F4EC; color: #1E7A55; border: none; }
+.tag.kcal-tag { background: var(--color-accent-tint); color: var(--color-accent-dark); }
+.tag.staple-badge { background: var(--color-accent-tint); color: var(--color-accent-dark); }
+
+/* Chips and tabs */
+.loc-tab, .state-chip, .quick-add-chip {
+  border: none; background: var(--color-paper); box-shadow: var(--shadow-card);
+  border-radius: 999px; font-weight: 600; color: var(--color-ink-soft);
+}
+.loc-tab.active, .state-chip.selected { background: var(--color-ink); color: #fff; box-shadow: none; }
+.quick-add-chip { color: var(--color-ink); }
+
+/* Segmented control: tinted track, white selected pill */
+.segmented { background: var(--color-fill); border-radius: 14px; padding: 4px; gap: 4px; }
+.segmented button { border: none; background: transparent; border-radius: 10px; font-weight: 600; color: var(--color-ink-soft); }
+.segmented button.selected { background: var(--color-paper); color: var(--color-ink); box-shadow: 0 1px 3px rgba(23, 25, 28, 0.12); }
+
+/* Buttons */
+.btn-primary {
+  border-radius: 16px; padding: 15px; font-weight: 700;
+  background: linear-gradient(135deg, #F58A42, var(--color-accent));
+  box-shadow: 0 6px 18px rgba(238, 106, 47, 0.28);
+}
+.btn-primary:active { background: var(--color-accent-dark); }
+.btn-primary:disabled { opacity: 0.5; box-shadow: none; }
+.btn-secondary { border: none; background: var(--color-fill); color: var(--color-ink); border-radius: 14px; font-weight: 700; }
+.btn-danger { border: none; background: var(--color-warn-bg); color: #B2332A; border-radius: 14px; font-weight: 700; }
+.link-btn { color: var(--color-accent-dark); }
+
+/* Big feature buttons */
+.stocktake-btn { border-left: none; padding: 14px; }
+.stocktake-btn .st-btn-title { font-size: 15px; }
+.suggest-kitchen-btn, .install-card { border-radius: var(--radius-card); box-shadow: var(--shadow-card); }
+.suggest-kitchen-btn { background: linear-gradient(135deg, #F58A42, #E4572E); }
+.install-card { background: linear-gradient(135deg, #22262B, #3A3F46); }
+
+/* Form fields: soft filled inputs */
+.field input[type="text"], .field input[type="number"], .field input[type="date"], .field select, .field textarea,
+.recipe-search input[type="search"], .st-add input, .st-add select, .ps-name, .ps-fields input, .ps-fields select,
+.st-qty input, .st-qty select, .settings-card .field input[type="password"] {
+  border: 1.5px solid transparent; background: var(--color-fill); border-radius: 12px;
+}
+.field input:focus, .field select:focus, .field textarea:focus, .recipe-search input:focus, .st-add input:focus,
+.ps-name:focus, .ps-fields input:focus, .st-qty input:focus { outline: none; border-color: var(--color-accent); background: var(--color-paper); }
+.st-box { border-radius: 8px; }
+.toggle-switch.on { background: var(--color-fridge); }
+
+/* Bottom sheet */
+.modal-sheet { border-radius: 28px 28px 0 0; background: var(--color-bg); padding: 16px 18px 0; }
+.modal-title-row h2 { font-size: 22px; font-weight: 800; }
+.close-btn { background: var(--color-fill); border-radius: 50%; width: 34px; height: 34px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+.modal-action-bar { border-top: none; background: var(--color-bg); }
+
+/* Floating bottom bar */
+.bottom-nav {
+  left: 12px; right: 12px; bottom: calc(10px + var(--safe-bottom)); height: var(--nav-height); padding: 6px;
+  border-top: none; border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  box-shadow: var(--shadow-float);
+}
+.nav-btn { border-radius: 18px; font-size: 11px; font-weight: 600; letter-spacing: 0; gap: 2px; }
+.nav-btn .icon { width: 22px; height: 22px; }
+.nav-btn.active .icon { stroke-width: 2.3; }
+.nav-btn.active { background: var(--color-accent-tint); color: var(--color-accent-dark); }
+
+/* Floating action button */
+.fab {
+  bottom: calc(var(--nav-height) + var(--safe-bottom) + 24px); right: 20px; width: 58px; height: 58px; border-radius: 20px;
+  background: linear-gradient(135deg, #F58A42, var(--color-accent));
+  box-shadow: 0 10px 24px rgba(238, 106, 47, 0.38);
+}
+
+/* Diary ring and meters on the new palette */
+.ring-track { stroke: #F6E2D7; }
+.diary-summary { padding: 16px; }
+.toast { border-radius: 14px; bottom: calc(var(--nav-height) + var(--safe-bottom) + 24px); }
 </style>
  </head>
  <body>
@@ -1052,12 +1231,12 @@ h1, h2, h3 {
   <main id="app-content"></main>
   <button class="fab" id="fab-btn" style="display:none;" aria-label="Add item">+</button>
   <nav class="bottom-nav">
-   <button class="nav-btn" data-route="home"><span class="icon">⌂</span>Today</button>
-   <button class="nav-btn" data-route="planner"><span class="icon">📅</span>Planner</button>
-   <button class="nav-btn" data-route="recipes"><span class="icon">📖</span>Recipes</button>
-   <button class="nav-btn" data-route="kitchen"><span class="icon">🧺</span>Kitchen</button>
-   <button class="nav-btn" data-route="shopping"><span class="icon">🛒</span>Shopping</button>
-   <button class="nav-btn" data-route="settings"><span class="icon">⚙</span>Settings</button>
+   <button class="nav-btn" data-route="home"><svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21a8 8 0 1 0 0-16"/><path d="M12 5a8 8 0 0 0-8 8"/><path d="M12 9v4l2.5 1.5"/></svg>Today</button>
+   <button class="nav-btn" data-route="planner"><svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h3M8 17h6"/></svg>Planner</button>
+   <button class="nav-btn" data-route="recipes"><svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h10a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h10"/><path d="M9 8h5"/></svg>Recipes</button>
+   <button class="nav-btn" data-route="kitchen"><svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="3" width="13" height="18" rx="3"/><path d="M5.5 10h13"/><path d="M9 6.5v1.2M9 13v3"/></svg>Kitchen</button>
+   <button class="nav-btn" data-route="shopping"><svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h14l-1.2 10.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg>Shopping</button>
+   <button class="nav-btn" data-route="settings"><svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
   </nav>
   <div class="modal-overlay" id="modal-overlay">
    <div class="modal-sheet" id="modal-sheet"></div>
@@ -1511,7 +1690,7 @@ async function renderRoute() {
   const titleMap = {
     home: ['Today', 'Your food diary'],
     planner: ['Meal Planner', 'Plan the week around what you have'],
-    recipes: ['Recipes', 'Indian · Anglo-Indian · Australian · Western'],
+    recipes: ['Recipes', 'Your recipe book'],
     kitchen: ['Kitchen', 'Pantry · Fridge · Freezer · Leftovers'],
     shopping: ['Shopping', 'Coming in Phase 3'],
     settings: ['Settings', 'App data & preferences']
