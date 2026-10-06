@@ -105,8 +105,52 @@ Each ingredient stores `matchTerms` (inventory names that count as having it, e.
 - For the most accurate calories, photograph the nutrition panel on the back of jars and packets.
 - **▦ Barcode** (Kitchen tab): point the camera at a barcode (uses Chrome on Android's built-in barcode reader), or type the number. The product is looked up in [Open Food Facts](https://world.openfoodfacts.org) for its name, brand, pack size and calories per 100 g/ml, and you confirm or edit before saving. Cans, jars and sauce bottles start as a count ("1 can"), other products as their pack size. Scanning something already in that location adds to it (e.g. 1 can → 2 cans). Products not in the database can be filled in on the same screen, with ✨ Estimate for calories. The camera keeps going for the next item until you close the sheet. Barcodes are saved on items.
 
-## Next
+## Step 3: Meal plan
 
-- **Step 3**: Meal plan, built around food expiring soonest and your calorie target.
-- **Step 4**: Shopping list and running low.
-- **Step 5**: "I cooked this" (e.g. cooked 4 portions, ate 2, 2 left over), then barcode scanning.
+- **Planner tab**: the week from Monday to Sunday, with lunch and dinner for each day (turn on **Plan breakfast too** in Settings). Use ‹ › to move between weeks. Each planned meal shows its kcal (✓ inside your target), food it uses up ("Uses Spinach") and how many ingredients you'd need to buy, with a daily kcal total.
+- **+ Add** on a meal opens a picker: things already made (leftovers, cooked portions, ready meals in your kitchen), your recipes ranked best match first, or "Eating out / skip".
+- **Leftovers**: when a recipe makes more portions than you cook for (Settings → Meal plan, default 2), the app offers to plan the spare portions as the next meal (dinner → next day's lunch). Removing the dinner removes its leftovers.
+- **🪄 Fill my week**: fills empty meals from today onwards, choosing recipes that use food closest to its use-by first, then best match, inside your calorie target, with a mix of cuisines and no repeats. Dinners with enough spare portions fill the next lunch. **✨ Include new ideas from Claude** first adds 3 fresh AI recipes to choose from (uses your API key).
+- **📅 Add to meal plan** on any recipe page picks a free slot in the next 10 days.
+- **Home** shows today's meals.
+
+## Start fresh
+
+**Settings → Start fresh** clears the kitchen, its history, meal plans, recipes you added or saved, ratings, favourites and settings, after offering a backup download. The 30 built-in recipes come back as new; the use-by and freezer reference data and your API key are kept.
+
+## Roadmap
+
+### Still to build (for personal use)
+- **Step 4**: Shopping list (missing ingredients from the meal plan) and running low.
+- **Step 5**: "I cooked this" (e.g. cooked 4 portions, ate 2, 2 left over), taking ingredients out of the kitchen.
+- **Automatic checks**: run the browser tests on every pull request with GitHub Actions; a "Report a problem" button.
+
+### Publishing to app stores (later)
+1. **Own domain** (e.g. kitchencompanion.app, ~A$20–40/year) pointed at GitHub Pages. Android needs it for its verification file.
+2. **Android / Google Play**: package with PWABuilder (Trusted Web Activity); Play Console account US$25 once; store listing, privacy policy, data safety form; new personal accounts currently need a ~14-day closed test with ~12 testers. Web updates reach Play users automatically.
+3. **iPhone / App Store**: wrap with Capacitor for native camera and barcode scanning (Safari has no built-in barcode reader); Apple Developer Program US$99/year; build with Xcode on a Mac or a cloud build service; test with TestFlight; App Store review.
+4. **Bug catching**: Sentry crash reports (free tier) that can open GitHub issues; Dependabot for library updates; Play pre-launch reports and Apple TestFlight crash reports.
+
+### Pricing plan (if offered to other people)
+
+**Model: buy once, then pay only for the AI you use.** Anything that costs money to run is paid for by whoever uses it; everything else is included.
+
+| | Price | What it covers |
+|---|---|---|
+| **App unlock** | A$7.99 one-off (A$4.99–7.99 range) | Everything non-AI: pantry/fridge/freezer inventory, stocktake, **barcode scanning with calories**, use-by reminders, recipes, match %, online recipe search, meal planner and Fill my week (non-AI), shopping list |
+| **AI credits** | 10 for A$2.99 · 30 for A$7.99 · 100 for A$19.99 | ✨ Suggest meals (1 credit), ✨ Fill my week with new ideas (1 credit), 📸 photo scan (1 credit per photo). Calorie estimates free or 10 per credit |
+| **Welcome credits** | 5 included with the unlock | Lets new users try the AI |
+
+- **How it's sold**: free to download with a short trial, then a one-off **Unlock** in-app purchase. It brings in the same money as an upfront price, but more people try the app. Credits are in-app "consumable" purchases, as Apple and Google require for digital goods; RevenueCat handles both stores.
+- **Money in**: in Australia the store price includes 10% GST and Apple/Google keep 15%, so about **77% of the sticker price** is received. A$7.99 unlock ≈ A$6.15 received.
+- **AI costs per use**: meal suggestions ~A$0.10–0.15, photo scan ~A$0.08–0.15, calorie estimate ~A$0.01. Credit prices (A$0.20–0.30 each) cover this with margin.
+- **Cost savings to make before launch**: run photo scans and calorie estimates on a cheaper Claude model (test quality on real labels first) and use prompt caching. Together these should roughly halve AI costs, which keeps the 100-credit pack comfortably profitable.
+- **Fixed costs**: ~A$200–300 a year (Apple US$99/yr, Google US$25 once, domain, small server). About **40–65 unlocks a year** covers them.
+- **Needed before charging**:
+  - a small server that holds the Anthropic key, checks each person's credit balance and deducts a credit per AI use (users never see a key);
+  - sign-in with Apple/Google so credits and data survive a new phone;
+  - RevenueCat for the unlock and credit purchases;
+  - TheMealDB supporter key (its free key is for personal/development use);
+  - privacy policy and terms (photos and food lists are sent to Anthropic to process).
+- **Owner use**: Kim keeps using her own API key in Settings, without credits.
+- **Approach**: use the app personally for a month first to see real AI use, then confirm the prices.
