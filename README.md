@@ -47,6 +47,15 @@ PantryFit installs like a normal app (home-screen icon, full screen, works offli
 - Once installed, the Install button is replaced by "Installed as an app" in Settings.
 - Your data stays in that browser's storage on the phone, so keep exporting backups from Settings.
 
+## Sharing the app
+
+Send the link: **https://woodk3-hue.github.io/kitchen-companion-pwa/**
+- It opens in the browser; on Android tap **📲 Install PantryFit**, on iPhone use Safari → Share → **Add to Home Screen**.
+- Each person's data lives only on their own phone, so they start with an empty app and never see yours. For a quick tour: **Settings → Starter recipes → Add the 30 starter recipes**, then try Stocktake, the Planner and the Today diary.
+- AI features need their own Anthropic API key in Settings. Never share yours: their AI use would be charged to your account. Everything else, including barcode lookups, works without a key.
+- iPhone Safari can't read barcodes with the camera; type the number under the barcode instead.
+- To give someone a copy of your setup: **Settings → Export kitchen data**, send the file, and they use **Settings → Import kitchen data**. It's a one-off copy, not live syncing.
+
 ## File structure
 
 ```
@@ -188,3 +197,24 @@ Once the kitchen has food in it, **🍳 Suggest recipes from my kitchen** appear
   - privacy policy and terms (photos and food lists are sent to Anthropic to process).
 - **Owner use**: Kim keeps using her own API key in Settings, without credits.
 - **Approach**: use the app personally for a month first to see real AI use, then confirm the prices.
+
+#### Lean option: just above break-even
+
+The same costs, with prices set to cover them plus a ~15% safety buffer (exchange rates, since AI and Apple costs are in US dollars; refunds; heavier-than-average AI use). Stores use fixed price points, so prices are rounded to those.
+
+| | Price | Received (~77%) | Cost | Margin |
+|---|---|---|---|---|
+| 1 AI credit | A$0.20 | A$0.154 | ~A$0.13 | ~A$0.02 |
+| **10 credits** | **A$1.99** | A$1.53 | A$1.30 | A$0.23 |
+| **50 credits** | **A$9.99** | A$7.69 | A$6.50 | A$1.19 |
+
+| Unlock price | Received after 5 welcome credits (~A$0.65) | Sales a year to cover ~A$300 fixed costs |
+|---|---|---|
+| A$2.99 | ~A$1.65 | ~180 |
+| **A$4.99** | **~A$3.19** | **~95** |
+| A$7.99 | ~A$5.50 | ~55 |
+
+- **Lean pick**: A$4.99 unlock, credits at 10 for A$1.99 or 50 for A$9.99. About 95 unlocks a year covers fixed costs; every sale and credit pack after that is a small profit.
+- **To go cheaper**: a cheaper Claude model for photo scans and calorie estimates (test quality first) and prompt caching could bring credits down to about A$0.10; fewer welcome credits (3 instead of 5) lowers the break-even.
+- **Don't price exactly at break-even**: one heavy AI user could tip it into a loss.
+- **Tax**: profit is income, so keep records. GST registration is only needed above A$75,000 turnover; the stores collect GST on sales.
