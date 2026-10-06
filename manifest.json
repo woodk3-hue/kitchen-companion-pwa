@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "Kitchen Companion",
-  "short_name": "Kitchen",
-  "description": "Kitchen inventory, recipes and meal ideas: stocktake, photo and barcode scanning, calories, and using food before it goes off.",
+  "name": "PantryFit: Kitchen & Food Tracker",
+  "short_name": "PantryFit",
+  "description": "Kitchen and food tracker: pantry, fridge and freezer stock, recipes from what you have, meal plans, and a calorie and macro diary. Use food before it goes off.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
