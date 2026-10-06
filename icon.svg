@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F59A42"/>
+      <stop offset="1" stop-color="#C9472A"/>
+    </linearGradient>
+    <linearGradient id="pot" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#FCEBD9"/>
+    </linearGradient>
+    <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7CCB5E"/>
+      <stop offset="1" stop-color="#2F8F4E"/>
+    </linearGradient>
+  </defs>
+  <!-- full-bleed background so masked shapes stay solid -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g transform="translate(256 262) scale(1.12) translate(-256 -262)">
+  <!-- soft glow behind the pot -->
+  <circle cx="256" cy="290" r="170" fill="#FFFFFF" opacity="0.10"/>
+  <!-- steam -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="17" stroke-linecap="round" opacity="0.95">
+    <path d="M196 214 C176 194, 216 176, 196 154 S 206 118, 200 108"/>
+    <path d="M256 210 C236 188, 278 170, 256 146 S 266 106, 260 96"/>
+    <path d="M316 214 C296 194, 336 176, 316 154 S 326 118, 320 108"/>
+  </g>
+  <!-- pot handles -->
+  <rect x="98" y="262" width="58" height="26" rx="13" fill="#FCEBD9"/>
+  <rect x="356" y="262" width="58" height="26" rx="13" fill="#FCEBD9"/>
+  <!-- pot body -->
+  <path d="M138 252 H374 V340 C374 370, 350 392, 320 392 H192 C162 392, 138 370, 138 340 Z" fill="url(#pot)"/>
+  <!-- rim -->
+  <rect x="120" y="232" width="272" height="30" rx="15" fill="#FFFFFF"/>
+  <rect x="120" y="254" width="272" height="8" fill="#000000" opacity="0.06"/>
+  <!-- leaf on the pot -->
+  <g transform="translate(256 322) rotate(-30)">
+    <path d="M0 -50 C 34 -34, 38 18, 0 50 C -38 18, -34 -34, 0 -50 Z" fill="url(#leaf)"/>
+    <path d="M0 -38 V 40" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" opacity="0.85"/>
+  </g>
+  </g>
+</svg>

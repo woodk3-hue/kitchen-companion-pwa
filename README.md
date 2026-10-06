@@ -52,7 +52,8 @@ index.html                    — the entire app (HTML, CSS, JS)
 sw.js                         — service worker (must stay a separate file)
 manifest.json                 — PWA install metadata
 recipes-seed.json             — built-in recipes, loaded into the app on first open
-icon-192.png, icon-512.png
+icon-192.png, icon-512.png   — app icons, rendered from icon.svg (orange tile, cooking pot with steam, green leaf)
+icon.svg                      — icon source; edit this and re-render the PNGs to change the icon
 ```
 
 ## Data upgrades
