@@ -973,6 +973,75 @@ h1, h2, h3 {
 .suggest-kitchen-btn .st-btn-title { font-size: 15px; font-weight: 800; }
 .suggest-kitchen-btn .st-btn-desc { font-size: 12px; opacity: 0.9; margin-top: 2px; }
 .suggest-kitchen-btn:active { background: var(--color-accent-dark); }
+
+/* ============================================================
+   FOOD DIARY
+   Macro colours: validated categorical slots 1–3 (blue, orange, aqua);
+   every meter also carries a text label and numbers.
+   ============================================================ */
+:root { --macro-protein: #2a78d6; --macro-carbs: #eb6834; --macro-fat: #1baf7a; }
+.diary-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.diary-nav .loc-tab:disabled { opacity: 0.35; }
+.diary-summary {
+  display: flex; gap: 14px; align-items: center; background: var(--color-paper);
+  border: 1px solid var(--color-line); border-radius: var(--radius-sm); padding: 12px;
+}
+.ring-wrap { flex: 0 0 132px; text-align: center; }
+.kcal-ring { width: 132px; height: 132px; display: block; }
+.ring-track { stroke: #F1DFCF; }
+.ring-fill { stroke: var(--color-accent); }
+.ring-fill.over { stroke: var(--color-warn); }
+.ring-num { font-size: 24px; font-weight: 800; fill: var(--color-ink); }
+.ring-sub { font-size: 11px; font-weight: 600; fill: var(--color-ink-soft); }
+.ring-left { font-size: 12px; font-weight: 700; color: var(--color-ink-soft); margin-top: 2px; }
+.ring-left.over { color: var(--color-warn); }
+.macro-list { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.macro-head { display: flex; justify-content: space-between; gap: 6px; font-size: 12px; margin-bottom: 4px; }
+.macro-name { font-weight: 800; display: flex; align-items: center; gap: 6px; }
+.macro-key { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.macro-val { color: var(--color-ink-soft); font-weight: 600; white-space: nowrap; }
+.macro-track { height: 8px; border-radius: 4px; overflow: hidden; }
+.macro-fill { height: 100%; border-radius: 4px; }
+.m-protein.macro-key, .m-protein.macro-fill { background: var(--macro-protein); }
+.m-carbs.macro-key, .m-carbs.macro-fill { background: var(--macro-carbs); }
+.m-fat.macro-key, .m-fat.macro-fill { background: var(--macro-fat); }
+.m-protein.macro-track { background: #DCE8F7; }
+.m-carbs.macro-track { background: #FBE3D8; }
+.m-fat.macro-track { background: #D6F1E6; }
+.diary-meal { background: var(--color-paper); border: 1px solid var(--color-line); border-radius: var(--radius-sm); padding: 10px 12px; margin-top: 10px; }
+.diary-meal-head { display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 800; }
+.diary-meal-kcal { font-weight: 600; color: var(--color-ink-soft); font-size: 12px; margin-left: 4px; }
+.diary-add { padding: 4px 0 4px 8px; }
+.diary-entry {
+  display: flex; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 0 2px; margin: 0;
+  border: none; border-top: 1px solid var(--color-line); background: none; text-align: left;
+  font-family: inherit; color: var(--color-ink); cursor: pointer; font-size: 14px;
+}
+.diary-entry .de-name { font-weight: 600; min-width: 0; }
+.diary-entry .de-amt, .diary-planned .de-amt { color: var(--color-ink-soft); font-weight: 500; }
+.diary-entry .de-num { color: var(--color-ink-soft); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.diary-planned { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0 2px; border-top: 1px dashed var(--color-line); font-size: 13px; color: var(--color-ink-soft); }
+.diary-planned .state-chip { padding: 5px 10px; font-size: 12px; }
+.add-food-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-bottom: 16px; }
+.add-food-opt {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 8px;
+  border: 1px solid var(--color-line); border-radius: var(--radius-sm); background: var(--color-paper);
+  font-family: inherit; font-size: 14px; font-weight: 700; color: var(--color-ink); cursor: pointer;
+}
+.add-food-opt span { font-size: 26px; }
+.add-food-opt.wide { grid-column: span 2; flex-direction: row; justify-content: center; }
+.add-food-opt.wide span { font-size: 20px; }
+.nutrient-row { gap: 6px; }
+.nutrient-row .field input { padding: 9px 8px; }
+.plan-ai-toggle input.lki-use { width: 76px; height: auto; padding: 5px 6px; border: 1px solid var(--color-line); border-radius: 6px; font-size: 14px; }
+#lki-amount { flex: 1 1 100px; }
+#lki-unit { flex: 0 0 120px; }
+.pp-nums label { display: flex; flex-direction: column; font-size: 10px; font-weight: 700; color: var(--color-ink-soft); flex: 1; min-width: 0; }
+.pp-nums input { width: 100%; }
+.goal-subhead { display: block; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-ink-soft); margin: 4px 0 6px; }
+.goal-macros { gap: 6px; }
+.goal-macros .field label { font-size: 11px; }
+.macro-fields { margin-top: 6px; }
 </style>
  </head>
  <body>
@@ -983,7 +1052,7 @@ h1, h2, h3 {
   <main id="app-content"></main>
   <button class="fab" id="fab-btn" style="display:none;" aria-label="Add item">+</button>
   <nav class="bottom-nav">
-   <button class="nav-btn" data-route="home"><span class="icon">⌂</span>Home</button>
+   <button class="nav-btn" data-route="home"><span class="icon">⌂</span>Today</button>
    <button class="nav-btn" data-route="planner"><span class="icon">📅</span>Planner</button>
    <button class="nav-btn" data-route="recipes"><span class="icon">📖</span>Recipes</button>
    <button class="nav-btn" data-route="kitchen"><span class="icon">🧺</span>Kitchen</button>
@@ -999,7 +1068,7 @@ h1, h2, h3 {
    DATABASE
    ============================================================ */
 const DB_NAME = 'KitchenCompanionDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 let db = null;
 
 // Controlled category list (PROJECT_VISION.md)
@@ -1143,6 +1212,12 @@ function openDatabase() {
 
       if (!_db.objectStoreNames.contains('settings')) {
         _db.createObjectStore('settings', { keyPath: 'key' });
+      }
+
+      // v3: food diary
+      if (!_db.objectStoreNames.contains('foodLog')) {
+        const store = _db.createObjectStore('foodLog', { keyPath: 'id', autoIncrement: true });
+        store.createIndex('date', 'date', { unique: false });
       }
     };
 
@@ -1402,6 +1477,7 @@ const AppState = {
   editingItemId: null,
   recipes: [],
   planWeekStart: null,
+  diaryDate: null,
   planUseAi: false,
   recipeFilters: { search: '', cuisine: 'all', favourites: false, quick: false, highProtein: false, freezer: false }
 };
@@ -1433,7 +1509,7 @@ async function renderRoute() {
   fab.style.display = (AppState.route === 'kitchen' || AppState.route === 'recipes') ? 'flex' : 'none';
 
   const titleMap = {
-    home: ['Kitchen Companion', "Know what you've got"],
+    home: ['Today', 'Your food diary'],
     planner: ['Meal Planner', 'Plan the week around what you have'],
     recipes: ['Recipes', 'Indian · Anglo-Indian · Australian · Western'],
     kitchen: ['Kitchen', 'Pantry · Fridge · Freezer · Leftovers'],
@@ -1450,6 +1526,7 @@ async function renderRoute() {
     case 'home': {
       content.innerHTML = await renderHomeScreen();
       attachInstallListener('home');
+      attachTodayDiaryListeners();
       const homeSuggest = document.getElementById('home-suggest-btn');
       if (homeSuggest) homeSuggest.addEventListener('click', openKitchenSuggestions);
       break;
@@ -1605,11 +1682,12 @@ async function renderHomeScreen() {
   }
 
   const totalItems = items.length;
-  const todayPlanHtml = await todaysMealsHtml();
+  const diaryHtml = await renderTodayDiaryHtml();
 
   return `
     ${installCardHtml('home')}
-    ${todayPlanHtml}
+    ${diaryHtml}
+    <div class="section-heading" style="margin-top:20px;"><h2>Your kitchen</h2></div>
     ${totalItems ? kitchenSuggestButtonHtml('home-suggest-btn') : ''}
     <div class="stat-grid">${statCardsHtml}</div>
     ${totalItems === 0 ? `
@@ -1887,6 +1965,11 @@ function openItemForm(item, prefill) {
                 </select>
                 <button type="button" class="btn-secondary" id="f-kcal-estimate" style="margin-top:0;width:auto;">✨ Estimate</button>
               </div>
+              <div class="ps-fields macro-fields" style="padding:0;">
+                <input type="number" id="f-protein" min="0" step="any" inputmode="decimal" placeholder="Protein g" value="${seed && seed.proteinPer100 ? seed.proteinPer100 : ''}">
+                <input type="number" id="f-carbs" min="0" step="any" inputmode="decimal" placeholder="Carbs g" value="${seed && seed.carbsPer100 ? seed.carbsPer100 : ''}">
+                <input type="number" id="f-fat" min="0" step="any" inputmode="decimal" placeholder="Fat g" value="${seed && seed.fatPer100 ? seed.fatPer100 : ''}">
+              </div>
             </div>
 
             <div class="field">
@@ -1962,6 +2045,10 @@ function openItemForm(item, prefill) {
     kcalInput.value = Math.round(result.caloriesPer100);
     kcalInput.dataset.source = 'estimated';
     document.getElementById('f-kcal-unit').value = result.caloriesUnit === 'ml' ? 'ml' : 'g';
+    const m = macrosFrom(result);
+    document.getElementById('f-protein').value = m.proteinPer100 ?? '';
+    document.getElementById('f-carbs').value = m.carbsPer100 ?? '';
+    document.getElementById('f-fat').value = m.fatPer100 ?? '';
     document.getElementById('f-kcal-source').textContent = '(estimated)';
   });
 
@@ -2051,6 +2138,7 @@ async function saveItemFromForm(existingItem) {
     caloriesPer100: parseFloat(document.getElementById('f-kcal').value) || null,
     caloriesUnit: document.getElementById('f-kcal').value ? document.getElementById('f-kcal-unit').value : null,
     caloriesSource: document.getElementById('f-kcal').value ? (document.getElementById('f-kcal').dataset.source || 'manual') : null,
+    ...macrosFrom({ proteinPer100: document.getElementById('f-protein').value, carbsPer100: document.getElementById('f-carbs').value, fatPer100: document.getElementById('f-fat').value }),
     notes: document.getElementById('f-notes').value.trim(),
     freezerFriendlyRating: null,
     linkedPurchaseEventId: null,
@@ -2821,7 +2909,10 @@ async function openRecipeDetail(id) {
       ${recipe.notes ? `<div class="section-heading" style="margin-top:18px;"><h2>Notes</h2></div><p class="recipe-notes">${escapeHtml(recipe.notes)}</p>` : ''}
     </div>
     <div class="modal-action-bar">
-      <button type="button" class="btn-primary" id="plan-recipe-btn">📅 Add to meal plan</button>
+      <div class="field-row" style="gap:8px;">
+        <button type="button" class="btn-primary" id="log-recipe-btn">🍽️ Log a serving</button>
+        <button type="button" class="btn-primary" id="plan-recipe-btn">📅 Add to plan</button>
+      </div>
       <div class="field-row" style="gap:8px;">
         <button type="button" class="btn-secondary" id="edit-recipe-btn">Edit recipe</button>
         <button type="button" class="btn-danger" id="delete-recipe-btn">Delete</button>
@@ -2856,6 +2947,7 @@ async function openRecipeDetail(id) {
 
   document.getElementById('edit-recipe-btn').addEventListener('click', () => openRecipeForm(recipe));
   document.getElementById('plan-recipe-btn').addEventListener('click', () => openAddRecipeToPlan(recipe));
+  document.getElementById('log-recipe-btn').addEventListener('click', () => openLogRecipeServings(localDateString(new Date()), defaultLogMeal(), recipe));
   document.getElementById('delete-recipe-btn').addEventListener('click', () => deleteRecipe(recipe));
 }
 
@@ -3125,6 +3217,10 @@ const DEFAULT_HEALTH_GOALS = {
   key: 'healthGoals',
   caloriesMin: 450,
   caloriesMax: 500,
+  dailyCalories: 1600,
+  dailyProtein: 100,
+  dailyCarbs: 175,
+  dailyFat: 55,
   preferredCuisines: ['Anglo-Indian', 'Indian', 'Australian', 'Western', 'Chinese', 'Indo-Chinese', 'Korean', 'Vietnamese'],
   cuisinesVersion: 2
 };
@@ -3140,6 +3236,16 @@ async function getHealthGoals() {
     goals.cuisinesVersion = 2;
   }
   return goals;
+}
+
+// Protein and carbs are 4 kcal/g, fat 9 kcal/g: show whether the macro targets add up to the calorie target
+function macroCheckText(goals) {
+  const fromMacros = goals.dailyProtein * 4 + goals.dailyCarbs * 4 + goals.dailyFat * 9;
+  const diff = fromMacros - goals.dailyCalories;
+  const split = fromMacros ? `Protein ${Math.round(goals.dailyProtein * 400 / fromMacros)}% · carbs ${Math.round(goals.dailyCarbs * 400 / fromMacros)}% · fat ${Math.round(goals.dailyFat * 900 / fromMacros)}% of calories.` : '';
+  return Math.abs(diff) <= 50
+    ? `${split} These add up to your ${goals.dailyCalories} kcal.`
+    : `${split} These macros add up to ${fromMacros} kcal, ${Math.abs(diff)} ${diff > 0 ? 'over' : 'under'} your ${goals.dailyCalories} kcal target.`;
 }
 
 // "✓ 480 kcal" inside the target, "590 kcal · over" above it, plain below it
@@ -3735,6 +3841,16 @@ async function openOnlineMeal(id) {
    Stored per item as kcal per 100 g or 100 ml, with where the number
    came from: read off a label, estimated by AI, or typed in.
    ============================================================ */
+// Protein / carbs / fat per 100 g or ml: a number, or null when unknown
+function macroOrNull(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 10) / 10 : null;
+}
+
+function macrosFrom(source) {
+  return { proteinPer100: macroOrNull(source.proteinPer100), carbsPer100: macroOrNull(source.carbsPer100), fatPer100: macroOrNull(source.fatPer100) };
+}
+
 const CALORIE_SOURCE_LABELS = { label: 'from label', database: 'from barcode database', estimated: 'estimated', manual: 'entered' };
 
 function itemCaloriesText(item) {
@@ -3760,17 +3876,20 @@ async function estimateItemCalories(name, category) {
           schema: {
             type: 'object',
             additionalProperties: false,
-            required: ['caloriesPer100', 'caloriesUnit'],
+            required: ['caloriesPer100', 'caloriesUnit', 'proteinPer100', 'carbsPer100', 'fatPer100'],
             properties: {
               caloriesPer100: { type: 'number' },
-              caloriesUnit: { type: 'string', enum: ['g', 'ml'] }
+              caloriesUnit: { type: 'string', enum: ['g', 'ml'] },
+              proteinPer100: { type: 'number' },
+              carbsPer100: { type: 'number' },
+              fatPer100: { type: 'number' }
             }
           }
         }
       },
       messages: [{
         role: 'user',
-        content: `Typical energy content of this food as sold in Australian supermarkets, in kcal per 100 g (or per 100 ml for liquids and sauces sold by volume). Use 0 if it isn't a food or you can't tell.\nItem: ${name}\nCategory: ${category || 'unknown'}`
+        content: `Typical nutrition of this food as sold in Australian supermarkets, per 100 g (or per 100 ml for liquids and sauces sold by volume): energy in kcal, and protein, carbohydrate and fat in grams. Use 0 for everything if it isn't a food or you can't tell.\nItem: ${name}\nCategory: ${category || 'unknown'}`
       }]
     });
     if (response.stop_reason === 'refusal') return { error: 'Claude couldn\'t estimate this one. Enter it from the label instead.' };
@@ -3824,7 +3943,7 @@ function photoScanSchema() {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['name', 'category', 'quantity', 'unit', 'states', 'isStaple', 'caloriesPer100', 'caloriesUnit', 'caloriesSource', 'confidence'],
+          required: ['name', 'category', 'quantity', 'unit', 'states', 'isStaple', 'caloriesPer100', 'caloriesUnit', 'caloriesSource', 'proteinPer100', 'carbsPer100', 'fatPer100', 'confidence'],
           properties: {
             name: { type: 'string' },
             category: { type: 'string', enum: CATEGORIES },
@@ -3835,6 +3954,9 @@ function photoScanSchema() {
             caloriesPer100: { type: 'number' },
             caloriesUnit: { type: 'string', enum: ['g', 'ml'] },
             caloriesSource: { type: 'string', enum: ['label', 'estimated', 'unknown'] },
+            proteinPer100: { type: 'number' },
+            carbsPer100: { type: 'number' },
+            fatPer100: { type: 'number' },
             confidence: { type: 'string', enum: ['high', 'medium', 'low'] }
           }
         }
@@ -3855,6 +3977,7 @@ async function requestPhotoScan(photos, location) {
       '- states: Frozen for freezer items; Opened if clearly opened; Fresh for fresh produce; otherwise Raw.',
       '- isStaple: true for salt, pepper, oils, dried spices, rice, flour, dals, soy sauce and similar basics.',
       '- caloriesPer100: energy in kcal per 100 g, or per 100 ml (caloriesUnit "ml") for liquids and sauces sold by volume. If a nutrition panel is readable, use it and set caloriesSource "label" (convert kJ to kcal by dividing by 4.184). Otherwise give a typical value and set "estimated". Use 0 with "unknown" if you can\'t tell.',
+      '- proteinPer100, carbsPer100, fatPer100: grams per 100 g (or ml), from the same nutrition panel or typical values. 0 if unknown.',
       '- confidence: low if the item is partly hidden or you are guessing what it is.',
       'Skip non-food items. If the photos show nothing you can identify, return an empty list.'
     ].join('\n');
@@ -4065,6 +4188,7 @@ async function readPhotos() {
     caloriesPer100: it.caloriesSource === 'unknown' ? null : (it.caloriesPer100 || null),
     caloriesUnit: it.caloriesUnit,
     caloriesSource: it.caloriesSource === 'unknown' ? null : it.caloriesSource,
+    ...(it.caloriesSource === 'unknown' ? {} : macrosFrom(it)),
     confidence: it.confidence,
     selected: true
   }));
@@ -4084,7 +4208,7 @@ async function savePhotoScan() {
   try {
     for (const row of rows) {
       const calories = row.caloriesPer100
-        ? { caloriesPer100: row.caloriesPer100, caloriesUnit: row.caloriesUnit === 'ml' ? 'ml' : 'g', caloriesSource: row.caloriesSource || 'manual' }
+        ? { caloriesPer100: row.caloriesPer100, caloriesUnit: row.caloriesUnit === 'ml' ? 'ml' : 'g', caloriesSource: row.caloriesSource || 'manual', ...macrosFrom(row) }
         : {};
       if (row.existingId) {
         const item = await dbGet('inventoryItems', row.existingId);
@@ -4147,7 +4271,7 @@ async function savePhotoScan() {
    brand, pack size and calories. The person confirms before saving.
    ============================================================ */
 const OFF_PRODUCT_URL = 'https://world.openfoodfacts.org/api/v2/product/';
-const OFF_FIELDS = 'code,product_name,product_name_en,brands,quantity,product_quantity,product_quantity_unit,nutriments,nutrition_data_per,categories_tags,image_front_small_url';
+const OFF_FIELDS = 'code,serving_quantity,product_name,product_name_en,brands,quantity,product_quantity,product_quantity_unit,nutriments,nutrition_data_per,categories_tags,image_front_small_url';
 const BARCODE_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e'];
 
 // Open Food Facts category tags → app category (first match wins)
@@ -4206,6 +4330,10 @@ function offToScanRow(code, p) {
     caloriesPer100: kcal ? Math.round(kcal) : null,
     caloriesUnit: isVolume ? 'ml' : 'g',
     caloriesSource: kcal ? 'database' : null,
+    servingSize: Number(p.serving_quantity) > 0 ? Math.round(Number(p.serving_quantity)) : null,
+    proteinPer100: macroOrNull(n.proteins_100g),
+    carbsPer100: macroOrNull(n.carbohydrates_100g),
+    fatPer100: macroOrNull(n.fat_100g),
     image: p.image_front_small_url || '',
     found: true
   };
@@ -4283,7 +4411,8 @@ async function handleBarcode(rawCode) {
     barcode: code, name: '', category: 'Other', quantity: 1, unit: 'each', packSize: '',
     caloriesPer100: null, caloriesUnit: 'g', caloriesSource: null, image: '', found: false
   };
-  await renderBarcodeConfirm();
+  if (BarcodeScan.mode === 'diary') await renderDiaryBarcodeConfirm();
+  else await renderBarcodeConfirm();
 }
 
 async function findExistingForBarcode(row) {
@@ -4309,6 +4438,7 @@ async function renderBarcodeConfirm() {
         <div class="bc-code">Barcode ${escapeHtml(row.barcode)}</div>
         ${row.found ? `<div class="tag kcal-ok">Found in Open Food Facts</div>` : '<div class="tag kcal-over">Not in the online database: fill it in below</div>'}
         ${row.packSize ? `<div class="recipe-muted" style="margin:4px 0 0;">Pack: ${escapeHtml(row.packSize)}</div>` : ''}
+        ${row.proteinPer100 || row.carbsPer100 || row.fatPer100 ? `<div class="recipe-muted" style="margin:2px 0 0;">Per 100${row.caloriesUnit === 'ml' ? ' ml' : ' g'}: protein ${row.proteinPer100 ?? '–'} g · carbs ${row.carbsPer100 ?? '–'} g · fat ${row.fatPer100 ?? '–'} g</div>` : ''}
       </div>
     </div>
     <div class="field"><label>Name</label><input type="text" id="bc-name" value="${escapeHtml(row.name)}" placeholder="e.g. Mutti Crushed Tomatoes"></div>
@@ -4343,6 +4473,7 @@ async function renderBarcodeConfirm() {
     if (result.error) { showToast(result.error); return; }
     kcal.value = Math.round(result.caloriesPer100);
     document.getElementById('bc-kunit').value = result.caloriesUnit === 'ml' ? 'ml' : 'g';
+    Object.assign(row, macrosFrom(result));
     row.caloriesSource = 'estimated';
     document.getElementById('bc-kcal-src').textContent = '(estimated)';
   });
@@ -4362,7 +4493,7 @@ async function saveBarcodeItem() {
   const category = document.getElementById('bc-cat').value;
   const kcalValue = parseFloat(document.getElementById('bc-kcal').value) || null;
   const calories = kcalValue
-    ? { caloriesPer100: kcalValue, caloriesUnit: document.getElementById('bc-kunit').value, caloriesSource: row.caloriesSource || 'manual' }
+    ? { caloriesPer100: kcalValue, caloriesUnit: document.getElementById('bc-kunit').value, caloriesSource: row.caloriesSource || 'manual', ...macrosFrom(row) }
     : {};
   const now = new Date().toISOString();
 
@@ -4451,6 +4582,7 @@ function scanNextBarcode() {
 }
 
 function openBarcodeScan() {
+  BarcodeScan.mode = 'kitchen';
   openModal(`
     <div class="modal-title-row">
       <h2>▦ Scan barcode</h2>
@@ -4886,19 +5018,6 @@ async function fillMyWeek() {
   renderRoute();
 }
 
-/* ---- Home: today's meals ---- */
-async function todaysMealsHtml() {
-  const today = localDateString(new Date());
-  const entries = await getPlanEntries([today]);
-  if (!entries.length) return '';
-  const sorted = entries.sort((a, b) => PLAN_MEALS.indexOf(a.meal) - PLAN_MEALS.indexOf(b.meal));
-  return `
-    <div class="section-heading"><h2>Today's meals</h2></div>
-    <div class="expiry-list">${sorted.map((e) => `
-      <div class="expiry-row"><span class="name">${escapeHtml(e.title)}</span><span class="when">${PLAN_MEAL_LABELS[e.meal]}</span></div>`).join('')}
-    </div>`;
-}
-
 /* ============================================================
    STARTER RECIPES ON / OFF
    ============================================================ */
@@ -4928,7 +5047,7 @@ async function startFresh() {
   if (confirm('Download a backup of your current data first? (Recommended)')) await exportKitchenData();
   if (!confirm('Last check: delete everything now?')) return;
 
-  for (const store of ['inventoryItems', 'inventoryHistory', 'mealPlans', 'batchCookEvents', 'purchaseEvents', 'recipes', 'quickAddTemplates', 'settings']) {
+  for (const store of ['inventoryItems', 'inventoryHistory', 'mealPlans', 'foodLog', 'batchCookEvents', 'purchaseEvents', 'recipes', 'quickAddTemplates', 'settings']) {
     await dbClearAndBulkPut(store, []);
   }
   AppState.planWeekStart = null;
@@ -5003,6 +5122,634 @@ async function openKitchenSuggestions() {
 }
 
 /* ============================================================
+   FOOD DIARY
+   foodLog records: { date, meal: 'breakfast'|'lunch'|'dinner'|'snacks',
+     name, amount?, amountUnit?, kcal, protein?, carbs?, fat?,
+     source: 'quick'|'kitchen'|'recipe'|'barcode'|'photo'|'plan',
+     recipeId?, itemId?, planEntryId?, barcode?, createdAt }
+   Nutrient values are totals for what was eaten (null when unknown).
+   ============================================================ */
+const LOG_MEALS = ['breakfast', 'lunch', 'dinner', 'snacks'];
+const LOG_MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snacks' };
+const MACROS = [
+  { key: 'protein', label: 'Protein', goal: 'dailyProtein', cls: 'm-protein' },
+  { key: 'carbs', label: 'Carbs', goal: 'dailyCarbs', cls: 'm-carbs' },
+  { key: 'fat', label: 'Fat', goal: 'dailyFat', cls: 'm-fat' }
+];
+
+function defaultLogMeal() {
+  const h = new Date().getHours();
+  return h < 11 ? 'breakfast' : h < 15 ? 'lunch' : h >= 17 && h < 22 ? 'dinner' : 'snacks';
+}
+
+function round1(n) { return Math.round(n * 10) / 10; }
+function numOrNull(v) { const n = parseFloat(v); return Number.isFinite(n) && n >= 0 ? n : null; }
+
+async function getLogEntries(date) {
+  return dbGetAll('foodLog', 'date', date);
+}
+
+async function addLogEntry(entry) {
+  return dbPut('foodLog', {
+    kcal: 0, protein: null, carbs: null, fat: null, amount: null, amountUnit: null,
+    ...entry,
+    kcal: Math.round(entry.kcal || 0),
+    protein: entry.protein == null ? null : round1(entry.protein),
+    carbs: entry.carbs == null ? null : round1(entry.carbs),
+    fat: entry.fat == null ? null : round1(entry.fat),
+    createdAt: new Date().toISOString()
+  });
+}
+
+function dayTotals(entries) {
+  return entries.reduce((t, e) => ({
+    kcal: t.kcal + (e.kcal || 0),
+    protein: t.protein + (e.protein || 0),
+    carbs: t.carbs + (e.carbs || 0),
+    fat: t.fat + (e.fat || 0)
+  }), { kcal: 0, protein: 0, carbs: 0, fat: 0 });
+}
+
+/* ---- Today: ring + macro meters + meals ---- */
+function calorieRingSvg(eaten, goal) {
+  const r = 52;
+  const c = 2 * Math.PI * r;
+  const frac = goal ? Math.min(eaten / goal, 1) : 0;
+  return `
+    <svg class="kcal-ring" viewBox="0 0 132 132" role="img" aria-label="${eaten} of ${goal} kcal eaten">
+      <circle cx="66" cy="66" r="${r}" fill="none" class="ring-track" stroke-width="12"/>
+      ${frac > 0 ? `<circle cx="66" cy="66" r="${r}" fill="none" class="ring-fill ${eaten > goal ? 'over' : ''}" stroke-width="12" stroke-linecap="round"
+        stroke-dasharray="${(c * frac).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 66 66)"/>` : ''}
+      <text x="66" y="64" text-anchor="middle" class="ring-num">${eaten.toLocaleString('en-AU')}</text>
+      <text x="66" y="84" text-anchor="middle" class="ring-sub">of ${goal.toLocaleString('en-AU')} kcal</text>
+    </svg>`;
+}
+
+function macroMeterHtml(m, eaten, goal) {
+  const pct = goal ? Math.min(eaten / goal, 1) * 100 : 0;
+  const over = goal && eaten > goal;
+  return `
+    <div class="macro-meter">
+      <div class="macro-head"><span class="macro-name"><span class="macro-key ${m.cls}"></span>${m.label}</span>
+        <span class="macro-val">${Math.round(eaten)} / ${goal} g${over ? ` · ${Math.round(eaten - goal)} over` : ''}</span></div>
+      <div class="macro-track ${m.cls}"><div class="macro-fill ${m.cls}" style="width:${pct.toFixed(1)}%"></div></div>
+    </div>`;
+}
+
+async function renderTodayDiaryHtml() {
+  const date = AppState.diaryDate || localDateString(new Date());
+  const today = localDateString(new Date());
+  const [entries, goals, plans] = await Promise.all([getLogEntries(date), getHealthGoals(), getPlanEntries([date])]);
+  const t = dayTotals(entries);
+  const left = goals.dailyCalories - Math.round(t.kcal);
+  const loggedPlanIds = new Set(entries.filter((e) => e.planEntryId).map((e) => e.planEntryId));
+
+  const mealCard = (meal) => {
+    const list = entries.filter((e) => e.meal === meal);
+    const planned = plans.filter((p) => p.meal === meal && !loggedPlanIds.has(p.id));
+    const kcal = list.reduce((s, e) => s + (e.kcal || 0), 0);
+    return `
+      <div class="diary-meal">
+        <div class="diary-meal-head">
+          <span>${LOG_MEAL_LABELS[meal]}${kcal ? ` <span class="diary-meal-kcal">${Math.round(kcal)} kcal</span>` : ''}</span>
+          <button type="button" class="link-btn diary-add" data-meal="${meal}">+ Add</button>
+        </div>
+        ${list.map((e) => `
+          <button type="button" class="diary-entry" data-log-id="${e.id}">
+            <span class="de-name">${escapeHtml(e.name)}${e.amount ? `<span class="de-amt"> · ${escapeHtml(formatLogAmount(e))}</span>` : ''}</span>
+            <span class="de-num">${Math.round(e.kcal || 0)} kcal${e.protein != null ? ` · ${Math.round(e.protein)} g P` : ''}</span>
+          </button>`).join('')}
+        ${planned.map((p) => `
+          <div class="diary-planned">
+            <span class="de-name">📅 ${escapeHtml(p.title)}</span>
+            <button type="button" class="state-chip diary-ate" data-plan-id="${p.id}">✓ Ate this</button>
+          </div>`).join('')}
+      </div>`;
+  };
+
+  return `
+    <div class="diary-nav">
+      <button type="button" class="loc-tab" id="diary-prev" aria-label="Previous day">‹</button>
+      <div class="plan-week-label">${date === today ? 'Today' : formatDayLabel(date)}${date !== today ? ' <button type="button" class="link-btn" id="diary-today">Today</button>' : ''}</div>
+      <button type="button" class="loc-tab" id="diary-next" aria-label="Next day" ${date >= today ? 'disabled' : ''}>›</button>
+    </div>
+    <div class="diary-summary">
+      <div class="ring-wrap">
+        ${calorieRingSvg(Math.round(t.kcal), goals.dailyCalories)}
+        <div class="ring-left ${left < 0 ? 'over' : ''}">${left >= 0 ? `${left.toLocaleString('en-AU')} kcal left` : `${Math.abs(left).toLocaleString('en-AU')} kcal over`}</div>
+      </div>
+      <div class="macro-list">${MACROS.map((m) => macroMeterHtml(m, t[m.key], goals[m.goal])).join('')}</div>
+    </div>
+    ${LOG_MEALS.map(mealCard).join('')}
+  `;
+}
+
+function formatLogAmount(e) {
+  if (!e.amount) return '';
+  if (e.amountUnit === 'serving') return `${e.amount} serving${e.amount === 1 ? '' : 's'}`;
+  return formatItemQuantity({ quantity: e.amount, unit: e.amountUnit });
+}
+
+function attachTodayDiaryListeners() {
+  const date = AppState.diaryDate || localDateString(new Date());
+  const shift = (days) => {
+    const next = localDateString(addDays(parseLocalDate(date), days));
+    AppState.diaryDate = next >= localDateString(new Date()) ? null : next;
+    renderRoute();
+  };
+  document.getElementById('diary-prev').addEventListener('click', () => shift(-1));
+  document.getElementById('diary-next').addEventListener('click', () => shift(1));
+  const todayBtn = document.getElementById('diary-today');
+  if (todayBtn) todayBtn.addEventListener('click', () => { AppState.diaryDate = null; renderRoute(); });
+  document.querySelectorAll('.diary-add').forEach((b) => b.addEventListener('click', () => openAddFood(date, b.dataset.meal)));
+  document.querySelectorAll('.diary-entry').forEach((b) => b.addEventListener('click', () => openLogEntry(parseInt(b.dataset.logId, 10))));
+  document.querySelectorAll('.diary-ate').forEach((b) => b.addEventListener('click', () => ateThis(parseInt(b.dataset.planId, 10))));
+}
+
+/* ---- Editing a logged entry ---- */
+async function openLogEntry(id) {
+  const e = await dbGet('foodLog', id);
+  if (!e) return;
+  openModal(`
+    <div class="modal-title-row"><h2>${escapeHtml(e.name)}</h2><button class="close-btn" id="modal-close">×</button></div>
+    <p class="recipe-muted" style="margin-top:0;">${LOG_MEAL_LABELS[e.meal]} · ${formatDayLabel(e.date)}${e.amount ? ' · ' + escapeHtml(formatLogAmount(e)) : ''}</p>
+    ${nutrientFieldsHtml('le', e)}
+    <button type="button" class="btn-primary" id="le-save">Save</button>
+    <button type="button" class="btn-danger" id="le-delete">Remove from diary</button>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('le-save').addEventListener('click', async () => {
+    Object.assign(e, readNutrientFields('le'));
+    e.kcal = Math.round(e.kcal || 0);
+    await dbPut('foodLog', e);
+    closeModal(); showToast('Updated'); renderRoute();
+  });
+  document.getElementById('le-delete').addEventListener('click', async () => {
+    await dbDelete('foodLog', id);
+    closeModal(); showToast('Removed from diary'); renderRoute();
+  });
+}
+
+function nutrientFieldsHtml(prefix, v) {
+  const val = (x) => (x == null ? '' : Math.round(x * 10) / 10);
+  return `
+    <div class="field-row nutrient-row">
+      <div class="field"><label>kcal</label><input type="number" id="${prefix}-kcal" min="0" step="any" inputmode="decimal" value="${val(v.kcal)}"></div>
+      <div class="field"><label>Protein g</label><input type="number" id="${prefix}-protein" min="0" step="any" inputmode="decimal" value="${val(v.protein)}"></div>
+      <div class="field"><label>Carbs g</label><input type="number" id="${prefix}-carbs" min="0" step="any" inputmode="decimal" value="${val(v.carbs)}"></div>
+      <div class="field"><label>Fat g</label><input type="number" id="${prefix}-fat" min="0" step="any" inputmode="decimal" value="${val(v.fat)}"></div>
+    </div>`;
+}
+
+function readNutrientFields(prefix) {
+  return {
+    kcal: numOrNull(document.getElementById(`${prefix}-kcal`).value) || 0,
+    protein: numOrNull(document.getElementById(`${prefix}-protein`).value),
+    carbs: numOrNull(document.getElementById(`${prefix}-carbs`).value),
+    fat: numOrNull(document.getElementById(`${prefix}-fat`).value)
+  };
+}
+
+function setNutrientFields(prefix, v) {
+  const set = (k, x) => { const el = document.getElementById(`${prefix}-${k}`); if (el) el.value = x == null ? '' : Math.round(x * 10) / 10; };
+  set('kcal', v.kcal); set('protein', v.protein); set('carbs', v.carbs); set('fat', v.fat);
+}
+
+/* ---- Add food: choose how ---- */
+function openAddFood(date, meal) {
+  openModal(`
+    <div class="modal-title-row"><h2>Add to ${LOG_MEAL_LABELS[meal]}</h2><button class="close-btn" id="modal-close">×</button></div>
+    <p class="recipe-muted" style="margin-top:0;">${formatDayLabel(date)}</p>
+    <div class="add-food-grid">
+      <button type="button" class="add-food-opt" data-how="kitchen"><span>🧺</span>From my kitchen</button>
+      <button type="button" class="add-food-opt" data-how="recipe"><span>📖</span>A recipe</button>
+      <button type="button" class="add-food-opt" data-how="barcode"><span>▦</span>Scan barcode</button>
+      <button type="button" class="add-food-opt" data-how="photo"><span>📸</span>Photo of my plate</button>
+      <button type="button" class="add-food-opt wide" data-how="quick"><span>⚡</span>Quick add calories</button>
+    </div>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  const flows = { kitchen: openLogFromKitchen, recipe: openLogRecipe, barcode: openDiaryBarcode, photo: openPlatePhoto, quick: openQuickAdd };
+  document.querySelectorAll('.add-food-opt').forEach((b) => b.addEventListener('click', () => flows[b.dataset.how](date, meal)));
+}
+
+function mealSelectHtml(meal) {
+  return `<div class="segmented" id="log-meal">${LOG_MEALS.map((m) => `<button type="button" data-val="${m}" class="${m === meal ? 'selected' : ''}">${LOG_MEAL_LABELS[m]}</button>`).join('')}</div>`;
+}
+function attachMealSelect() {
+  document.querySelectorAll('#log-meal button').forEach((btn) => btn.addEventListener('click', () => {
+    btn.parentElement.querySelectorAll('button').forEach((b) => b.classList.remove('selected'));
+    btn.classList.add('selected');
+  }));
+}
+function selectedMeal(fallback) {
+  return document.querySelector('#log-meal button.selected')?.dataset.val || fallback;
+}
+
+async function finishLog(name) {
+  closeModal();
+  showToast(`Logged ${name}`);
+  if (AppState.route !== 'home') navigateTo('home'); else renderRoute();
+}
+
+/* ---- Quick add ---- */
+function openQuickAdd(date, meal, prefill = {}) {
+  openModal(`
+    <div class="modal-title-row"><h2>⚡ Quick add</h2><button class="close-btn" id="modal-close">×</button></div>
+    ${mealSelectHtml(meal)}
+    <div class="field" style="margin-top:12px;"><label>What was it?</label><input type="text" id="qa-name" placeholder="e.g. Coffee with milk" value="${escapeHtml(prefill.name || '')}"></div>
+    ${nutrientFieldsHtml('qa', {})}
+    <button type="button" class="btn-primary" id="qa-save">Log it</button>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  attachMealSelect();
+  document.getElementById('qa-save').addEventListener('click', async () => {
+    const name = document.getElementById('qa-name').value.trim() || 'Quick add';
+    const n = readNutrientFields('qa');
+    if (!n.kcal) { showToast('Enter the calories'); return; }
+    await addLogEntry({ date, meal: selectedMeal(meal), name, ...n, source: prefill.source || 'quick', planEntryId: prefill.planEntryId || null });
+    finishLog(name);
+  });
+}
+
+/* ---- From my kitchen ---- */
+async function openLogFromKitchen(date, meal, preselectId) {
+  const items = (await dbGetAll('inventoryItems')).sort((a, b) => a.name.localeCompare(b.name));
+  if (preselectId) { const it = items.find((i) => i.id === preselectId); if (it) return openLogKitchenItem(date, meal, it); }
+  openModal(`
+    <div class="modal-title-row"><h2>🧺 From my kitchen</h2><button class="close-btn" id="modal-close">×</button></div>
+    <div class="field recipe-search" style="margin-bottom:8px;"><input type="search" id="lk-search" placeholder="Search your kitchen"></div>
+    <div class="modal-scroll-area" id="lk-list">
+      ${items.length ? items.map((i) => `
+        <button type="button" class="pick-row" data-item-id="${i.id}" data-name="${escapeHtml(i.name.toLowerCase())}">
+          <span class="pick-name">${escapeHtml(i.name)}</span>
+          <span class="pick-tags"><span class="tag">${LOCATION_LABELS[i.location]}</span><span class="tag">${escapeHtml(formatItemQuantity(i))}</span>${i.caloriesPer100 ? `<span class="tag kcal-tag">${itemCaloriesText(i)}</span>` : ''}</span>
+        </button>`).join('') : '<p class="recipe-muted">Your kitchen is empty.</p>'}
+    </div>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('lk-search').addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('#lk-list .pick-row').forEach((r) => { r.style.display = !q || r.dataset.name.includes(q) ? '' : 'none'; });
+  });
+  document.querySelectorAll('#lk-list .pick-row').forEach((b) => b.addEventListener('click', () => {
+    openLogKitchenItem(date, meal, items.find((i) => i.id === parseInt(b.dataset.itemId, 10)));
+  }));
+}
+
+function openLogKitchenItem(date, meal, item) {
+  const per100 = item.caloriesPer100;
+  const eatenUnit = item.caloriesUnit === 'ml' ? 'ml' : 'g';
+  const hasQty = item.quantity != null && item.quantity > 0;
+  const weighable = ['g', 'kg', 'ml', 'L'].includes(item.unit);
+  openModal(`
+    <div class="modal-title-row"><h2>${escapeHtml(item.name)}</h2><button class="close-btn" id="modal-close">×</button></div>
+    ${mealSelectHtml(meal)}
+    <div class="field" style="margin-top:12px;">
+      <label>How much did you have?</label>
+      <div class="ps-fields" style="margin:0;">
+        <input type="number" id="lki-amount" min="0" step="any" inputmode="decimal" value="100">
+        <select id="lki-unit" class="ps-unit"><option value="g" ${eatenUnit === 'g' ? 'selected' : ''}>g</option><option value="ml" ${eatenUnit === 'ml' ? 'selected' : ''}>ml</option><option value="serving">serving(s)</option></select>
+      </div>
+    </div>
+    <p class="recipe-muted" id="lki-hint" style="margin:0 0 8px;">${per100 ? `${itemCaloriesText(item)}: worked out from the amount.` : 'No calories saved for this item: enter them below, or add them to the item later.'}</p>
+    ${nutrientFieldsHtml('lki', {})}
+    <label class="plan-ai-toggle" style="margin-top:4px;"><input type="checkbox" id="lki-takeout" checked>
+      ${hasQty ? `Take out of my kitchen: <input type="number" id="lki-use" class="lki-use" min="0" step="any" inputmode="decimal" value="${weighable ? '' : 1}"> ${escapeHtml(item.unit === 'each' ? '' : item.unit)} (has ${escapeHtml(formatItemQuantity(item))})`
+               : 'I used it all up (remove from my kitchen)'}
+    </label>
+    <button type="button" class="btn-primary" id="lki-save">Log it</button>
+  `);
+  if (!hasQty) document.getElementById('lki-takeout').checked = false;
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  attachMealSelect();
+  const recalc = () => {
+    const amount = numOrNull(document.getElementById('lki-amount').value) || 0;
+    const unit = document.getElementById('lki-unit').value;
+    if (per100 && unit !== 'serving') {
+      const f = amount / 100;
+      setNutrientFields('lki', {
+        kcal: per100 * f,
+        protein: item.proteinPer100 != null ? item.proteinPer100 * f : null,
+        carbs: item.carbsPer100 != null ? item.carbsPer100 * f : null,
+        fat: item.fatPer100 != null ? item.fatPer100 * f : null
+      });
+    }
+    const use = document.getElementById('lki-use');
+    if (use && weighable && unit !== 'serving' && !use.dataset.touched) {
+      use.value = ['kg', 'L'].includes(item.unit) ? round1(amount / 100) / 10 : amount;
+    }
+  };
+  document.getElementById('lki-amount').addEventListener('input', recalc);
+  document.getElementById('lki-unit').addEventListener('change', recalc);
+  const useEl = document.getElementById('lki-use');
+  if (useEl) useEl.addEventListener('input', () => { useEl.dataset.touched = '1'; });
+  recalc();
+
+  document.getElementById('lki-save').addEventListener('click', async () => {
+    const n = readNutrientFields('lki');
+    const amount = numOrNull(document.getElementById('lki-amount').value);
+    const unit = document.getElementById('lki-unit').value;
+    await addLogEntry({ date, meal: selectedMeal(meal), name: item.name, amount, amountUnit: unit, ...n, source: 'kitchen', itemId: item.id });
+    if (document.getElementById('lki-takeout').checked) {
+      const fresh = await dbGet('inventoryItems', item.id);
+      if (fresh) {
+        if (hasQty) {
+          const use = numOrNull(document.getElementById('lki-use').value) || 0;
+          const remaining = Math.round((fresh.quantity - use) * 1000) / 1000;
+          if (remaining <= 0) {
+            await dbDelete('inventoryItems', fresh.id);
+            await logHistory(fresh.id, 'used', use, fresh.location, null, 'Eaten (food diary): used up');
+          } else {
+            fresh.quantity = remaining;
+            fresh.updatedAt = new Date().toISOString();
+            await dbPut('inventoryItems', fresh);
+            await logHistory(fresh.id, 'used', use, fresh.location, fresh.location, 'Eaten (food diary)');
+          }
+        } else {
+          await dbDelete('inventoryItems', fresh.id);
+          await logHistory(fresh.id, 'used', null, fresh.location, null, 'Eaten (food diary): used up');
+        }
+      }
+    }
+    finishLog(item.name);
+  });
+}
+
+/* ---- A recipe ---- */
+async function openLogRecipe(date, meal, preselectId, planEntryId) {
+  const recipes = (await dbGetAll('recipes')).sort((a, b) => a.name.localeCompare(b.name));
+  if (preselectId) { const r = recipes.find((x) => x.id === preselectId); if (r) return openLogRecipeServings(date, meal, r, planEntryId); }
+  openModal(`
+    <div class="modal-title-row"><h2>📖 A recipe</h2><button class="close-btn" id="modal-close">×</button></div>
+    <div class="field recipe-search" style="margin-bottom:8px;"><input type="search" id="lr-search" placeholder="Search recipes"></div>
+    <div class="modal-scroll-area" id="lr-list">
+      ${recipes.length ? recipes.map((r) => `
+        <button type="button" class="pick-row" data-recipe-id="${r.id}" data-name="${escapeHtml(r.name.toLowerCase())}">
+          <span class="pick-name">${escapeHtml(r.name)}</span>
+          <span class="pick-tags">${r.caloriesPerServing ? `<span class="tag">${r.caloriesPerServing} kcal / serve</span>` : '<span class="tag">no calories yet</span>'}${r.proteinGramsPerServing ? `<span class="tag tag-protein">${r.proteinGramsPerServing} g protein</span>` : ''}</span>
+        </button>`).join('') : '<p class="recipe-muted">No recipes yet.</p>'}
+    </div>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('lr-search').addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('#lr-list .pick-row').forEach((r) => { r.style.display = !q || r.dataset.name.includes(q) ? '' : 'none'; });
+  });
+  document.querySelectorAll('#lr-list .pick-row').forEach((b) => b.addEventListener('click', () => {
+    openLogRecipeServings(date, meal, recipes.find((r) => r.id === parseInt(b.dataset.recipeId, 10)));
+  }));
+}
+
+function openLogRecipeServings(date, meal, recipe, planEntryId) {
+  openModal(`
+    <div class="modal-title-row"><h2>${escapeHtml(recipe.name)}</h2><button class="close-btn" id="modal-close">×</button></div>
+    ${mealSelectHtml(meal)}
+    <div class="field" style="margin-top:12px;"><label>Servings</label><input type="number" id="lrs-servings" min="0" step="0.25" inputmode="decimal" value="1"></div>
+    ${nutrientFieldsHtml('lrs', {})}
+    <p class="recipe-muted" style="margin-top:0;">${recipe.caloriesPerServing ? 'From the recipe\'s per-serving figures (approximate).' : 'This recipe has no calories yet: enter them, or ✨ Estimate in the recipe\'s edit screen later.'}</p>
+    <button type="button" class="btn-primary" id="lrs-save">Log it</button>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  attachMealSelect();
+  const recalc = () => {
+    const s = numOrNull(document.getElementById('lrs-servings').value) || 0;
+    setNutrientFields('lrs', {
+      kcal: recipe.caloriesPerServing ? recipe.caloriesPerServing * s : null,
+      protein: recipe.proteinGramsPerServing ? recipe.proteinGramsPerServing * s : null,
+      carbs: null, fat: null
+    });
+  };
+  document.getElementById('lrs-servings').addEventListener('input', recalc);
+  recalc();
+  document.getElementById('lrs-save').addEventListener('click', async () => {
+    const n = readNutrientFields('lrs');
+    await addLogEntry({ date, meal: selectedMeal(meal), name: recipe.name, amount: numOrNull(document.getElementById('lrs-servings').value), amountUnit: 'serving', ...n, source: planEntryId ? 'plan' : 'recipe', recipeId: recipe.id, planEntryId: planEntryId || null });
+    finishLog(recipe.name);
+  });
+}
+
+/* ---- ✓ Ate this (from the meal plan) ---- */
+async function ateThis(planId) {
+  const p = await dbGet('mealPlans', planId);
+  if (!p) return;
+  const meal = p.meal;
+  if (p.recipeId) return openLogRecipe(p.date, meal, p.recipeId, p.id);
+  if (p.type === 'kitchen' && p.itemId) return openLogFromKitchen(p.date, meal, p.itemId);
+  return openQuickAdd(p.date, meal, { name: p.title, source: 'plan', planEntryId: p.id });
+}
+
+/* ---- Barcode (diary mode) ---- */
+function openDiaryBarcode(date, meal) {
+  BarcodeScan.mode = 'diary';
+  BarcodeScan.diary = { date, meal };
+  openModal(`
+    <div class="modal-title-row"><h2>▦ Scan to log</h2><button class="close-btn" id="modal-close">×</button></div>
+    <div class="modal-scroll-area st-body" id="bc-body"></div>
+    <div class="modal-action-bar">
+      <button type="button" class="btn-primary" id="bc-action" disabled>Scan a barcode</button>
+      <button type="button" class="btn-secondary" id="bc-again" style="display:none;">Scan something else</button>
+    </div>
+  `);
+  document.getElementById('modal-sheet').classList.add('tall');
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('bc-action').addEventListener('click', saveDiaryBarcode);
+  document.getElementById('bc-again').addEventListener('click', scanNextBarcode);
+  scanNextBarcode();
+}
+
+async function renderDiaryBarcodeConfirm() {
+  const row = BarcodeScan.row;
+  const { meal } = BarcodeScan.diary;
+  const unit = row.caloriesUnit === 'ml' ? 'ml' : 'g';
+  const kitchenItem = (await dbGetAll('inventoryItems')).find((i) => i.barcode && i.barcode === row.barcode);
+  BarcodeScan.diaryItemId = kitchenItem ? kitchenItem.id : null;
+  document.getElementById('bc-body').innerHTML = `
+    <div class="bc-product">
+      ${row.image ? `<img src="${escapeHtml(row.image)}" alt="">` : '<div class="bc-noimg">▦</div>'}
+      <div>
+        <div class="bc-code">Barcode ${escapeHtml(row.barcode)}</div>
+        ${row.found ? '<div class="tag kcal-ok">Found in Open Food Facts</div>' : '<div class="tag kcal-over">Not in the online database: fill it in below</div>'}
+        ${row.packSize ? `<div class="recipe-muted" style="margin:4px 0 0;">Pack: ${escapeHtml(row.packSize)}</div>` : ''}
+      </div>
+    </div>
+    ${mealSelectHtml(meal)}
+    <div class="field" style="margin-top:12px;"><label>Name</label><input type="text" id="bd-name" value="${escapeHtml(row.name)}" placeholder="e.g. Chobani Greek yoghurt"></div>
+    <div class="field"><label>How much did you have? (${unit})</label><input type="number" id="bd-amount" min="0" step="any" inputmode="decimal" value="${row.servingSize || 100}"></div>
+    ${row.caloriesPer100 ? `<p class="recipe-muted" style="margin:0 0 8px;">Per 100 ${unit}: ${row.caloriesPer100} kcal${row.proteinPer100 != null ? ` · protein ${row.proteinPer100} g` : ''}${row.carbsPer100 != null ? ` · carbs ${row.carbsPer100} g` : ''}${row.fatPer100 != null ? ` · fat ${row.fatPer100} g` : ''}</p>` : ''}
+    ${nutrientFieldsHtml('bd', {})}
+    ${kitchenItem ? `<label class="plan-ai-toggle"><input type="checkbox" id="bd-takeout" checked> Take one out of my kitchen (${escapeHtml(kitchenItem.name)}: ${escapeHtml(formatItemQuantity(kitchenItem))})</label>` : ''}
+  `;
+  attachMealSelect();
+  const recalc = () => {
+    if (!row.caloriesPer100) return;
+    const f = (numOrNull(document.getElementById('bd-amount').value) || 0) / 100;
+    setNutrientFields('bd', {
+      kcal: row.caloriesPer100 * f,
+      protein: row.proteinPer100 != null ? row.proteinPer100 * f : null,
+      carbs: row.carbsPer100 != null ? row.carbsPer100 * f : null,
+      fat: row.fatPer100 != null ? row.fatPer100 * f : null
+    });
+  };
+  document.getElementById('bd-amount').addEventListener('input', recalc);
+  recalc();
+  const action = document.getElementById('bc-action');
+  action.textContent = 'Log it';
+  action.disabled = false;
+  document.getElementById('bc-again').style.display = 'block';
+}
+
+async function saveDiaryBarcode() {
+  const row = BarcodeScan.row;
+  if (!row) return;
+  const name = document.getElementById('bd-name').value.trim();
+  if (!name) { showToast('Enter a name first'); return; }
+  const n = readNutrientFields('bd');
+  if (!n.kcal) { showToast('Enter the calories'); return; }
+  const { date, meal } = BarcodeScan.diary;
+  await addLogEntry({ date, meal: selectedMeal(meal), name, amount: numOrNull(document.getElementById('bd-amount').value), amountUnit: row.caloriesUnit === 'ml' ? 'ml' : 'g', ...n, source: 'barcode', barcode: row.barcode, itemId: BarcodeScan.diaryItemId || null });
+  const takeout = document.getElementById('bd-takeout');
+  if (takeout && takeout.checked && BarcodeScan.diaryItemId) {
+    const item = await dbGet('inventoryItems', BarcodeScan.diaryItemId);
+    if (item) {
+      const counted = !['g', 'kg', 'ml', 'L'].includes(item.unit) && item.quantity;
+      if (counted && item.quantity > 1) {
+        item.quantity -= 1;
+        await dbPut('inventoryItems', item);
+        await logHistory(item.id, 'used', 1, item.location, item.location, 'Eaten (food diary)');
+      } else if (counted || !item.quantity) {
+        await dbDelete('inventoryItems', item.id);
+        await logHistory(item.id, 'used', 1, item.location, null, 'Eaten (food diary): used up');
+      }
+    }
+  }
+  finishLog(name);
+}
+
+/* ---- Photo of my plate (Claude) ---- */
+const PlatePhoto = { photo: null, rows: [] };
+
+function plateSchema() {
+  return {
+    type: 'object', additionalProperties: false, required: ['items'],
+    properties: {
+      items: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['name', 'portion', 'kcal', 'protein', 'carbs', 'fat'],
+          properties: { name: { type: 'string' }, portion: { type: 'string' }, kcal: { type: 'number' }, protein: { type: 'number' }, carbs: { type: 'number' }, fat: { type: 'number' } }
+        }
+      }
+    }
+  };
+}
+
+function openPlatePhoto(date, meal) {
+  if (!getAiKey()) { showToast('Add your API key in Settings → AI suggestions to use plate photos'); return; }
+  PlatePhoto.photo = null;
+  PlatePhoto.rows = [];
+  openModal(`
+    <div class="modal-title-row"><h2>📸 Photo of my plate</h2><button class="close-btn" id="modal-close">×</button></div>
+    ${mealSelectHtml(meal)}
+    <div class="modal-scroll-area" id="pp-body" style="margin-top:12px;">
+      <p class="st-intro">Take a photo of your meal from above. Claude estimates each part and its calories, and you check them before logging.</p>
+      <div class="ps-thumbs"><label class="ps-add">📷<span>Take photo</span><input type="file" id="pp-file" accept="image/*" capture="environment" hidden></label></div>
+      <p class="ai-error" id="pp-error"></p>
+    </div>
+    <div class="modal-action-bar"><button type="button" class="btn-primary" id="pp-action" disabled>Take a photo first</button></div>
+  `);
+  document.getElementById('modal-sheet').classList.add('tall');
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  attachMealSelect();
+  document.getElementById('pp-file').addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    try { PlatePhoto.photo = await photoToBase64Jpeg(f); } catch (err) { showToast(err.message); return; }
+    document.querySelector('#pp-body .ps-thumbs').innerHTML = `<div class="ps-thumb"><img src="${PlatePhoto.photo.preview}" alt="Your plate"></div>`;
+    const btn = document.getElementById('pp-action');
+    btn.disabled = false;
+    btn.textContent = 'Estimate calories';
+  });
+  document.getElementById('pp-action').addEventListener('click', () => (PlatePhoto.rows.length ? savePlate(date, meal) : readPlate()));
+}
+
+async function readPlate() {
+  const btn = document.getElementById('pp-action');
+  btn.disabled = true;
+  btn.textContent = 'Looking at your plate…';
+  let Anthropic = null;
+  let error = null;
+  try {
+    const loaded = await getAnthropicClient();
+    Anthropic = loaded.Anthropic;
+    const response = await loaded.client.beta.messages.create({
+      model: AI_MODEL,
+      max_tokens: 8000,
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+      output_config: { effort: 'medium', format: { type: 'json_schema', schema: plateSchema() } },
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: PlatePhoto.photo.data } },
+        { type: 'text', text: 'This is one person\'s serving of a meal. List each food on the plate with an estimated portion (e.g. "1 cup cooked rice", "150 g chicken curry") and its kcal, protein, carbs and fat in grams for that portion. If there is no food in the photo, return an empty list.' }
+      ] }]
+    });
+    if (response.stop_reason === 'refusal') error = 'Claude couldn\'t read this photo. Try another, or use Quick add.';
+    else {
+      const parsed = JSON.parse(response.content.filter((b) => b.type === 'text').map((b) => b.text).join(''));
+      PlatePhoto.rows = (parsed.items || []).map((it) => ({ ...it, selected: true }));
+      if (!PlatePhoto.rows.length) error = 'No food was recognised. Try a closer photo from above.';
+    }
+  } catch (err) {
+    error = err instanceof SyntaxError ? 'Claude\'s reply couldn\'t be read. Please try again.' : describeAiError(err, Anthropic);
+  }
+  if (!document.getElementById('pp-body')) return;
+  if (error) {
+    document.getElementById('pp-error').textContent = error;
+    btn.disabled = false;
+    btn.textContent = 'Try again';
+    return;
+  }
+  document.getElementById('pp-body').innerHTML = `
+    <div class="ps-thumbs" style="margin-bottom:10px;"><div class="ps-thumb"><img src="${PlatePhoto.photo.preview}" alt="Your plate"></div></div>
+    <p class="st-intro">Estimated by Claude. Untick anything wrong and adjust the numbers.</p>
+    ${PlatePhoto.rows.map((r, i) => `
+      <div class="st-row ps-row ticked" data-i="${i}">
+        <div class="ps-top"><button type="button" class="st-box ps-tick">✓</button><input type="text" class="ps-name" value="${escapeHtml(r.name)}"></div>
+        <div class="ps-tags"><span class="tag">${escapeHtml(r.portion)}</span></div>
+        <div class="ps-fields pp-nums">
+          <label>kcal<input type="number" class="pp-kcal" value="${Math.round(r.kcal)}"></label>
+          <label>P g<input type="number" class="pp-protein" value="${round1(r.protein)}"></label>
+          <label>C g<input type="number" class="pp-carbs" value="${round1(r.carbs)}"></label>
+          <label>F g<input type="number" class="pp-fat" value="${round1(r.fat)}"></label>
+        </div>
+      </div>`).join('')}
+  `;
+  document.querySelectorAll('#pp-body .ps-row').forEach((el) => {
+    const row = PlatePhoto.rows[parseInt(el.dataset.i, 10)];
+    el.querySelector('.ps-tick').addEventListener('click', () => {
+      row.selected = !row.selected;
+      el.classList.toggle('ticked', row.selected);
+      el.querySelector('.ps-tick').textContent = row.selected ? '✓' : '';
+    });
+    el.querySelector('.ps-name').addEventListener('input', (e) => { row.name = e.target.value; });
+    ['kcal', 'protein', 'carbs', 'fat'].forEach((k) => el.querySelector(`.pp-${k}`).addEventListener('input', (e) => { row[k] = numOrNull(e.target.value) || 0; }));
+  });
+  btn.disabled = false;
+  btn.textContent = 'Log ticked items';
+}
+
+async function savePlate(date, meal) {
+  const rows = PlatePhoto.rows.filter((r) => r.selected && r.name.trim());
+  if (!rows.length) { showToast('Tick at least one item'); return; }
+  const m = selectedMeal(meal);
+  for (const r of rows) {
+    await addLogEntry({ date, meal: m, name: `${r.name.trim()} (${r.portion})`, kcal: r.kcal, protein: r.protein, carbs: r.carbs, fat: r.fat, source: 'photo' });
+  }
+  finishLog(rows.length === 1 ? rows[0].name : `${rows.length} items`);
+}
+
+/* ============================================================
    SETTINGS SCREEN
    ============================================================ */
 async function renderSettingsScreen() {
@@ -5042,6 +5789,14 @@ async function renderSettingsScreen() {
         <div class="field"><label>Min kcal per meal</label><input type="number" id="goal-min" min="100" step="10" value="${goals.caloriesMin}"></div>
         <div class="field"><label>Max kcal per meal</label><input type="number" id="goal-max" min="100" step="10" value="${goals.caloriesMax}"></div>
       </div>
+      <label class="goal-subhead">Daily targets (food diary)</label>
+      <div class="field-row goal-macros">
+        <div class="field"><label>kcal</label><input type="number" id="goal-day-kcal" min="500" step="50" inputmode="numeric" value="${goals.dailyCalories}"></div>
+        <div class="field"><label>Protein g</label><input type="number" id="goal-day-protein" min="0" step="5" inputmode="numeric" value="${goals.dailyProtein}"></div>
+        <div class="field"><label>Carbs g</label><input type="number" id="goal-day-carbs" min="0" step="5" inputmode="numeric" value="${goals.dailyCarbs}"></div>
+        <div class="field"><label>Fat g</label><input type="number" id="goal-day-fat" min="0" step="5" inputmode="numeric" value="${goals.dailyFat}"></div>
+      </div>
+      <p class="recipe-muted" id="goal-macro-check" style="margin:0 0 12px;">${macroCheckText(goals)}</p>
       <div class="field" id="goal-cuisines">
         <label>Cuisines you like <span style="text-transform:none;font-weight:500;">(${goals.preferredCuisines.length ? `${goals.preferredCuisines.length} chosen` : 'none chosen = any cuisine'})</span></label>
         ${CUISINE_GROUPS.map((g) => {
@@ -5113,10 +5868,22 @@ function attachSettingsListeners() {
     const max = parseInt(document.getElementById('goal-max').value, 10);
     if (!(min > 0 && max >= min)) { showToast('"From" must be lower than "to"'); return; }
     const cuisines = Array.from(document.querySelectorAll('#goal-cuisines button.selected')).map((b) => b.dataset.val);
-    await dbPut('settings', { ...DEFAULT_HEALTH_GOALS, caloriesMin: min, caloriesMax: max, preferredCuisines: cuisines });
+    const num = (id, fallback) => { const v = parseInt(document.getElementById(id).value, 10); return v >= 0 ? v : fallback; };
+    const saved = {
+      ...DEFAULT_HEALTH_GOALS, caloriesMin: min, caloriesMax: max, preferredCuisines: cuisines,
+      dailyCalories: num('goal-day-kcal', DEFAULT_HEALTH_GOALS.dailyCalories),
+      dailyProtein: num('goal-day-protein', DEFAULT_HEALTH_GOALS.dailyProtein),
+      dailyCarbs: num('goal-day-carbs', DEFAULT_HEALTH_GOALS.dailyCarbs),
+      dailyFat: num('goal-day-fat', DEFAULT_HEALTH_GOALS.dailyFat)
+    };
+    await dbPut('settings', saved);
+    // The change event can fire as the person leaves Settings, so the text may already be gone
+    const check = document.getElementById('goal-macro-check');
+    if (check) check.textContent = macroCheckText(saved);
     showToast('Health goals saved');
   };
   document.getElementById('goal-min').addEventListener('change', saveGoals);
+  ['goal-day-kcal', 'goal-day-protein', 'goal-day-carbs', 'goal-day-fat'].forEach((id) => document.getElementById(id).addEventListener('change', saveGoals));
   document.getElementById('goal-max').addEventListener('change', saveGoals);
   document.querySelectorAll('#goal-cuisines button').forEach((btn) => btn.addEventListener('click', () => {
     btn.classList.toggle('selected');
@@ -5235,7 +6002,7 @@ async function handleImportRecipesFile(e) {
 }
 
 async function exportKitchenData() {
-  const storeNames = ['inventoryItems', 'inventoryHistory', 'freezerRatingsReference', 'useByReference', 'quickAddTemplates', 'recipes', 'mealPlans', 'batchCookEvents', 'purchaseEvents', 'settings'];
+  const storeNames = ['inventoryItems', 'inventoryHistory', 'freezerRatingsReference', 'useByReference', 'quickAddTemplates', 'recipes', 'mealPlans', 'foodLog', 'batchCookEvents', 'purchaseEvents', 'settings'];
   const backup = { exportedAt: new Date().toISOString(), version: DB_VERSION, data: {} };
 
   for (const storeName of storeNames) {

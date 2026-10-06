@@ -121,6 +121,22 @@ Each ingredient stores `matchTerms` (inventory names that count as having it, e.
 
 **Settings → Starter recipes** adds the 30 built-in recipes back, or removes them (any you've edited are kept). Once removed they don't come back by themselves.
 
+## Food diary (Today tab)
+
+The **Today** tab (formerly Home) is a food diary, like a fitness tracker:
+- **Calorie ring** for the day ("1,120 of 1,600 kcal · 480 left", turning rust when over) and **protein, carbs and fat** meters against your daily targets. Use ‹ › to look at earlier days.
+- **Breakfast, Lunch, Dinner, Snacks**, each with its total and **+ Add**. Tap a logged entry to fix its numbers or remove it.
+- **Planned meals** from the meal plan appear under their meal with **✓ Ate this**.
+- **Ways to log**:
+  - **From my kitchen**: pick an item, enter how much (e.g. 150 g); calories and macros are worked out from its per-100 g values. **Take out of my kitchen** is ticked by default and subtracts what you ate (or removes the item when it runs out), logged in the item's history.
+  - **A recipe**: per-serving calories and protein × servings. Also **🍽️ Log a serving** on every recipe page.
+  - **Scan barcode**: Open Food Facts calories, protein, carbs and fat; starts at the product's serving size. If that product is in your kitchen, it can take one out.
+  - **Photo of my plate**: Claude estimates each food's portion, calories and macros; untick or adjust, then log (uses your API key / an AI credit).
+  - **Quick add**: a name and calories (macros optional).
+- **Daily targets** (Settings → Health goals): **1,600 kcal, 100 g protein, 175 g carbs, 55 g fat** by default, all editable, with a check that shows the protein/carbs/fat split and whether they add up to the calorie target.
+- Kitchen items now also store **protein, carbs and fat per 100 g/ml**, filled from barcodes, label photos and ✨ Estimate, or typed in the item's More details.
+- Diary entries are stored in a new `foodLog` store (database version 3; the upgrade keeps all existing data) and are included in backups and cleared by Start fresh.
+
 ## Suggest recipes from my kitchen
 
 Once the kitchen has food in it, **🍳 Suggest recipes from my kitchen** appears on the Kitchen tab and the Home screen. It opens one sheet with: food to use soon (expiring within 3 days); your saved recipes that are at least a 50% match, best first and favouring ones that use food going off, each showing what you'd still need; **✨ AI ideas from my kitchen** (Claude, needs your API key); and **🔎 Free ideas online** (TheMealDB, with quick buttons for meat and fish you have).
