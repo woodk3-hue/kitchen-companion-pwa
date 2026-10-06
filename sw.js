@@ -1,7 +1,7 @@
 // Kitchen Companion — Service Worker
 // Caches the app shell so it works fully offline after first load.
 
-const CACHE_NAME = 'kitchen-companion-v4';
+const CACHE_NAME = 'kitchen-companion-v5';
 const APP_SHELL = [
   './',
   './index.html',

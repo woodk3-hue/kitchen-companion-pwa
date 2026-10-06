@@ -37,6 +37,14 @@ Then in repo Settings → Pages, set source to the branch/folder containing thes
 
 > **Why `index.html`?** GitHub Pages serves `index.html` at a folder's root automatically. If that file doesn't exist, GitHub falls back to rendering `README.md` instead — which is why the README was showing up rather than the app.
 
+## Installing on your phone
+
+Kitchen Companion installs like a normal app (home-screen icon, full screen, works offline), with no app store needed:
+- **Chrome on Android**: open the site and tap **📲 Install Kitchen Companion** on the Home screen (or in Settings), then **Install**. If that button only shows instructions, use Chrome's ⋮ menu → **Add to home screen** / **Install app**.
+- **Long-press the app icon** for shortcuts: Scan barcode, Stocktake, Suggest meals.
+- Once installed, the Install button is replaced by "Installed as an app" in Settings.
+- Your data stays in that browser's storage on the phone, so keep exporting backups from Settings.
+
 ## File structure
 
 ```

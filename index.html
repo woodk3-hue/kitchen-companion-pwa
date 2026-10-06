@@ -903,6 +903,18 @@ h1, h2, h3 {
 .bc-product .tag { display: inline-block; }
 #bc-kunit, .ps-fields select.ps-kunit { flex: 0 0 auto; }
 #bc-kcal { flex: 1 1 80px; }
+
+/* ============================================================
+   INSTALL
+   ============================================================ */
+.install-card {
+  display: flex; flex-direction: column; align-items: flex-start; width: 100%;
+  padding: 14px; margin-bottom: 14px; border-radius: var(--radius-sm);
+  background: var(--color-ink); color: var(--color-bg); border: none;
+  font-family: inherit; text-align: left; cursor: pointer;
+}
+.install-card .install-title { font-size: 15px; font-weight: 800; }
+.install-card .install-desc { font-size: 12px; opacity: 0.85; margin-top: 3px; }
 </style>
  </head>
  <body>
@@ -1375,7 +1387,7 @@ async function renderRoute() {
   const content = document.getElementById('app-content');
 
   switch (AppState.route) {
-    case 'home': content.innerHTML = await renderHomeScreen(); break;
+    case 'home': content.innerHTML = await renderHomeScreen(); attachInstallListener('home'); break;
     case 'kitchen': content.innerHTML = await renderKitchenScreen(); attachKitchenListeners(); break;
     case 'settings': content.innerHTML = await renderSettingsScreen(); attachSettingsListeners(); break;
     case 'planner': content.innerHTML = renderPlaceholder('Meal Planner', 'Weekly breakfast, lunch and dinner planning — built around what\'s already in your kitchen, expiry dates, and your protein targets.'); break;
@@ -1529,6 +1541,7 @@ async function renderHomeScreen() {
   const totalItems = items.length;
 
   return `
+    ${installCardHtml('home')}
     <div class="stat-grid">${statCardsHtml}</div>
     ${totalItems === 0 ? `
       <div class="empty-state">
@@ -4373,6 +4386,7 @@ async function renderSettingsScreen() {
   const goals = await getHealthGoals();
   const hasKey = !!getAiKey();
   return `
+    ${installCardHtml('settings')}
     <div class="settings-row" id="export-row">
       <div>
         <div class="label">Export kitchen data</div>
@@ -4430,6 +4444,7 @@ async function renderSettingsScreen() {
 }
 
 function attachSettingsListeners() {
+  attachInstallListener('settings');
   document.getElementById('export-row').addEventListener('click', exportKitchenData);
   document.getElementById('import-row').addEventListener('click', () => {
     document.getElementById('import-file-input').click();
@@ -4585,6 +4600,70 @@ async function handleImportFile(e) {
 }
 
 /* ============================================================
+   INSTALL AS AN APP
+   Chrome fires beforeinstallprompt when the app can be installed; we keep
+   it so an "Install app" button can show the real install dialog.
+   ============================================================ */
+let deferredInstallPrompt = null;
+
+function isInstalledApp() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  if (AppState.route === 'home' || AppState.route === 'settings') renderRoute();
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  showToast('Installed. Open Kitchen Companion from your home screen.');
+  if (AppState.route === 'home' || AppState.route === 'settings') renderRoute();
+});
+
+async function promptInstall() {
+  if (!deferredInstallPrompt) {
+    alert('To install: tap Chrome\'s ⋮ menu (top right), then "Add to home screen" or "Install app", then "Install".');
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  const choice = await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  if (choice && choice.outcome === 'dismissed') showToast('No problem. You can install it later from Settings.');
+  renderRoute();
+}
+
+function installCardHtml(place) {
+  if (isInstalledApp()) {
+    return place === 'settings'
+      ? '<div class="settings-row"><div><div class="label">📲 Installed as an app</div><div class="desc">You\'re using the home-screen app</div></div><span class="chev">✓</span></div>'
+      : '';
+  }
+  return `
+    <button type="button" class="install-card" id="install-btn-${place}">
+      <span class="install-title">📲 Install Kitchen Companion</span>
+      <span class="install-desc">${deferredInstallPrompt ? 'Add it to your home screen as an app. Works offline.' : 'Add it to your home screen: tap here for how.'}</span>
+    </button>`;
+}
+
+function attachInstallListener(place) {
+  const btn = document.getElementById(`install-btn-${place}`);
+  if (btn) btn.addEventListener('click', promptInstall);
+}
+
+// Home-screen shortcuts (long-press the app icon) open with ?action=…
+function runLaunchAction() {
+  const params = new URLSearchParams(window.location.search);
+  const action = params.get('action');
+  if (!action) return;
+  history.replaceState(null, '', window.location.pathname + window.location.hash);
+  if (action === 'barcode') { navigateTo('kitchen'); openBarcodeScan(); }
+  else if (action === 'stocktake') { navigateTo('kitchen'); openStocktake(); }
+  else if (action === 'suggest') { navigateTo('recipes'); openAiSuggest(); }
+}
+
+/* ============================================================
    HELPERS
    ============================================================ */
 function registerServiceWorker() {
@@ -4614,6 +4693,7 @@ window.addEventListener('hashchange', handleHashChange);
     await seedIfEmpty();
     registerServiceWorker();
     handleHashChange();
+    runLaunchAction();
     // Built-in recipes load in the background so a slow network never delays opening the app
     syncRecipeSeed()
       .then((changed) => { if (changed && AppState.route === 'recipes') renderRoute(); })
