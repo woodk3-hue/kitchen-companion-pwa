@@ -57,7 +57,7 @@ test('a recipe can have no cuisine, and shows under Basics', async ({ page }) =>
   await open(page, 'recipes', '#recipe-list');
   await page.click('#fab-btn');
   await page.fill('#r-name', 'Jasmine rice');
-  await page.selectOption('#r-cuisine', '');
+  await page.fill('#r-cuisine', '');
   await page.fill('#r-ingredients', '240 g jasmine rice');
   await page.click('#recipe-form button[type="submit"]');
   await expect.poll(async () => (await readStore(page, 'recipes')).find((r) => r.name === 'Jasmine rice')?.cuisine).toBe('');

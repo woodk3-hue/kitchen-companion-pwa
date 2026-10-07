@@ -3031,6 +3031,27 @@ const NO_CUISINE_LABEL = 'Basics';
 function cuisineOptionsHtml(selected) {
   return `<option value="" ${selected === '' ? 'selected' : ''}>None (basics like rice, oats, toast)</option>` + CUISINE_GROUPS.map((g) => `<optgroup label="${g.region}">${g.cuisines.map((c) => `<option value="${c}" ${selected === c ? 'selected' : ''}>${c}</option>`).join('')}</optgroup>`).join('');
 }
+
+// Keep saved cuisines looking consistent: trim whitespace, title-case words.
+// Empty string stays empty (meaning "Basics / no cuisine").
+function normaliseCuisine(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (!s) return '';
+  // Match the capitalisation of a built-in cuisine when the user types one, case-insensitively
+  const lower = s.toLowerCase();
+  const matchBuiltIn = RECIPE_CUISINES.find((c) => c.toLowerCase() === lower);
+  if (matchBuiltIn) return matchBuiltIn;
+  // Otherwise title-case each word (keeps "Indo-Chinese" style separators intact)
+  return s.replace(/\b([a-z])([a-z]*)/gi, (_, a, b) => a.toUpperCase() + b.toLowerCase());
+}
+
+// Datalist of built-in cuisines + any custom ones already used in saved recipes
+function cuisineSuggestionsHtml(id) {
+  const custom = Array.from(new Set((AppState.recipes || []).map((r) => r.cuisine).filter(Boolean)))
+    .filter((c) => !RECIPE_CUISINES.includes(c));
+  const all = [...RECIPE_CUISINES, ...custom];
+  return `<datalist id="${id}">${all.map((c) => `<option value="${escapeHtml(c)}"></option>`).join('')}</datalist>`;
+}
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
 const LEVELS = ['Low', 'Medium', 'High'];
@@ -3078,7 +3099,7 @@ function normalizeRecipe(r) {
   const pick = (value, allowed, fallback) => (allowed.includes(value) ? value : fallback);
   return {
     name: String(r.name || '').trim(),
-    cuisine: r.cuisine === '' ? '' : pick(r.cuisine, RECIPE_CUISINES, 'Western'),
+    cuisine: normaliseCuisine(r.cuisine),
     mealTypes: (Array.isArray(r.mealTypes) ? r.mealTypes : []).filter((m) => MEAL_TYPES.includes(m)),
     servings: toNumberOrNull(r.servings),
     prepMinutes: toNumberOrNull(r.prepMinutes),
@@ -3772,10 +3793,9 @@ function openRecipeForm(recipe, prefill) {
         </div>
 
         <div class="field">
-          <label>Cuisine</label>
-          <select id="r-cuisine">
-            ${cuisineOptionsHtml(r.cuisine)}
-          </select>
+          <label>Cuisine <span style="text-transform:none;font-weight:500;">(type to search, or add your own)</span></label>
+          <input type="text" id="r-cuisine" list="r-cuisine-list" value="${escapeHtml(r.cuisine)}" placeholder="e.g. Indian, Thai, or leave blank for basics" autocomplete="off">
+          ${cuisineSuggestionsHtml('r-cuisine-list')}
         </div>
 
         <div class="field">
