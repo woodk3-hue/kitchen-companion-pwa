@@ -3031,6 +3031,27 @@ const NO_CUISINE_LABEL = 'Basics';
 function cuisineOptionsHtml(selected) {
   return `<option value="" ${selected === '' ? 'selected' : ''}>None (basics like rice, oats, toast)</option>` + CUISINE_GROUPS.map((g) => `<optgroup label="${g.region}">${g.cuisines.map((c) => `<option value="${c}" ${selected === c ? 'selected' : ''}>${c}</option>`).join('')}</optgroup>`).join('');
 }
+
+// Keep saved cuisines looking consistent: trim whitespace, title-case words.
+// Empty string stays empty (meaning "Basics / no cuisine").
+function normaliseCuisine(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (!s) return '';
+  // Match the capitalisation of a built-in cuisine when the user types one, case-insensitively
+  const lower = s.toLowerCase();
+  const matchBuiltIn = RECIPE_CUISINES.find((c) => c.toLowerCase() === lower);
+  if (matchBuiltIn) return matchBuiltIn;
+  // Otherwise title-case each word (keeps "Indo-Chinese" style separators intact)
+  return s.replace(/\b([a-z])([a-z]*)/gi, (_, a, b) => a.toUpperCase() + b.toLowerCase());
+}
+
+// Datalist of built-in cuisines + any custom ones already used in saved recipes
+function cuisineSuggestionsHtml(id) {
+  const custom = Array.from(new Set((AppState.recipes || []).map((r) => r.cuisine).filter(Boolean)))
+    .filter((c) => !RECIPE_CUISINES.includes(c));
+  const all = [...RECIPE_CUISINES, ...custom];
+  return `<datalist id="${id}">${all.map((c) => `<option value="${escapeHtml(c)}"></option>`).join('')}</datalist>`;
+}
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
 const LEVELS = ['Low', 'Medium', 'High'];
@@ -3078,7 +3099,7 @@ function normalizeRecipe(r) {
   const pick = (value, allowed, fallback) => (allowed.includes(value) ? value : fallback);
   return {
     name: String(r.name || '').trim(),
-    cuisine: r.cuisine === '' ? '' : pick(r.cuisine, RECIPE_CUISINES, 'Western'),
+    cuisine: normaliseCuisine(r.cuisine),
     mealTypes: (Array.isArray(r.mealTypes) ? r.mealTypes : []).filter((m) => MEAL_TYPES.includes(m)),
     servings: toNumberOrNull(r.servings),
     prepMinutes: toNumberOrNull(r.prepMinutes),
@@ -3623,14 +3644,45 @@ function buildKnownIngredientLookup(excludeRecipeId) {
   return lookup;
 }
 
-function parseIngredientLine(line, previousIngredients, knownLookup) {
-  let text = line.trim();
+// Strip leading list markers so pasted recipes with bullets parse. Returns the
+// cleaned text or null if the line is a section header ("For the Sauce:") so
+// the caller can drop it silently.
+function stripLineNoise(line) {
+  let text = String(line || '').trim();
   if (!text) return null;
+  // Leading bullets, dashes, asterisks, numbered list markers ("1.", "1)")
+  text = text.replace(/^(?:[•·▪◦■●○▶►►\-*–—]+|\d+[.)])\s*/u, '').trim();
+  if (!text) return null;
+  // Section header: no digits, ends with ":"
+  if (/:\s*$/.test(text) && !/[0-9]/.test(text)) return null;
+  return text;
+}
+
+function parseIngredientLine(line, previousIngredients, knownLookup) {
+  let text = stripLineNoise(line);
+  if (text === null) return null;
 
   let optional = false;
   if (/\(optional\)\s*$/i.test(text)) {
     optional = true;
     text = text.replace(/\(optional\)\s*$/i, '').trim();
+  }
+
+  // "Pinch of salt" / "a pinch of pepper" → assumedStaple with no amount, no warning
+  const pinchMatch = text.match(/^(?:a\s+)?pinch(?:\s+of)?\s+(.+)$/i);
+  if (pinchMatch) {
+    const nm = pinchMatch[1].trim();
+    return normalizeRecipeIngredient({
+      name: nm, quantity: null, unit: '', prepNote: '', optional: true,
+      nutrition: null, category: 'Spices & Seasonings', matchTerms: [nm.toLowerCase()],
+      assumedStaple: true
+    });
+  }
+
+  // "1 can (400ml) light coconut milk" → use the bracketed pack size as the real amount
+  const bracket = text.match(/^(\d+(?:[.,]\d+)?)\s+([A-Za-z]+)\s*\(\s*(\d+(?:[.,]\d+)?)\s*([A-Za-z]+)\s*\)\s*(.+)$/);
+  if (bracket && RECIPE_UNIT_ALIASES[bracket[4].toLowerCase()]) {
+    text = `${bracket[3]} ${bracket[4]} ${bracket[5]}`;
   }
 
   // "Jasmine rice 240 grams" or "Jasmine rice - 240g": move the amount to the front
@@ -3655,6 +3707,10 @@ function parseIngredientLine(line, previousIngredients, knownLookup) {
     }
   }
 
+  // Truncate at " or " so "bone broth or stock" picks the first option
+  const orAt = text.search(/\s+or\s+/i);
+  if (orAt > 0) text = text.slice(0, orAt).trim();
+
   let prepNote = '';
   const comma = text.indexOf(',');
   if (comma > 0) {
@@ -3676,6 +3732,37 @@ function parseIngredientLine(line, previousIngredients, knownLookup) {
     matchTerms: known ? known.matchTerms : [key],
     assumedStaple: known ? known.assumedStaple : false
   });
+}
+
+// Split a pasted line like "1 tsp minced garlic and ginger" into two lines
+// (half the amount each) so each ingredient gets counted. Returns an array
+// of lines — the original line unchanged if no " and " split applies.
+// Also handles "pinch of X and Y" by splitting into two pinch lines.
+function splitAndIngredientLine(line) {
+  const cleaned = stripLineNoise(line);
+  if (cleaned === null) return [];
+  // "pinch of X and Y" → two pinch lines (no amount, no warning)
+  const pinch = cleaned.match(/^((?:a\s+)?pinch(?:\s+of)?\s+)(.+)$/i);
+  if (pinch) {
+    const prefix = pinch[1];
+    const names = pinch[2].split(/\s+and\s+/i).map((s) => s.trim()).filter(Boolean);
+    if (names.length >= 2) return names.map((n) => `${prefix}${n}`);
+  }
+  // Only split when there's a leading amount+optional-unit AND the "and" sits in the
+  // ingredient name proper, not in a trailing prep note ("raw and skinless").
+  const main = cleaned.split(',')[0];
+  const m = main.match(/^(\d+(?:[.,]\d+)?|\d+\s+\d+\/\d+|\d+\/\d+|[½¼¾⅓⅔])\s+(?:([A-Za-z]+)\.?\s+)?(.+)$/);
+  if (!m) return [cleaned];
+  const qty = parseQuantity(m[1]);
+  const unitWord = (m[2] || '').toLowerCase();
+  const hasUnit = unitWord && RECIPE_UNIT_ALIASES[unitWord];
+  const rest = m[3];
+  const parts = rest.split(/\s+and\s+/i).map((s) => s.trim()).filter(Boolean);
+  if (parts.length < 2) return [cleaned];
+  if (!Number.isFinite(qty) || qty <= 0) return [cleaned];
+  const share = qty / parts.length;
+  const shareStr = Number.isInteger(share) ? String(share) : String(Math.round(share * 100) / 100);
+  return parts.map((p) => (hasUnit ? `${shareStr} ${unitWord} ${p}` : `${shareStr} ${p}`));
 }
 
 function openRecipeForm(recipe, prefill) {
@@ -3706,10 +3793,9 @@ function openRecipeForm(recipe, prefill) {
         </div>
 
         <div class="field">
-          <label>Cuisine</label>
-          <select id="r-cuisine">
-            ${cuisineOptionsHtml(r.cuisine)}
-          </select>
+          <label>Cuisine <span style="text-transform:none;font-weight:500;">(type to search, or add your own)</span></label>
+          <input type="text" id="r-cuisine" list="r-cuisine-list" value="${escapeHtml(r.cuisine)}" placeholder="e.g. Indian, Thai, or leave blank for basics" autocomplete="off">
+          ${cuisineSuggestionsHtml('r-cuisine-list')}
         </div>
 
         <div class="field">
@@ -3849,6 +3935,7 @@ function openRecipeForm(recipe, prefill) {
     list.innerHTML = calc.lines.length
       ? calc.lines.map((l) => {
           if (l.status === 'optional') return `<li><span class="r-live-name">${escapeHtml(l.name)}</span><span class="r-live-tag">optional</span></li>`;
+          if (l.status === 'staple') return `<li><span class="r-live-name">${escapeHtml(l.name)}</span><span class="r-live-tag">pinch / staple</span></li>`;
           if (l.status === 'unknown') return `<li><span class="r-live-name">${escapeHtml(l.name)}</span><span class="r-live-tag warn">not recognised</span></li>`;
           if (l.status === 'no-amount') return `<li><span class="r-live-name">${escapeHtml(l.name)}</span><span class="r-live-tag warn">no amount</span></li>`;
           if (l.status === 'unknown-unit') return `<li><span class="r-live-name">${escapeHtml(l.name)}</span><span class="r-live-tag warn">unknown unit${l.unit ? ' (' + escapeHtml(l.unit) + ')' : ''}</span></li>`;
@@ -3893,7 +3980,9 @@ function openRecipeForm(recipe, prefill) {
 function recipeFormIngredientLines() {
   const recipeName = document.getElementById('r-name').value.trim();
   const amountOnly = /^\s*(\d+(?:[.,]\d+)?)\s*([A-Za-z]+)?\.?\s*$/;
-  let lines = document.getElementById('r-ingredients').value.split('\n').filter((l) => l.trim());
+  const rawLines = document.getElementById('r-ingredients').value.split('\n').filter((l) => l.trim());
+  // Strip bullets / section headers up front and expand "X and Y" into two half-amount lines
+  let lines = rawLines.flatMap((l) => splitAndIngredientLine(l));
   if (!lines.length && recipeName) {
     const inNotes = (document.getElementById('r-notes').value || '').match(/(\d+(?:[.,]\d+)?)\s*(g|gram|grams|kg|ml|l|litre|litres|cups?)\b/i);
     if (inNotes) lines = [`${inNotes[1]} ${inNotes[2]}`];
@@ -5978,6 +6067,9 @@ const FOOD_NUTRITION = [
   { names: ['tomato paste double concentrate'], kcal: 82, p: 4.3, c: 19, f: 0.5, tbsp: 16 },
   { names: ['liquid stock', 'chicken stock liquid', 'beef stock liquid', 'vegetable stock liquid'], kcal: 10, p: 0.6, c: 0.7, f: 0.3, cup: 250 },
   { names: ['stock cube', 'bouillon cube', 'stock concentrate'], kcal: 200, p: 10, c: 20, f: 10, each: 10 },
+  // Broths — specific entries so "chicken bone broth" doesn't fall through to "chicken" (meat).
+  // Values per 100 ml for a store-bought simmer, slightly higher than stock because of the collagen.
+  { names: ['bone broth', 'chicken bone broth', 'beef bone broth', 'chicken broth', 'beef broth', 'vegetable broth'], kcal: 17, p: 4, c: 0.6, f: 0.1, cup: 240 },
   // Veg (cooked)
   { names: ['roast potatoes', 'roasted potatoes'], kcal: 149, p: 2.4, c: 20, f: 7, cup: 170 },
   { names: ['steamed vegetables'], kcal: 45, p: 2, c: 8, f: 0.5, cup: 150 },
@@ -6011,7 +6103,10 @@ const PREP_WORDS = new Set([
   'to', 'taste', 'optional', 'approximately', 'about', 'approx', 'extra', 'large', 'small', 'medium',
   'organic', 'free', 'range', 'skin', 'on', 'off', 'piece', 'pieces', 'whole', 'half', 'quartered',
   'softened', 'melted', 'warm', 'cold', 'hot', 'ripe', 'leaves', 'leaf', 'stalk', 'stalks',
-  'florets', 'spears', 'wedges', 'rings', 'strips', 'juice', 'zest', 'rind', 'skin'
+  'florets', 'spears', 'wedges', 'rings', 'strips', 'juice', 'zest', 'rind', 'skin',
+  'lean'
+  // Note: 'light' is deliberately NOT a prep word — some foods ("light coconut milk",
+  // "light cream") are distinct entries with their own per-100 g values.
 ]);
 
 // Regional / shop-aisle names → the names we actually use in FOOD_NUTRITION.
@@ -6060,7 +6155,10 @@ const REGIONAL_ALIASES = {
 
 // Normalise an ingredient name for matching: lowercase, drop prep words, apply aliases
 function normaliseIngredientText(text) {
-  const raw = String(text || '').toLowerCase();
+  let raw = String(text || '').toLowerCase();
+  // "jasmine" / "basmati" on their own almost always means "jasmine rice" / "basmati rice"
+  raw = raw.replace(/\bjasmine\b(?!\s+rice)/g, 'jasmine rice');
+  raw = raw.replace(/\bbasmati\b(?!\s+rice)/g, 'basmati rice');
   // Apply multi-word aliases first (longest first so "ground beef" beats "beef")
   const aliasKeys = Object.keys(REGIONAL_ALIASES).sort((a, b) => b.length - a.length);
   let aliased = raw;
@@ -6258,7 +6356,7 @@ function nutritionFromIngredients(ingredients, servings, kitchenItems = []) {
   const missing = [];
   const lines = []; // Per-ingredient breakdown for the live panel
   for (const ing of ingredients || []) {
-    if (ing.optional) { lines.push({ name: ing.name, status: 'optional' }); continue; }
+    if (ing.optional && !ing.assumedStaple) { lines.push({ name: ing.name, status: 'optional' }); continue; }
     const kitchen = index.length ? findInventoryMatch(ing, index) : null;
     const typicalMatch = findFoodMatch([ing.name, ...(ing.matchTerms || [])].join(' | '));
     const typical = typicalMatch ? typicalMatch.food : null;
@@ -6274,12 +6372,12 @@ function nutritionFromIngredients(ingredients, servings, kitchenItems = []) {
     const food = plausiblePer100(rawFood, typical);
     if (!food) {
       if (!ing.assumedStaple) missing.push(ing.name);
-      lines.push({ name: ing.name, status: 'unknown' });
+      lines.push({ name: ing.name, status: ing.assumedStaple ? 'staple' : 'unknown' });
       continue;
     }
     if (ing.quantity == null) {
       if (food.kcal && !ing.assumedStaple && !/salt|pepper|water/i.test(ing.name)) missing.push(`${ing.name} (no amount)`);
-      lines.push({ name: ing.name, status: 'no-amount' });
+      lines.push({ name: ing.name, status: ing.assumedStaple ? 'staple' : 'no-amount' });
       continue;
     }
     const grams = gramsOf(ing.quantity, ing.unit, food);
