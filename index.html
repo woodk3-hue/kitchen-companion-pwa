@@ -660,6 +660,26 @@ h1, h2, h3 {
 .modal-sheet.tall { height: 92vh; max-height: 92vh; }
 .modal-sheet.fullscreen { height: 100vh; max-height: 100vh; border-radius: 0; padding: 14px 16px 0; }
 .modal-sheet.fullscreen .modal-handle { display: none; }
+
+/* Live macro breakdown in the recipe form */
+.r-live { background: var(--color-bg-soft, #f6f6f8); border: 1px solid var(--color-border); border-radius: 14px; padding: 12px 14px; }
+.r-live-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.r-live-totals { font-size: 13px; color: var(--color-ink-soft); font-variant-numeric: tabular-nums; }
+.r-live-bars { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+.r-live-bar { background: var(--color-bg); border-radius: 8px; padding: 6px 8px; text-align: center; }
+.r-live-bar strong { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }
+.r-live-bar small { font-size: 10px; color: var(--color-ink-soft); text-transform: uppercase; letter-spacing: 0.03em; }
+.r-live-list { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; }
+.r-live-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--color-border); font-size: 13px; }
+.r-live-list li:first-child { border-top: none; }
+.r-live-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.r-live-kcal { font-variant-numeric: tabular-nums; color: var(--color-ink-soft); font-size: 12px; }
+.r-live-tag { font-size: 10px; padding: 2px 6px; border-radius: 6px; background: var(--color-border); color: var(--color-ink-soft); }
+.r-live-tag.warn { background: #ffe6c7; color: #8a4b00; }
+.r-live-tag.ok { background: #d8f1dc; color: #1f6b2b; }
+:root[data-theme="dark"] .r-live-tag.warn { background: #4a2d10; color: #ffcf8a; }
+:root[data-theme="dark"] .r-live-tag.ok { background: #1f3822; color: #8fe59b; }
+:root[data-theme="dark"] .r-live { background: rgba(255,255,255,0.03); }
 .st-intro { font-size: 13px; color: var(--color-ink-soft); margin: 0 0 10px; }
 .st-body { flex: 1; }
 .st-add { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
@@ -3716,6 +3736,17 @@ function openRecipeForm(recipe, prefill) {
         </div>
 
         <div class="field">
+          <div class="r-live" id="r-live">
+            <div class="r-live-head">
+              <strong>Per serve</strong>
+              <span class="r-live-totals" id="r-live-totals">—</span>
+            </div>
+            <div class="r-live-bars" id="r-live-bars"></div>
+            <ul class="r-live-list" id="r-live-list"></ul>
+          </div>
+        </div>
+
+        <div class="field">
           <label>Method <span style="text-transform:none;font-weight:500;">(one step per line)</span></label>
           <textarea id="r-method" rows="6">${escapeHtml(r.method.join('\n'))}</textarea>
         </div>
@@ -3793,6 +3824,57 @@ function openRecipeForm(recipe, prefill) {
 
   document.getElementById('r-scan-barcode').addEventListener('click', () => startRecipePacketScan('barcode', isEdit, recipe));
   document.getElementById('r-scan-label').addEventListener('click', () => startRecipePacketScan('label', isEdit, recipe));
+
+  // Live macro breakdown: redraws as you edit ingredients or change serves
+  let liveTimer = null;
+  const renderLive = async () => {
+    // The form may have closed between the debounce and this call
+    if (!document.getElementById('r-ingredients') || !document.getElementById('r-servings')) return;
+    let calc;
+    try { calc = await calcRecipeFormNutrition(recipe); } catch (_) { return; }
+    const servesEl = document.getElementById('r-servings');
+    if (!servesEl) return;
+    const serves = parseFloat(servesEl.value) || 1;
+    const p = calc.perServing;
+    const totals = document.getElementById('r-live-totals');
+    const bars = document.getElementById('r-live-bars');
+    const list = document.getElementById('r-live-list');
+    if (!totals) return;
+    const hasAny = calc.lines.some((l) => l.status === 'ok');
+    totals.textContent = hasAny ? `whole recipe ${calc.totals.kcal} kcal · serves ${serves}` : 'add ingredients with amounts';
+    bars.innerHTML = `
+      <div class="r-live-bar"><strong>${hasAny ? p.kcal : '—'}</strong><small>kcal</small></div>
+      <div class="r-live-bar"><strong>${hasAny ? p.protein + ' g' : '—'}</strong><small>Protein</small></div>
+      <div class="r-live-bar"><strong>${hasAny ? p.carbs + ' g' : '—'}</strong><small>Carbs</small></div>`;
+    list.innerHTML = calc.lines.length
+      ? calc.lines.map((l) => {
+          if (l.status === 'optional') return `<li><span class="r-live-name">${escapeHtml(l.name)}</span><span class="r-live-tag">optional</span></li>`;
+          if (l.status === 'unknown') return `<li><span class="r-live-name">${escapeHtml(l.name)}</span><span class="r-live-tag warn">not recognised</span></li>`;
+          if (l.status === 'no-amount') return `<li><span class="r-live-name">${escapeHtml(l.name)}</span><span class="r-live-tag warn">no amount</span></li>`;
+          if (l.status === 'unknown-unit') return `<li><span class="r-live-name">${escapeHtml(l.name)}</span><span class="r-live-tag warn">unknown unit${l.unit ? ' (' + escapeHtml(l.unit) + ')' : ''}</span></li>`;
+          const sourceTag = l.source === 'packet' ? '<span class="r-live-tag ok">packet</span>' : l.source === 'kitchen' ? '<span class="r-live-tag ok">kitchen</span>' : '';
+          return `<li>
+            <span class="r-live-name">${escapeHtml(l.name)}</span>
+            <span class="r-live-kcal">${l.kcal} kcal · P ${l.protein} C ${l.carbs} F ${l.fat}</span>
+            ${sourceTag}
+          </li>`;
+        }).join('')
+      : '<li><span class="r-live-name" style="color:var(--color-ink-soft);">Nothing added yet.</span></li>';
+    // Fill the (collapsed) macro fields unless the user has typed into them
+    if (hasAny) {
+      ['r-calories', 'r-proteinGrams', 'r-carbsGrams', 'r-fatGrams'].forEach((id, i) => {
+        const el = document.getElementById(id);
+        if (el && !el.dataset.userEdited) el.value = [p.kcal, p.protein, p.carbs, p.fat][i];
+      });
+    }
+  };
+  const scheduleLive = () => { clearTimeout(liveTimer); liveTimer = setTimeout(renderLive, 200); };
+  document.getElementById('r-ingredients').addEventListener('input', scheduleLive);
+  document.getElementById('r-servings').addEventListener('input', scheduleLive);
+  ['r-calories', 'r-proteinGrams', 'r-carbsGrams', 'r-fatGrams'].forEach((id) => {
+    document.getElementById(id).addEventListener('input', (e) => { e.target.dataset.userEdited = '1'; });
+  });
+  renderLive();
 
   document.getElementById('recipe-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -5786,8 +5868,9 @@ function nutritionFromIngredients(ingredients, servings, kitchenItems = []) {
   const total = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
   const counted = [];
   const missing = [];
+  const lines = []; // Per-ingredient breakdown for the live panel
   for (const ing of ingredients || []) {
-    if (ing.optional) continue;
+    if (ing.optional) { lines.push({ name: ing.name, status: 'optional' }); continue; }
     const kitchen = index.length ? findInventoryMatch(ing, index) : null;
     const typical = findFood([ing.name, ...(ing.matchTerms || [])].join(' | '));
     // Kitchen item values win; the typical entry still supplies weights like "1 each = 150 g"
@@ -5796,23 +5879,45 @@ function nutritionFromIngredients(ingredients, servings, kitchenItems = []) {
       : kitchen
       ? { ...(typical || {}), kcal: kitchen.item.caloriesPer100, p: kitchen.item.proteinPer100 ?? (typical ? typical.p : 0), c: kitchen.item.carbsPer100 ?? (typical ? typical.c : 0), f: kitchen.item.fatPer100 ?? (typical ? typical.f : 0) }
       : typical;
+    const source = ing.nutrition ? 'packet' : kitchen ? 'kitchen' : typical ? 'typical' : null;
     const food = plausiblePer100(rawFood, typical);
-    if (!food) { if (!ing.assumedStaple) missing.push(ing.name); continue; }
-    if (ing.quantity == null) { if (food.kcal && !ing.assumedStaple && !/salt|pepper|water/i.test(ing.name)) missing.push(`${ing.name} (no amount)`); continue; }
+    if (!food) {
+      if (!ing.assumedStaple) missing.push(ing.name);
+      lines.push({ name: ing.name, status: 'unknown' });
+      continue;
+    }
+    if (ing.quantity == null) {
+      if (food.kcal && !ing.assumedStaple && !/salt|pepper|water/i.test(ing.name)) missing.push(`${ing.name} (no amount)`);
+      lines.push({ name: ing.name, status: 'no-amount' });
+      continue;
+    }
     const grams = gramsOf(ing.quantity, ing.unit, food);
-    if (grams == null) { missing.push(`${ing.name} (${ing.unit || 'each'})`); continue; }
+    if (grams == null) {
+      missing.push(`${ing.name} (${ing.unit || 'each'})`);
+      lines.push({ name: ing.name, status: 'unknown-unit', unit: ing.unit });
+      continue;
+    }
     const k = (grams * (food.edible || 1)) / 100;
-    total.kcal += food.kcal * k;
-    total.protein += (food.p || 0) * k;
-    total.carbs += (food.c || 0) * k;
-    total.fat += (food.f || 0) * k;
+    const kcal = food.kcal * k;
+    const protein = (food.p || 0) * k;
+    const carbs = (food.c || 0) * k;
+    const fat = (food.f || 0) * k;
+    total.kcal += kcal; total.protein += protein; total.carbs += carbs; total.fat += fat;
     counted.push(ing.name);
+    lines.push({
+      name: ing.name, status: 'ok', source,
+      quantity: ing.quantity, unit: ing.unit,
+      grams: Math.round(grams),
+      kcal: Math.round(kcal), protein: Math.round(protein), carbs: Math.round(carbs), fat: Math.round(fat)
+    });
   }
   const s = servings && servings > 0 ? servings : 1;
   return {
     perServing: { kcal: Math.round(total.kcal / s), protein: Math.round(total.protein / s), carbs: Math.round(total.carbs / s), fat: Math.round(total.fat / s) },
+    totals: { kcal: Math.round(total.kcal), protein: Math.round(total.protein), carbs: Math.round(total.carbs), fat: Math.round(total.fat) },
     counted,
-    missing
+    missing,
+    lines
   };
 }
 
