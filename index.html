@@ -3992,8 +3992,67 @@ function ingredientLine(ing) {
 // Kept between sheets so scanning a packet can come back to the changes made so far
 const MyWay = { recipe: null, rows: [], added: [] };
 
+// Heavy ingredients the trimmer may reduce, with a floor that keeps the flavour.
+// Checked in order: the first one that drops below its current amount runs first (biggest wins).
+const CALORIE_TRIM = [
+  { match: /\b(ghee|butter|lard)\b/i, unit: 'tbsp', floor: 1, hint: 'Just enough for the tadka' },
+  { match: /^(oil|olive oil|vegetable oil|canola oil|sunflower oil|rice bran oil|grapeseed oil|peanut oil|avocado oil|coconut oil|sesame oil|gingelly oil|mustard oil)$/i, unit: 'tbsp', floor: 1, hint: 'Still enough to cook with' },
+  { match: /\bcream\b/i, unit: 'ml', floor: 60, hint: 'A smaller finish of cream' },
+  { match: /^coconut milk$|^coconut cream$/i, unit: 'ml', floor: 150, hint: 'Lighter, still coconutty', swapTo: 'light coconut milk' },
+  { match: /^cheese$|cheddar|tasty cheese|parmesan|mozzarella/i, unit: 'g', floor: 30, hint: 'Enough to taste' },
+  { match: /^(sugar|brown sugar|honey|jaggery|maple syrup)$/i, unit: null, floor: 0, hint: 'Leave the sugar out' }
+];
+
+// If the recipe is over its calorie budget, step heavy ingredients down to their floor
+// one at a time until it fits (or there's nothing left to trim). Returns the trim steps taken.
+function trimForCalories(rows, added, baseKcal, nowKcal, servings, targetKcal) {
+  const steps = [];
+  if (!nowKcal || !targetKcal || nowKcal <= targetKcal) return steps;
+  for (let i = 0; i < 20; i++) {
+    const current = rows.filter((r) => !r.removed);
+    let best = null;
+    for (const row of current) {
+      const ing = row.cur;
+      const rule = CALORIE_TRIM.find((t) => t.match.test((ing.name || '').trim()));
+      if (!rule) continue;
+      // Current amount in the unit the floor is in
+      const asUnit = (unit) => {
+        if (unit === 'tbsp') {
+          if (ing.unit === 'tbsp') return ing.quantity;
+          if (ing.unit === 'tsp') return ing.quantity / 3;
+          const grams = metricAmount(ing);
+          return grams ? grams.quantity / UNIT_GRAMS.tbsp : (ing.unit === 'g' ? ing.quantity / UNIT_GRAMS.tbsp : null);
+        }
+        if (unit === 'ml') return ing.unit === 'ml' ? ing.quantity : ing.unit === 'L' ? ing.quantity * 1000 : null;
+        return ing.unit === 'g' ? ing.quantity : ing.unit === 'kg' ? ing.quantity * 1000 : null;
+      };
+      const current = asUnit(rule.unit);
+      const floorGrams = rule.unit === 'tbsp' ? rule.floor * UNIT_GRAMS.tbsp : rule.unit === 'ml' ? rule.floor : rule.floor;
+      const currentGrams = rule.unit === 'tbsp' && current != null ? current * UNIT_GRAMS.tbsp : current;
+      if (rule.floor === 0) {
+        if (!row.removed) best = best && best.saving > 50 ? best : { row, remove: true, saving: 50, rule };
+      } else if (currentGrams && currentGrams > floorGrams + 1) {
+        // How many calories per gram, from the ingredient's own values if any, otherwise typical
+        const food = (ing.nutrition && ing.nutrition.kcal) ? { kcal: ing.nutrition.kcal } : (findFood(ing.name) || {});
+        const saving = ((currentGrams - floorGrams) * (food.kcal || 0)) / servings;
+        if (saving > 5 && (!best || saving > best.saving)) best = { row, remove: false, floorGrams, saving, rule };
+      }
+    }
+    if (!best) break;
+    if (best.remove) { best.row.removed = true; steps.push({ name: best.row.cur.name, action: 'removed', why: best.rule.hint }); continue; }
+    const ing = best.row.cur;
+    const unit = best.rule.unit || 'tbsp';
+    const newQty = best.rule.unit === 'tbsp' ? best.rule.floor : (best.rule.unit === 'ml' ? best.rule.floor : best.rule.floor);
+    best.row.cur = normalizeRecipeIngredient({ ...ing, name: best.rule.swapTo || ing.name, quantity: newQty, unit, matchTerms: [(best.rule.swapTo || ing.name).toLowerCase()] });
+    steps.push({ name: ing.name, action: 'trimmed', to: `${newQty} ${unit}${best.rule.swapTo ? ` ${best.rule.swapTo}` : ''}`, why: best.rule.hint });
+    nowKcal -= best.saving;
+    if (nowKcal <= targetKcal) break;
+  }
+  return steps;
+}
+
 async function openMakeItMyWay(recipe, resume = false) {
-  const kitchenItems = await dbGetAll('inventoryItems');
+  const [kitchenItems, goals] = await Promise.all([dbGetAll('inventoryItems'), getHealthGoals()]);
   const serves = recipe.servings || 1;
   const base = recipeMacros(recipe);
   const carryOn = resume && MyWay.recipe && MyWay.recipe.id === recipe.id;
@@ -4064,6 +4123,11 @@ async function openMakeItMyWay(recipe, resume = false) {
   const draw = () => {
     const spices = spiceRows();
     document.getElementById('mw-body').innerHTML = `
+      ${(() => {
+        const m = after().m;
+        const over = base.kcal && goals.caloriesMax && m.kcal > goals.caloriesMax ? Math.round(m.kcal - goals.caloriesMax) : 0;
+        return over ? `<div class="cook-box mw-tip"><span>🎯 ${Math.round(m.kcal)} kcal per serve, ${over} over your ${goals.caloriesMax} target.</span><button type="button" class="btn-secondary" id="mw-trim">Match my calories</button></div>` : '';
+      })()}
       ${spices.length >= 3 ? `<div class="cook-box mw-tip"><span>🧂 ${spices.length} separate spices. Use a packet mix instead?</span><button type="button" class="btn-secondary" id="mw-spice">Swap for a packet mix</button></div>` : ''}
       ${rows.map((r, i) => {
         const ideas = swapIdeasFor(r.orig);
@@ -4140,6 +4204,15 @@ async function openMakeItMyWay(recipe, resume = false) {
     document.getElementById('mw-new').addEventListener('keydown', (e) => { if (e.key === 'Enter') addNew(); });
     document.getElementById('mw-scan').addEventListener('click', openPacketBarcode);
     document.getElementById('mw-label').addEventListener('click', openPacketLabel);
+    const trim = document.getElementById('mw-trim');
+    if (trim) trim.addEventListener('click', () => {
+      const m = after().m;
+      const target = goals.caloriesMax || m.kcal;
+      const steps = trimForCalories(rows, added, base.kcal, m.kcal, serves, target);
+      draw();
+      if (!steps.length) { showToast('Nothing obvious to trim: try removing or swapping ingredients.'); return; }
+      showToast(`${steps.map((s) => s.action === 'removed' ? `removed ${s.name}` : `${s.name} → ${s.to}`).join(', ')}`);
+    });
     const spice = document.getElementById('mw-spice');
     if (spice) spice.addEventListener('click', () => {
       spiceRows().forEach((r) => { r.removed = true; });
