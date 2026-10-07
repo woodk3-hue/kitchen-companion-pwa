@@ -223,7 +223,7 @@ Once the kitchen has food in it, **🍳 Suggest recipes from my kitchen** appear
 
 ## Cuisines
 
-45 cuisines in 8 regions: South Asian, East Asian, Southeast Asian, Middle Eastern & African, European, Americas, Oceania, and Other. The Recipes tab only shows tabs for cuisines you have recipes in. **Settings → Health goals → Cuisines you like** lists them by region; choosing none means any cuisine, and AI suggestions follow whatever is chosen. Online search results keep their cuisine (e.g. TheMealDB Jamaican → Caribbean).
+46 cuisines in 8 regions: South Asian, East Asian, Southeast Asian, Middle Eastern & African, European, Americas, Oceania, and Other (Western, Fusion, Other). Basics that aren't really a cuisine, like rice, oats or toast, can be saved with **None (basics)** at the top of the cuisine list; they show no cuisine tag and get their own **Basics** tab on the Recipes page. The Recipes tab only shows tabs for cuisines you have recipes in. **Settings → Health goals → Cuisines you like** lists them by region; choosing none means any cuisine, and AI suggestions follow whatever is chosen. Online search results keep their cuisine (e.g. TheMealDB Jamaican → Caribbean).
 
 ## Roadmap
 

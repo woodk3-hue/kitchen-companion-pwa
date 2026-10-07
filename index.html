@@ -2920,13 +2920,16 @@ const CUISINE_GROUPS = [
   { region: 'European', key: 'european', cuisines: ['Italian', 'Greek', 'French', 'Spanish', 'Portuguese', 'British', 'Irish', 'German', 'Eastern European', 'Mediterranean'] },
   { region: 'Americas', key: 'americas', cuisines: ['American', 'Mexican', 'Caribbean', 'Latin American', 'Canadian'] },
   { region: 'Oceania', key: 'oceania', cuisines: ['Australian', 'Pacific Islander'] },
-  { region: 'Other', key: 'other', cuisines: ['Western', 'Fusion'] }
+  { region: 'Other', key: 'other', cuisines: ['Western', 'Fusion', 'Other'] }
 ];
 const RECIPE_CUISINES = CUISINE_GROUPS.flatMap((g) => g.cuisines);
 const CUISINE_REGION_KEY = Object.fromEntries(CUISINE_GROUPS.flatMap((g) => g.cuisines.map((c) => [c, g.key])));
 
+// Basics like rice or oats don't belong to a cuisine: they're saved with an empty cuisine
+const NO_CUISINE_LABEL = 'Basics';
+
 function cuisineOptionsHtml(selected) {
-  return CUISINE_GROUPS.map((g) => `<optgroup label="${g.region}">${g.cuisines.map((c) => `<option value="${c}" ${selected === c ? 'selected' : ''}>${c}</option>`).join('')}</optgroup>`).join('');
+  return `<option value="" ${selected === '' ? 'selected' : ''}>None (basics like rice, oats, toast)</option>` + CUISINE_GROUPS.map((g) => `<optgroup label="${g.region}">${g.cuisines.map((c) => `<option value="${c}" ${selected === c ? 'selected' : ''}>${c}</option>`).join('')}</optgroup>`).join('');
 }
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
@@ -2970,7 +2973,7 @@ function normalizeRecipe(r) {
   const pick = (value, allowed, fallback) => (allowed.includes(value) ? value : fallback);
   return {
     name: String(r.name || '').trim(),
-    cuisine: pick(r.cuisine, RECIPE_CUISINES, 'Western'),
+    cuisine: r.cuisine === '' ? '' : pick(r.cuisine, RECIPE_CUISINES, 'Western'),
     mealTypes: (Array.isArray(r.mealTypes) ? r.mealTypes : []).filter((m) => MEAL_TYPES.includes(m)),
     servings: toNumberOrNull(r.servings),
     prepMinutes: toNumberOrNull(r.prepMinutes),
@@ -3043,7 +3046,7 @@ async function syncRecipeSeed() {
 
 /* ---- Recipes list screen ---- */
 function recipeMatchesFilters(r, f) {
-  if (f.cuisine !== 'all' && r.cuisine !== f.cuisine) return false;
+  if (f.cuisine === 'none' ? r.cuisine : f.cuisine !== 'all' && r.cuisine !== f.cuisine) return false;
   if (f.favourites && !r.isFavourite) return false;
   if (f.time && !(recipeTotalMinutes(r) > 0 && recipeTotalMinutes(r) <= f.time)) return false;
   if (f.highProtein || f.lowCarb || f.keto || f.lowFat) {
@@ -3098,7 +3101,7 @@ function renderRecipeList() {
           </div>
           <div class="meta-row">
             ${sc ? `<span class="tag match-pct ${sc.pct >= 80 ? 'high' : ''}">${sc.pct}% match</span>` : ''}
-            <span class="tag">${escapeHtml(r.cuisine)}</span>
+            ${r.cuisine ? `<span class="tag">${escapeHtml(r.cuisine)}</span>` : ''}
             ${calorieBadgeHtml(r.caloriesPerServing, AppState.healthGoals)}
             ${dietTagsHtml(r)}
             ${r.freezerFriendly ? '<span class="tag state-frozen">Freezes well</span>' : ''}
@@ -3138,8 +3141,9 @@ async function renderRecipesScreen() {
       <input type="search" id="recipe-search" placeholder="Search recipes or ingredients" value="${escapeHtml(f.search)}">
     </div>
     <div class="location-tabs">
-      ${['all', ...RECIPE_CUISINES.filter((c) => c === f.cuisine || AppState.recipes.some((r) => r.cuisine === c))].map((c) => `
-        <button class="loc-tab recipe-cuisine-tab ${f.cuisine === c ? 'active' : ''}" data-cuisine="${c}">${c === 'all' ? 'All' : c}</button>
+      ${['all', ...RECIPE_CUISINES.filter((c) => c === f.cuisine || AppState.recipes.some((r) => r.cuisine === c)),
+        ...(f.cuisine === 'none' || AppState.recipes.some((r) => !r.cuisine) ? ['none'] : [])].map((c) => `
+        <button class="loc-tab recipe-cuisine-tab ${f.cuisine === c ? 'active' : ''}" data-cuisine="${c}">${c === 'all' ? 'All' : c === 'none' ? NO_CUISINE_LABEL : c}</button>
       `).join('')}
     </div>
     <div class="state-chip-grid recipe-filter-row">
@@ -3262,7 +3266,7 @@ async function openRecipeDetail(id) {
     </div>
     <div class="modal-scroll-area">
       <div class="field-row" style="margin-bottom:12px;flex-wrap:wrap;gap:6px;">
-        <span class="tag">${escapeHtml(recipe.cuisine)}</span>
+        ${recipe.cuisine ? `<span class="tag">${escapeHtml(recipe.cuisine)}</span>` : ''}
         ${recipe.mealTypes.map((m) => `<span class="tag">${escapeHtml(m)}</span>`).join('')}
         ${calorieBadgeHtml(recipe.caloriesPerServing, goals)}
         ${dietTagsHtml(recipe, { long: true })}
