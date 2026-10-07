@@ -2988,7 +2988,10 @@ function normalizeRecipeIngredient(ing) {
     assumedStaple: !!ing.assumedStaple,
     prepNote: ing.prepNote || '',
     // Values per 100 g read from the packet (barcode or label), used before typical values
-    nutrition: ing.nutrition && ing.nutrition.kcal != null ? { kcal: ing.nutrition.kcal, p: ing.nutrition.p ?? null, c: ing.nutrition.c ?? null, f: ing.nutrition.f ?? null, from: ing.nutrition.from || '' } : null
+    nutrition: ing.nutrition && ing.nutrition.kcal != null ? {
+      kcal: ing.nutrition.kcal, p: ing.nutrition.p ?? null, c: ing.nutrition.c ?? null, f: ing.nutrition.f ?? null, from: ing.nutrition.from || '',
+      tsp: ing.nutrition.tsp || null, tbsp: ing.nutrition.tbsp || null // grams in a spoonful of this packet
+    } : null
   };
 }
 
@@ -4103,30 +4106,79 @@ async function openMakeItMyWay(recipe, resume = false) {
 const Packet = { row: null, photos: [] };
 
 // Puts the packet in the recipe with its own values, in place of a generic "packet mix" if there is one
-function addPacketToMyWay(name, grams, per100, from) {
+// What kind of packet it is decides how much a spoonful weighs ("Butter Chicken Spice Mix" is a mix, not the dish)
+function packetKind(name) {
+  const n = name.toLowerCase();
+  const kind = /paste/.test(n) ? 'curry paste' : /sauce/.test(n) ? 'soy sauce' : /stock|broth/.test(n) ? 'stock'
+    : /powder|masala|spice|seasoning|mix/.test(n) ? 'spice mix' : null;
+  return (kind && findFood(kind)) || findFood(name) || {};
+}
+
+async function addPacketToMyWay(name, quantity, unit, per100, from, pantry) {
+  const kind = packetKind(name);
   const ing = normalizeRecipeIngredient({
-    name, quantity: grams, unit: 'g', category: 'Spices & Seasonings', matchTerms: [name.toLowerCase()],
-    nutrition: { kcal: per100.kcal, p: per100.p, c: per100.c, f: per100.f, from }
+    name, quantity, unit, category: 'Spices & Seasonings', matchTerms: [name.toLowerCase()],
+    nutrition: { kcal: per100.kcal, p: per100.p, c: per100.c, f: per100.f, from, tsp: kind.tsp || UNIT_GRAMS.tsp, tbsp: kind.tbsp || UNIT_GRAMS.tbsp }
   });
+  // The packet itself goes in the pantry; what the recipe uses comes out of it when it's cooked
+  let pantryNote = '';
+  if (pantry) {
+    const items = await dbGetAll('inventoryItems');
+    const existing = items.find((i) => (pantry.barcode && i.barcode === pantry.barcode) || matchWords(i.name) === matchWords(name));
+    const now = new Date().toISOString();
+    if (existing) {
+      if (existing.quantity != null && pantry.grams && existing.unit === 'g') existing.quantity = Math.round((existing.quantity + pantry.grams) * 10) / 10;
+      Object.assign(existing, { caloriesPer100: per100.kcal, caloriesUnit: 'g', caloriesSource: from === 'label' ? 'label' : 'database', ...macrosFrom({ proteinPer100: per100.p, carbsPer100: per100.c, fatPer100: per100.f }), updatedAt: now });
+      await dbPut('inventoryItems', existing);
+      await logHistory(existing.id, 'bought', pantry.grams || null, existing.location, existing.location, 'Packet scanned for a recipe');
+    } else {
+      const id = await dbPut('inventoryItems', {
+        name, quantity: pantry.grams || null, unit: 'g', portionCount: null, portionSize: null, location: 'pantry', subLocation: null,
+        states: ['Raw'], category: 'Spices & Seasonings', isStaple: false, purchaseDate: localDateString(new Date()), expiryDate: null,
+        useByOverrideDays: null, cost: null, notes: '', freezerFriendlyRating: null, linkedPurchaseEventId: null, barcode: pantry.barcode || null,
+        caloriesPer100: per100.kcal, caloriesUnit: 'g', caloriesSource: from === 'label' ? 'label' : 'database',
+        ...macrosFrom({ proteinPer100: per100.p, carbsPer100: per100.c, fatPer100: per100.f }), runningLow: false, createdAt: now, updatedAt: now
+      });
+      await logHistory(id, 'created', pantry.grams || null, null, 'pantry', 'Packet scanned for a recipe');
+    }
+    pantryNote = ' and the packet to your pantry';
+  }
   const generic = MyWay.added.findIndex((a) => !a.nutrition && /mix|packet|paste|sauce|stock/i.test(a.name));
   if (generic >= 0) MyWay.added[generic] = ing; else MyWay.added.push(ing);
   stopBarcodeCamera();
   openMakeItMyWay(MyWay.recipe, true);
-  showToast(`Added ${name} with its packet values`);
+  showToast(`Added ${formatIngredientQuantity(ing)} ${name}${pantryNote}`);
 }
 
 function packetAmountHtml(defaultGrams, packGrams, serveGrams) {
   const chips = [
-    packGrams ? `<button type="button" class="state-chip pk-chip" data-g="${packGrams}">Whole packet (${packGrams} g)</button>` : '',
-    serveGrams ? `<button type="button" class="state-chip pk-chip" data-g="${serveGrams}">1 serve (${serveGrams} g)</button>` : ''
+    packGrams ? `<button type="button" class="state-chip pk-chip" data-q="${packGrams}" data-u="g">Whole packet (${packGrams} g)</button>` : '',
+    serveGrams ? `<button type="button" class="state-chip pk-chip" data-q="${serveGrams}" data-u="g">1 serve (${serveGrams} g)</button>` : '',
+    '<button type="button" class="state-chip pk-chip" data-q="1" data-u="tbsp">1 tbsp</button>',
+    '<button type="button" class="state-chip pk-chip" data-q="3" data-u="tbsp">3 tbsp</button>'
   ].join('');
   return `
-    <div class="field" style="margin-top:12px;"><label>How much goes in the whole recipe? (g)</label>
-      <input type="number" id="pk-grams" min="0" step="any" inputmode="decimal" value="${defaultGrams}"></div>
-    ${chips ? `<div class="state-chip-grid" style="margin-bottom:8px;">${chips}</div>` : ''}`;
+    <div class="field" style="margin-top:12px;"><label>How much goes in the whole recipe?</label>
+      <div class="ps-fields" style="padding:0;">
+        <input type="number" id="pk-grams" min="0" step="any" inputmode="decimal" value="${defaultGrams}">
+        <select id="pk-unit" class="ps-unit"><option value="g">g</option><option value="tsp">tsp</option><option value="tbsp">tbsp</option></select>
+      </div></div>
+    <div class="state-chip-grid" style="margin-bottom:8px;">${chips}</div>
+    <label class="plan-ai-toggle"><input type="checkbox" id="pk-pantry" checked> Add the ${packGrams ? `${packGrams} g ` : ''}packet to my pantry
+      <span class="recipe-muted">(what the recipe uses comes out when you tap I cooked this)</span></label>`;
 }
 function attachPacketAmount() {
-  document.querySelectorAll('.pk-chip').forEach((b) => b.addEventListener('click', () => { document.getElementById('pk-grams').value = b.dataset.g; }));
+  document.querySelectorAll('.pk-chip').forEach((b) => b.addEventListener('click', () => {
+    document.getElementById('pk-grams').value = b.dataset.q;
+    document.getElementById('pk-unit').value = b.dataset.u;
+  }));
+}
+function readPacketAmount(packGrams, barcode) {
+  return {
+    quantity: numOrNull(document.getElementById('pk-grams').value) || 0,
+    unit: document.getElementById('pk-unit').value,
+    pantry: document.getElementById('pk-pantry').checked ? { grams: packGrams || null, barcode: barcode || null } : null
+  };
 }
 function packetBackButton() {
   return '<button type="button" class="btn-secondary" id="pk-back">Back to the recipe</button>';
@@ -4152,9 +4204,10 @@ function openPacketBarcode() {
   document.getElementById('bc-action').addEventListener('click', () => {
     const row = BarcodeScan.row;
     if (!row || !row.caloriesPer100) return;
-    const grams = numOrNull(document.getElementById('pk-grams').value) || 0;
+    const packGrams = row.unit === 'g' ? Math.round(row.quantity) : row.unit === 'kg' ? Math.round(row.quantity * 1000) : null;
+    const amt = readPacketAmount(packGrams, row.barcode);
     const name = document.getElementById('pk-name').value.trim() || row.name || 'Packet mix';
-    addPacketToMyWay(name, grams, { kcal: row.caloriesPer100, p: row.proteinPer100, c: row.carbsPer100, f: row.fatPer100 }, 'barcode');
+    addPacketToMyWay(name, amt.quantity, amt.unit, { kcal: row.caloriesPer100, p: row.proteinPer100, c: row.carbsPer100, f: row.fatPer100 }, 'barcode', amt.pantry);
   });
   attachPacketBack();
   scanNextBarcode();
@@ -4222,9 +4275,9 @@ function openPacketLabel() {
   draw();
   document.getElementById('pk-go').addEventListener('click', async () => {
     if (Packet.label) {
-      const grams = numOrNull(document.getElementById('pk-grams').value) || 0;
+      const amt = readPacketAmount(Packet.label.packAmount ? Math.round(Packet.label.packAmount) : null, null);
       const name = document.getElementById('pk-name').value.trim() || Packet.label.name || 'Packet mix';
-      addPacketToMyWay(name, grams, { kcal: Packet.label.per100.kcal, p: Packet.label.per100.protein, c: Packet.label.per100.carbs, f: Packet.label.per100.fat }, 'label');
+      addPacketToMyWay(name, amt.quantity, amt.unit, { kcal: Packet.label.per100.kcal, p: Packet.label.per100.protein, c: Packet.label.per100.carbs, f: Packet.label.per100.fat }, 'label', amt.pantry);
       return;
     }
     await readPacketLabel();
@@ -5345,7 +5398,7 @@ function nutritionFromIngredients(ingredients, servings, kitchenItems = []) {
     const typical = findFood([ing.name, ...(ing.matchTerms || [])].join(' | '));
     // Kitchen item values win; the typical entry still supplies weights like "1 each = 150 g"
     const food = ing.nutrition
-      ? { ...(typical || {}), kcal: ing.nutrition.kcal, p: ing.nutrition.p || 0, c: ing.nutrition.c || 0, f: ing.nutrition.f || 0, edible: 1 }
+      ? { ...(typical || {}), kcal: ing.nutrition.kcal, p: ing.nutrition.p || 0, c: ing.nutrition.c || 0, f: ing.nutrition.f || 0, edible: 1, ...(ing.nutrition.tsp ? { tsp: ing.nutrition.tsp } : {}), ...(ing.nutrition.tbsp ? { tbsp: ing.nutrition.tbsp } : {}) }
       : kitchen
       ? { ...(typical || {}), kcal: kitchen.item.caloriesPer100, p: kitchen.item.proteinPer100 ?? (typical ? typical.p : 0), c: kitchen.item.carbsPer100 ?? (typical ? typical.c : 0), f: kitchen.item.fatPer100 ?? (typical ? typical.f : 0) }
       : typical;
@@ -7701,6 +7754,12 @@ function ingredientUseInItemUnit(ing, item, scale) {
   const qty = ing.quantity * scale;
   const direct = convertQty(qty, ing.unit || 'each', item.unit || 'each');
   if (direct != null) return Math.round(direct * 1000) / 1000;
+  // Spoons or "each" of something kept by weight, e.g. 3 tbsp from a 170 g packet of curry powder
+  if (['g', 'kg'].includes(item.unit)) {
+    const food = { ...(findFood([ing.name, ...(ing.matchTerms || [])].join(' | ')) || {}), ...(ing.nutrition && ing.nutrition.tbsp ? { tsp: ing.nutrition.tsp, tbsp: ing.nutrition.tbsp } : {}) };
+    const grams = gramsOf(qty, ing.unit || 'each', food);
+    if (grams != null) return Math.round((item.unit === 'kg' ? grams / 1000 : grams) * 1000) / 1000;
+  }
   if (ing.unit === 'can' && item.unit === 'can') return qty;
   return null;
 }

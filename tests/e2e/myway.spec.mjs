@@ -63,13 +63,22 @@ test('a scanned curry-mix packet replaces the generic mix, with its own values',
   await page.click('#bc-manual-go');
   await expect(page.locator('#pk-name')).toHaveValue('Masterfoods Butter Chicken Spice Mix');
   await expect(page.locator('#pk-grams')).toHaveValue('35');
+  // Use 3 tablespoons in the recipe; the packet goes in the pantry
+  await page.locator('.pk-chip', { hasText: '3 tbsp' }).click();
+  await expect(page.locator('#pk-pantry')).toBeChecked();
   await page.click('#bc-action');
   // Back in Make it my way: the generic mix is replaced, the earlier changes are kept
   await expect(page.locator('.mw-row.added')).toHaveCount(1);
+  await expect(page.locator('.mw-row.added')).toContainText('3 tbsp Masterfoods Butter Chicken Spice Mix');
   await expect(page.locator('.mw-row.added')).toContainText('from the barcode: 320 kcal');
+  const pantry = (await readStore(page, 'inventoryItems')).find((i) => i.barcode === '9300633000000');
+  expect(pantry).toMatchObject({ location: 'pantry', quantity: 35, unit: 'g', caloriesPer100: 320 });
   await expect(page.locator('.mw-row.removed').first()).toBeVisible();
   await page.click('#mw-save-new');
   await expect.poll(async () => (await readStore(page, 'recipes')).find((r) => r.name === 'Railway Lamb Curry (my way)')?.ingredients.find((i) => i.nutrition)?.nutrition.kcal).toBe(320);
+  // Cooking it takes the 3 tbsp (about 27 g) out of the packet in the pantry
+  await page.click('#cooked-recipe-btn');
+  await expect(page.locator('.cook-use', { hasText: 'Spice Mix' }).locator('.ck-use-qty')).toHaveValue('27');
   expect(errors).toEqual([]);
 });
 
