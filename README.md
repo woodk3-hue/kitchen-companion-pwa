@@ -101,6 +101,19 @@ IndexedDB is local to the browser/device. Clearing browser data, switching brows
 
 Each ingredient stores `matchTerms` (inventory names that count as having it, e.g. `chicken thigh`, `chicken`), `assumedStaple` (salt, oil and dried spices are assumed on hand) and `optional`.
 
+## Recipe from a photo
+
+**📸 Recipe from a photo** on the Recipes tab: choose up to 4 pictures from your gallery (or take them), such as a screenshot of a website or post, a cookbook page or a handwritten card, with one photo per page if it runs over. Claude reads the name, serves, times, ingredients and method (converting imperial amounts to metric) and opens it in the **Add recipe** form to check before saving; calories and macros are then worked out from the ingredients. Uses your API key. (**Settings → Import recipes** is still for recipe files, not photos.)
+
+## Make it my way: swap ingredients
+
+**🔁 Make it my way** on any recipe page lists its ingredients with **Swap** and **×** (remove) on each, and **+ Add** at the bottom. Calories, protein, carbs and fat per serve update as you go, with the change shown (e.g. "kcal −109").
+- **💡 Suggested swaps**: chicken on the bone → chicken breast, lamb or fatty mince → chicken breast or lean mince, cream → light cooking cream or Greek yoghurt, coconut milk → light coconut milk, ghee or butter → half the oil, rice → cauliflower rice, pasta → zucchini noodles, potato → cauliflower, cheese → reduced-fat cheese, sugar → leave it out.
+- **🧂 Packet mix**: when a recipe has 3 or more separate spices, one tap swaps them for a packet spice mix.
+- **Swap** lets you type anything, e.g. "800 g chicken breast".
+- **Save as my version** keeps the original and adds "… (my way)"; **Update this recipe** changes it.
+- The new numbers start from the recipe's own figures and move in proportion to the change, using the built-in typical values.
+
 ## Searching for a dish
 
 **🔎 Search online** on the Recipes tab:

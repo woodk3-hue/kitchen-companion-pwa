@@ -1286,6 +1286,24 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 .plan-add-more { display: block; width: 100%; margin: 2px 0 6px; padding: 6px 10px; border: none; background: none; color: var(--color-accent); font: inherit; font-size: 13px; font-weight: 700; text-align: left; cursor: pointer; }
 .ask-claude { background: var(--color-fill); border-radius: var(--radius-card); padding: 12px; margin: 10px 0 4px; }
 .ask-claude .ai-meal { margin-top: 10px; }
+.photo-recipe-btn { width: 100%; margin: 0 0 10px; }
+.myway-macros { margin-bottom: 10px; }
+.myway-macros .mt-l b { font-size: 11px; margin-left: 2px; }
+.myway-macros .mt-l b.down { color: var(--color-fridge); }
+.myway-macros .mt-l b.up { color: var(--color-warn); }
+.mw-row { padding: 9px 0; border-bottom: 1px solid var(--color-fill); }
+.mw-line { display: flex; align-items: center; gap: 8px; }
+.mw-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; }
+.mw-row.removed .mw-name { text-decoration: line-through; color: var(--color-ink-soft); font-weight: 500; }
+.mw-row.swapped .mw-name { color: var(--color-fridge); }
+.mw-was { display: block; font-size: 12px; font-weight: 500; color: var(--color-ink-soft); }
+.mw-del { background: none; border: none; font-size: 22px; line-height: 1; color: var(--color-ink-soft); padding: 2px 6px; cursor: pointer; }
+.mw-ideas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.mw-idea { font-size: 12px; padding: 5px 10px; text-align: left; }
+.mw-why { color: var(--color-ink-soft); font-weight: 500; }
+.mw-edit { margin-top: 6px; }
+.mw-tip { display: flex; align-items: center; gap: 10px; justify-content: space-between; font-size: 14px; font-weight: 600; }
+.mw-tip .btn-secondary { width: auto; margin: 0; white-space: nowrap; }
 .plan-portions { display: flex; align-items: center; gap: 10px; background: var(--color-paper); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 10px 12px; margin: 0 0 12px; }
 .plan-portions .stepper { flex: 0 0 132px; }
 .plan-portions .stepper input { width: 44px; padding: 8px 2px; border: none; background: var(--color-fill); border-radius: 10px; font: inherit; font-weight: 700; color: var(--color-ink); text-align: center; }
@@ -3139,6 +3157,10 @@ async function renderRecipesScreen() {
         <span class="st-btn-desc">Free recipe ideas</span>
       </button>
     </div>
+    <button type="button" class="stocktake-btn photo-recipe-btn" id="photo-recipe-btn">
+      <span class="st-btn-title">📸 Recipe from a photo</span>
+      <span class="st-btn-desc">Screenshots, cookbook pages or handwritten recipes</span>
+    </button>
     <div class="field recipe-search">
       <input type="search" id="recipe-search" placeholder="Search recipes or ingredients" value="${escapeHtml(f.search)}">
     </div>
@@ -3171,6 +3193,7 @@ function attachRecipeCardListeners() {
 function attachRecipesListeners() {
   document.getElementById('ai-suggest-btn').addEventListener('click', openAiSuggest);
   document.getElementById('online-search-btn').addEventListener('click', openOnlineSearch);
+  document.getElementById('photo-recipe-btn').addEventListener('click', openRecipePhoto);
 
   // Search only redraws the list so the input keeps focus while typing
   document.getElementById('recipe-search').addEventListener('input', (e) => {
@@ -3317,6 +3340,7 @@ async function openRecipeDetail(id) {
       ${recipe.notes ? `<div class="section-heading" style="margin-top:18px;"><h2>Notes</h2></div><p class="recipe-notes">${escapeHtml(recipe.notes)}</p>` : ''}
     </div>
     <div class="modal-action-bar">
+      <button type="button" class="btn-secondary" id="myway-recipe-btn">🔁 Make it my way: swap ingredients</button>
       <button type="button" class="btn-primary" id="cooked-recipe-btn">🍳 I cooked this${baseServes ? ` · ${baseServes} portions` : ''}</button>
       <div class="field-row" style="gap:8px;">
         <button type="button" class="btn-secondary" id="log-recipe-btn">🍽️ Log a serving</button>
@@ -3355,6 +3379,7 @@ async function openRecipeDetail(id) {
   });
 
   document.getElementById('edit-recipe-btn').addEventListener('click', () => openRecipeForm(recipe));
+  document.getElementById('myway-recipe-btn').addEventListener('click', () => openMakeItMyWay(recipe));
   const calcBtn = document.getElementById('recipe-calc-btn');
   if (calcBtn) calcBtn.addEventListener('click', async () => {
     let calc = nutritionFromIngredients(recipe.ingredients, recipe.servings || 1, kitchenItems);
@@ -3501,9 +3526,9 @@ function parseIngredientLine(line, previousIngredients, knownLookup) {
   });
 }
 
-function openRecipeForm(recipe) {
+function openRecipeForm(recipe, prefill) {
   const isEdit = !!recipe;
-  const r = recipe || normalizeRecipe({ mealTypes: ['Dinner'], servings: 4, difficulty: 'Easy', proteinLevel: 'High', fatLevel: 'Low' });
+  const r = recipe || normalizeRecipe(prefill || { mealTypes: ['Dinner'], servings: 4, difficulty: 'Easy', proteinLevel: 'High', fatLevel: 'Low' });
 
   const segmented = (id, options, selected) => `
     <div class="segmented" id="${id}">
@@ -3717,6 +3742,342 @@ async function saveRecipeFromForm(existing) {
   } catch (err) {
     alert('Couldn\'t save this recipe: ' + (err && err.message ? err.message : 'unknown storage error'));
   }
+}
+
+/* ============================================================
+   RECIPE FROM PHOTO
+   Screenshots, cookbook pages or handwritten recipes from the gallery
+   (or the camera). Claude reads them into the Add recipe form to check.
+   ============================================================ */
+const RecipePhoto = { photos: [] };
+
+function recipePhotoSchema() {
+  const str = { type: 'string' };
+  return {
+    type: 'object', additionalProperties: false,
+    required: ['found', 'name', 'cuisine', 'mealTypes', 'servings', 'prepMinutes', 'cookMinutes', 'caloriesPerServing', 'ingredients', 'method', 'notes'],
+    properties: {
+      found: { type: 'boolean' },
+      name: str,
+      cuisine: { type: 'string', enum: ['', ...RECIPE_CUISINES] },
+      mealTypes: { type: 'array', items: { type: 'string', enum: MEAL_TYPES } },
+      servings: { type: 'integer' },
+      prepMinutes: { type: 'integer' },
+      cookMinutes: { type: 'integer' },
+      caloriesPerServing: { type: 'integer' },
+      ingredients: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['name', 'quantity', 'unit', 'prepNote', 'optional'],
+          properties: {
+            name: str,
+            quantity: { type: 'number' },
+            unit: { type: 'string', enum: ['g', 'kg', 'ml', 'L', 'tsp', 'tbsp', 'cup', 'each', 'clove', 'bunch', 'sprig', 'pinch', 'can', ''] },
+            prepNote: str,
+            optional: { type: 'boolean' }
+          }
+        }
+      },
+      method: { type: 'array', items: str },
+      notes: str
+    }
+  };
+}
+
+function openRecipePhoto() {
+  if (!getAiKey()) { showToast('Reading recipes from photos uses Claude: add your API key in Settings → AI suggestions'); return; }
+  RecipePhoto.photos = [];
+  openModal(`
+    <div class="modal-title-row"><h2>📸 Recipe from a photo</h2><button class="close-btn" id="modal-close">×</button></div>
+    <div class="modal-scroll-area" id="rp-body">
+      <p class="st-intro">Pick screenshots or photos of a recipe: a website or post, a cookbook page or a handwritten card. Add each page if it runs over more than one. Claude reads it into a recipe for you to check before saving.</p>
+      <div class="ps-thumbs" id="rp-thumbs"></div>
+      <p class="ai-error" id="rp-error"></p>
+    </div>
+    <div class="modal-action-bar"><button type="button" class="btn-primary" id="rp-go" disabled>Add a photo first</button></div>
+  `);
+  document.getElementById('modal-sheet').classList.add('tall');
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  const draw = () => {
+    document.getElementById('rp-thumbs').innerHTML = RecipePhoto.photos.map((p, i) => `<div class="ps-thumb"><img src="${p.preview}" alt="Page ${i + 1}"><button type="button" class="ps-remove" data-i="${i}" aria-label="Remove page ${i + 1}">×</button></div>`).join('')
+      + (RecipePhoto.photos.length < 4 ? `<label class="ps-add">🖼️<span>${RecipePhoto.photos.length ? 'Add a page' : 'Choose photos'}</span><input type="file" id="rp-file" accept="image/*" multiple hidden></label>` : '');
+    document.querySelectorAll('#rp-thumbs .ps-remove').forEach((b) => b.addEventListener('click', () => { RecipePhoto.photos.splice(parseInt(b.dataset.i, 10), 1); draw(); }));
+    const input = document.getElementById('rp-file');
+    if (input) input.addEventListener('change', async (e) => {
+      for (const f of Array.from(e.target.files || []).slice(0, 4 - RecipePhoto.photos.length)) {
+        try { RecipePhoto.photos.push(await photoToBase64Jpeg(f)); } catch (err) { showToast(err.message); }
+      }
+      draw();
+    });
+    const go = document.getElementById('rp-go');
+    go.disabled = !RecipePhoto.photos.length;
+    go.textContent = RecipePhoto.photos.length ? `Read the recipe (${RecipePhoto.photos.length} photo${RecipePhoto.photos.length === 1 ? '' : 's'})` : 'Add a photo first';
+  };
+  draw();
+  document.getElementById('rp-go').addEventListener('click', readRecipePhoto);
+}
+
+async function readRecipePhoto() {
+  const btn = document.getElementById('rp-go');
+  btn.disabled = true;
+  btn.textContent = 'Reading the recipe…';
+  let Anthropic = null;
+  let error = null;
+  let r = null;
+  try {
+    const loaded = await getAnthropicClient();
+    Anthropic = loaded.Anthropic;
+    const response = await loaded.client.beta.messages.create({
+      model: AI_MODEL,
+      max_tokens: 8000,
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+      output_config: { effort: 'medium', format: { type: 'json_schema', schema: recipePhotoSchema() } },
+      messages: [{ role: 'user', content: [
+        ...RecipePhoto.photos.map((p) => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: p.data } })),
+        { type: 'text', text: `These photos show one recipe (a screenshot, a cookbook page or a handwritten card), possibly over several pages in order. Read it exactly as written; don't invent steps or ingredients.
+Set found to false if there is no recipe in the photos.
+Convert imperial amounts to metric (oz to g, lb to g or kg, fl oz to ml). Fractions become decimals. "To taste" or no amount: quantity 0 and an empty unit.
+prepNote holds words like "chopped" or "to serve". Mark ingredients that are optional or "to serve if you like" as optional.
+servings: the number it serves (4 if not stated). Times in minutes, 0 if not stated. caloriesPerServing only if the recipe states it, otherwise 0.
+cuisine: the closest from the list, or "" for basics that aren't a cuisine (plain rice, porridge). method: one step per item, in order. notes: any tips or the source, briefly.` }
+      ] }]
+    });
+    if (response.stop_reason === 'refusal') error = 'Claude couldn\'t read these photos. Try clearer ones.';
+    else {
+      r = JSON.parse(response.content.filter((b) => b.type === 'text').map((b) => b.text).join(''));
+      if (!r.found || !r.ingredients.length) error = 'No recipe was found in these photos. Try a sharper, closer photo of the ingredients and method.';
+    }
+  } catch (err) {
+    error = err instanceof SyntaxError ? 'Claude\'s reply couldn\'t be read. Please try again.' : describeAiError(err, Anthropic);
+  }
+  if (!document.getElementById('rp-body')) return;
+  if (error) {
+    document.getElementById('rp-error').textContent = error;
+    btn.disabled = false;
+    btn.textContent = 'Try again';
+    return;
+  }
+  // Ingredient names give the category and match words other recipes already use
+  AppState.recipes = AppState.recipes && AppState.recipes.length ? AppState.recipes : await dbGetAll('recipes');
+  const known = buildKnownIngredientLookup(null);
+  const ingredients = r.ingredients.map((i) => {
+    const k = known.get(i.name.toLowerCase());
+    return { ...i, quantity: i.quantity || null, category: k ? k.category : 'Other', matchTerms: k ? k.matchTerms : [i.name.toLowerCase()], assumedStaple: k ? k.assumedStaple : /^(salt|pepper|oil|water)$/i.test(i.name) };
+  });
+  openRecipeForm(null, {
+    name: r.name, cuisine: r.cuisine, mealTypes: r.mealTypes.length ? r.mealTypes : ['Dinner'], servings: r.servings || 4,
+    prepMinutes: r.prepMinutes || null, cookMinutes: r.cookMinutes || null, caloriesPerServing: r.caloriesPerServing || null,
+    difficulty: 'Easy', proteinLevel: 'Medium', fatLevel: 'Medium', ingredients, method: r.method, notes: r.notes
+  });
+  showToast('Check the recipe, then tap Add recipe');
+}
+
+/* ============================================================
+   MAKE IT MY WAY
+   Swap, remove or add ingredients on a recipe (e.g. chicken on the bone
+   for breast, a homemade spice mix for a packet mix) and see the
+   calories and macros change, then save it as your own version.
+   ============================================================ */
+// Lighter swaps the app suggests, by what an ingredient is called
+const SWAP_IDEAS = [
+  { match: /chicken (drumsticks?|thighs?|marylands?|wings?)|whole chicken|on the bone|bone in/i, to: 'chicken breast', why: 'leaner, no bone' },
+  { match: /\b(beef|lamb|pork) mince\b|^mince$/i, to: 'lean beef mince', why: 'less fat' },
+  { match: /\blamb\b|pork (shoulder|belly)/i, to: 'chicken breast', why: 'much leaner' },
+  { match: /thickened cream|^cream$|pouring cream|cooking cream/i, to: 'light cooking cream', why: 'about half the fat' },
+  { match: /cream|sour cream/i, to: 'greek yoghurt', why: 'more protein, less fat' },
+  { match: /coconut (milk|cream)/i, to: 'light coconut milk', why: 'less than half the fat', skip: /light|lite/i },
+  { match: /\b(ghee|butter)\b/i, to: 'olive oil', why: 'less saturated fat', half: true },
+  { match: /\boil\b/i, to: null, why: 'use half the oil', half: true },
+  { match: /\b(basmati|jasmine|white|brown)? ?rice\b/i, to: 'cauliflower rice', why: 'far fewer carbs', skip: /cauliflower/i },
+  { match: /spaghetti|penne|fettuccine|pasta|noodles/i, to: 'zucchini noodles', why: 'far fewer carbs', skip: /zucchini/i },
+  { match: /potato/i, to: 'cauliflower', why: 'fewer carbs', skip: /sweet/i },
+  { match: /\b(cheese|cheddar|tasty)\b/i, to: 'reduced fat cheese', why: 'less fat', skip: /reduced|light/i },
+  { match: /\b(sugar|honey|jaggery)\b/i, to: null, why: 'leave it out', remove: true }
+];
+const SPICE_WORDS = /turmeric|cumin|coriander (seeds|powder)|ground coriander|garam masala|curry powder|chilli powder|paprika|cardamom|cloves|cinnamon|fenugreek|mustard seeds|fennel|asafoetida|star anise|spices/i;
+
+function swapIdeasFor(ing) {
+  return SWAP_IDEAS.filter((s) => s.match.test(ing.name) && !(s.skip && s.skip.test(ing.name)));
+}
+
+function ingredientLine(ing) {
+  return [formatIngredientQuantity(ing), ing.name].filter(Boolean).join(' ') + (ing.prepNote ? `, ${ing.prepNote}` : '');
+}
+
+async function openMakeItMyWay(recipe) {
+  const kitchenItems = await dbGetAll('inventoryItems');
+  const serves = recipe.servings || 1;
+  const base = recipeMacros(recipe);
+  const rows = recipe.ingredients.map((ing) => ({ orig: ing, cur: ing, removed: false, open: false }));
+  const added = [];
+  const known = buildKnownIngredientLookup(recipe.id);
+
+  // Per-serving macros after the changes. The recipe's own figures are the base; each one is scaled
+  // by how much the whole recipe changes using typical values (so a recipe whose own numbers differ
+  // from the typical values still moves in proportion and never drops below what's left in it)
+  const totals = (list) => nutritionFromIngredients(list, 1, kitchenItems);
+  const after = () => {
+    const before = totals(rows.map((r) => r.orig));
+    const now = totals([...rows.filter((r) => !r.removed).map((r) => r.cur), ...added]);
+    const changed = rows.filter((r) => r.removed || r.cur !== r.orig);
+    const uncounted = [...new Set([...totals(changed.map((r) => r.orig)).missing, ...totals([...changed.filter((r) => !r.removed).map((r) => r.cur), ...added]).missing])];
+    if (!base.kcal) {
+      const n = now.perServing;
+      return { m: { kcal: n.kcal / serves, protein: n.protein / serves, carbs: n.carbs / serves, fat: n.fat / serves }, uncounted: now.missing };
+    }
+    const scaled = (k, b) => {
+      const was = before.perServing[k];
+      const is = now.perServing[k];
+      if (b == null) return is / serves;
+      return was > 0 ? b * (is / was) : b + is / serves;
+    };
+    return {
+      m: { kcal: scaled('kcal', base.kcal), protein: scaled('protein', base.protein), carbs: scaled('carbs', base.carbs), fat: scaled('fat', base.fat) },
+      uncounted
+    };
+  };
+  const spiceRows = () => rows.filter((r) => !r.removed && SPICE_WORDS.test(r.cur.name));
+  const changes = () => rows.filter((r) => r.removed || r.cur !== r.orig).length + added.length;
+
+  openModal(`
+    <div class="modal-title-row"><h2>🔁 Make it my way</h2><button class="close-btn" id="modal-close">×</button></div>
+    <p class="recipe-muted" style="margin-top:0;">${escapeHtml(recipe.name)}: swap, remove or add ingredients. Calories and macros per serve update as you go.</p>
+    <div class="myway-macros" id="mw-macros"></div>
+    <div class="modal-scroll-area" id="mw-body"></div>
+    <div class="modal-action-bar">
+      <button type="button" class="btn-primary" id="mw-save-new" disabled>Save as my version</button>
+      <button type="button" class="btn-secondary" id="mw-save" disabled>Update this recipe</button>
+    </div>
+  `);
+  document.getElementById('modal-sheet').classList.add('tall');
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+
+  const drawMacros = () => {
+    const { m, uncounted } = after();
+    const cell = (cls, label, b, a, unit) => {
+      const diff = b != null && a != null ? Math.round(a) - Math.round(b) : 0;
+      return `<div class="mt ${cls}"><span class="mt-v">${a == null ? '–' : Math.round(a)}<small>${unit}</small></span><span class="mt-l">${label}${diff ? ` <b class="${diff < 0 ? 'down' : 'up'}">${diff > 0 ? '+' : ''}${diff}</b>` : ''}</span></div>`;
+    };
+    document.getElementById('mw-macros').innerHTML = `
+      <div class="macro-tiles">
+        ${cell('mt-kcal', 'kcal', base.kcal, m.kcal, '')}
+        ${cell('mt-protein', 'Protein', base.protein, m.protein, 'g')}
+        ${cell('mt-carbs', 'Carbs', base.carbs, m.carbs, 'g')}
+        ${cell('mt-fat', 'Fat', base.fat, m.fat, 'g')}
+      </div>
+      ${uncounted.length ? `<p class="recipe-muted" style="margin:6px 0 0;">Not counted (no typical values): ${escapeHtml(uncounted.join(', '))}</p>` : ''}`;
+    const n = changes();
+    document.getElementById('mw-save-new').disabled = !n;
+    document.getElementById('mw-save').disabled = !n;
+  };
+
+  const draw = () => {
+    const spices = spiceRows();
+    document.getElementById('mw-body').innerHTML = `
+      ${spices.length >= 3 ? `<div class="cook-box mw-tip"><span>🧂 ${spices.length} separate spices. Use a packet mix instead?</span><button type="button" class="btn-secondary" id="mw-spice">Swap for a packet mix</button></div>` : ''}
+      ${rows.map((r, i) => {
+        const ideas = swapIdeasFor(r.orig);
+        return `
+        <div class="mw-row ${r.removed ? 'removed' : ''} ${r.cur !== r.orig ? 'swapped' : ''}" data-i="${i}">
+          <div class="mw-line">
+            <span class="mw-name">${escapeHtml(ingredientLine(r.cur))}${r.cur !== r.orig && !r.removed ? `<span class="mw-was">was ${escapeHtml(ingredientLine(r.orig))}</span>` : ''}${r.orig.optional ? ' <span class="ing-flag">optional</span>' : ''}</span>
+            ${r.removed
+              ? '<button type="button" class="link-btn mw-undo">Undo</button>'
+              : `<button type="button" class="link-btn mw-swap">${r.cur !== r.orig ? 'Change' : 'Swap'}</button><button type="button" class="mw-del" aria-label="Remove ${escapeHtml(r.cur.name)}">×</button>`}
+          </div>
+          ${!r.removed && !r.open && r.cur === r.orig && ideas.length ? `<div class="mw-ideas">${ideas.map((s, k) => `<button type="button" class="state-chip mw-idea" data-k="${k}">💡 ${escapeHtml(s.to ? `${s.half ? 'half the amount of ' : ''}${s.to}` : s.why)}${s.to ? ` <span class="mw-why">${escapeHtml(s.why)}</span>` : ''}</button>`).join('')}</div>` : ''}
+          ${r.open ? `<div class="st-add mw-edit"><input type="text" class="mw-input" value="${escapeHtml(ingredientLine(r.cur))}" placeholder="e.g. 800 g chicken breast"><button type="button" class="btn-secondary mw-apply">Done</button></div>` : ''}
+        </div>`;
+      }).join('')}
+      ${added.map((ing, i) => `
+        <div class="mw-row swapped added" data-a="${i}">
+          <div class="mw-line"><span class="mw-name">＋ ${escapeHtml(ingredientLine(ing))}</span><button type="button" class="mw-del mw-del-added" aria-label="Remove ${escapeHtml(ing.name)}">×</button></div>
+        </div>`).join('')}
+      <div class="st-add" style="margin-top:12px;">
+        <input type="text" id="mw-new" placeholder="Add an ingredient, e.g. 1 packet curry spice mix">
+        <button type="button" class="btn-secondary" id="mw-add">+ Add</button>
+      </div>`;
+    attach();
+    drawMacros();
+  };
+
+  const parse = (text, prev) => parseIngredientLine(text, prev ? [prev] : [], known);
+  const attach = () => {
+    document.querySelectorAll('#mw-body .mw-row[data-i]').forEach((el) => {
+      const r = rows[parseInt(el.dataset.i, 10)];
+      const q = (sel) => el.querySelector(sel);
+      if (q('.mw-undo')) q('.mw-undo').addEventListener('click', () => { r.removed = false; draw(); });
+      if (q('.mw-del')) q('.mw-del').addEventListener('click', () => { r.removed = true; r.open = false; draw(); });
+      if (q('.mw-swap')) q('.mw-swap').addEventListener('click', () => { r.open = !r.open; draw(); });
+      el.querySelectorAll('.mw-idea').forEach((b) => b.addEventListener('click', () => {
+        const idea = swapIdeasFor(r.orig)[parseInt(b.dataset.k, 10)];
+        if (idea.remove) { r.removed = true; draw(); return; }
+        const qty = r.orig.quantity != null && idea.half ? Math.round(r.orig.quantity * 50) / 100 : r.orig.quantity;
+        const name = idea.to || r.orig.name;
+        r.cur = { ...normalizeRecipeIngredient({ ...r.orig, name, quantity: qty, matchTerms: idea.to ? [idea.to] : r.orig.matchTerms }), prepNote: r.orig.prepNote };
+        draw();
+      }));
+      if (q('.mw-apply')) {
+        const apply = () => {
+          const parsed = parse(q('.mw-input').value, r.orig);
+          if (parsed) { r.cur = parsed.name.toLowerCase() === r.orig.name.toLowerCase() && parsed.quantity === r.orig.quantity && parsed.unit === r.orig.unit ? r.orig : parsed; }
+          r.open = false;
+          draw();
+        };
+        q('.mw-apply').addEventListener('click', apply);
+        q('.mw-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') apply(); });
+        q('.mw-input').focus();
+      }
+    });
+    document.querySelectorAll('#mw-body .mw-del-added').forEach((b) => b.addEventListener('click', () => {
+      added.splice(parseInt(b.closest('[data-a]').dataset.a, 10), 1);
+      draw();
+    }));
+    const addNew = () => {
+      const parsed = parse(document.getElementById('mw-new').value);
+      if (!parsed) return;
+      added.push(parsed);
+      draw();
+    };
+    document.getElementById('mw-add').addEventListener('click', addNew);
+    document.getElementById('mw-new').addEventListener('keydown', (e) => { if (e.key === 'Enter') addNew(); });
+    const spice = document.getElementById('mw-spice');
+    if (spice) spice.addEventListener('click', () => {
+      spiceRows().forEach((r) => { r.removed = true; });
+      added.push(parse(`1 each packet ${recipe.cuisine === 'Indian' || recipe.cuisine === 'Anglo-Indian' ? 'curry' : ''} spice mix`.replace(/\s+/g, ' ')));
+      draw();
+    });
+  };
+
+  const save = async (asNew) => {
+    const { m } = after();
+    const ingredients = [...rows.filter((r) => !r.removed).map((r) => r.cur), ...added];
+    const fields = {
+      ingredients,
+      caloriesPerServing: Math.round(m.kcal) || null,
+      proteinGramsPerServing: Math.round(m.protein),
+      carbsGramsPerServing: Math.round(m.carbs),
+      fatGramsPerServing: Math.round(m.fat),
+      proteinLevel: m.protein >= 25 ? 'High' : m.protein >= 12 ? 'Medium' : 'Low',
+      fatLevel: m.fat > 20 ? 'High' : m.fat > 12 ? 'Medium' : 'Low',
+      updatedAt: new Date().toISOString()
+    };
+    let id = recipe.id;
+    if (asNew) {
+      const { id: _old, seedId, ...rest } = recipe;
+      id = await dbPut('recipes', { ...rest, ...fields, name: `${recipe.name} (my way)`, seedId: null, source: 'user', userModified: false, userRating: null, partnerRating: null, isFavourite: false, createdAt: fields.updatedAt });
+    } else {
+      await dbPut('recipes', { ...recipe, ...fields, userModified: recipe.source === 'built-in' ? true : !!recipe.userModified });
+    }
+    showToast(asNew ? `Saved as "${recipe.name} (my way)"` : 'Recipe updated');
+    renderRoute();
+    openRecipeDetail(id);
+  };
+  document.getElementById('mw-save-new').addEventListener('click', () => save(true));
+  document.getElementById('mw-save').addEventListener('click', () => save(false));
+  draw();
 }
 
 /* ============================================================
@@ -4716,6 +5077,10 @@ const FOOD_NUTRITION = [
   { names: ['peanut butter'], kcal: 590, p: 25, c: 20, f: 50, tbsp: 16 },
   { names: ['nuts', 'almonds', 'cashews', 'peanuts', 'walnuts'], kcal: 600, p: 20, c: 20, f: 52, cup: 140 },
   { names: ['stock', 'chicken stock', 'beef stock', 'vegetable stock', 'broth'], kcal: 5, p: 0.5, c: 0.5, f: 0.1, cup: 250 },
+  { names: ['spice mix', 'packet spice mix', 'curry spice mix', 'packet curry spice mix', 'seasoning mix', 'curry mix', 'masala mix', 'packet mix'], kcal: 300, p: 9, c: 45, f: 8, each: 35, tsp: 3, tbsp: 9 },
+  { names: ['cauliflower rice', 'riced cauliflower'], kcal: 25, p: 1.9, c: 5, f: 0.3, cup: 110 },
+  { names: ['zucchini noodles', 'zoodles'], kcal: 17, p: 1.2, c: 3.1, f: 0.3 },
+  { names: ['reduced fat cheese', 'light cheese', 'low fat cheese'], kcal: 290, p: 30, c: 1, f: 18 },
   { names: ['protein powder', 'whey protein', 'whey'], kcal: 380, p: 75, c: 8, f: 5, each: 30 },
   { names: ['water', 'salt', 'sea salt', 'ice'], kcal: 0, p: 0, c: 0, f: 0 },
   // Dried spices: a teaspoon is about 2.5 g
