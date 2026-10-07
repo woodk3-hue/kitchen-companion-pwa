@@ -36,3 +36,25 @@ test('quick add without an API key uses typical values for "amount + food"', asy
   await page.click('#qa-estimate');
   await expect(page.locator('#qa-kcal')).toHaveValue('216');
 });
+
+for (const [label, ingredients, notes] of [
+  ['amount first', '240 g jasmine rice', ''],
+  ['amount after the name', 'Jasmine rice 240 grams', ''],
+  ['amount with no space', 'jasmine rice - 240g', ''],
+  ['only an amount in ingredients', '240 grams', ''],
+  ['amount only in the notes', '', 'Cook 240 grams in the rice cooker']
+]) {
+  test(`rice macros work with the ${label}`, async ({ page }) => {
+    await open(page, 'recipes', '#recipe-list');
+    await page.click('#fab-btn');
+    await page.fill('#r-name', 'Jasmine rice');
+    await page.fill('#r-servings', '4');
+    await page.fill('#r-ingredients', ingredients);
+    if (notes) {
+      await page.locator('details.more-fields').evaluate((d) => { d.open = true; });
+      await page.fill('#r-notes', notes);
+    }
+    await page.click('#recipe-form button[type="submit"]');
+    await expect(page.locator('.macro-tiles')).toContainText('216');
+  });
+}

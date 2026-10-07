@@ -3351,7 +3351,13 @@ async function openRecipeDetail(id) {
   document.getElementById('edit-recipe-btn').addEventListener('click', () => openRecipeForm(recipe));
   const calcBtn = document.getElementById('recipe-calc-btn');
   if (calcBtn) calcBtn.addEventListener('click', async () => {
-    const calc = nutritionFromIngredients(recipe.ingredients, recipe.servings || 1, kitchenItems);
+    let calc = nutritionFromIngredients(recipe.ingredients, recipe.servings || 1, kitchenItems);
+    // Ingredients without amounts: an amount in the notes ("240 grams") is that much of the recipe itself
+    if (!calc.counted.length) {
+      const m = (recipe.notes || '').match(/(\d+(?:[.,]\d+)?)\s*(g|gram|grams|kg|ml|l|litre|litres|cups?)\b/i);
+      const ing = m ? parseIngredientLine(`${m[1]} ${m[2]} ${recipe.name}`, [], new Map()) : null;
+      if (ing) calc = nutritionFromIngredients([ing], recipe.servings || 1, kitchenItems);
+    }
     if (!calc.counted.length) {
       document.getElementById('recipe-calc-note').textContent = 'None of the ingredients have amounts the app knows. Tap Edit recipe and add them one per line, e.g. "240 g jasmine rice".';
       return;
@@ -3443,6 +3449,12 @@ function parseIngredientLine(line, previousIngredients, knownLookup) {
   if (/\(optional\)\s*$/i.test(text)) {
     optional = true;
     text = text.replace(/\(optional\)\s*$/i, '').trim();
+  }
+
+  // "Jasmine rice 240 grams" or "Jasmine rice - 240g": move the amount to the front
+  if (!/^[\d½¼¾⅓⅔]/.test(text)) {
+    const tail = text.match(/^(.*?[A-Za-z)])[\s,:\-–]+(\d+(?:[.,]\d+)?)\s*([A-Za-z]+)?\.?$/);
+    if (tail && (!tail[3] || RECIPE_UNIT_ALIASES[tail[3].toLowerCase()])) text = `${tail[2]} ${tail[3] || ''} ${tail[1]}`.replace(/\s+/g, ' ').trim();
   }
 
   let quantity = null;
@@ -3617,10 +3629,23 @@ function openRecipeForm(recipe) {
 }
 
 // Nutrition per serve from what's typed in the recipe form right now
+// The ingredient lines typed in the recipe form. A line that's only an amount ("240 grams") is that
+// amount of the recipe itself; with no ingredients at all, an amount written in the notes is used the same way.
+function recipeFormIngredientLines() {
+  const recipeName = document.getElementById('r-name').value.trim();
+  const amountOnly = /^\s*(\d+(?:[.,]\d+)?)\s*([A-Za-z]+)?\.?\s*$/;
+  let lines = document.getElementById('r-ingredients').value.split('\n').filter((l) => l.trim());
+  if (!lines.length && recipeName) {
+    const inNotes = (document.getElementById('r-notes').value || '').match(/(\d+(?:[.,]\d+)?)\s*(g|gram|grams|kg|ml|l|litre|litres|cups?)\b/i);
+    if (inNotes) lines = [`${inNotes[1]} ${inNotes[2]}`];
+  }
+  return lines.map((l) => (amountOnly.test(l) && recipeName ? `${l.trim()} ${recipeName}` : l));
+}
+
 async function calcRecipeFormNutrition(existing) {
   const previousIngredients = existing ? existing.ingredients : [];
   const knownLookup = buildKnownIngredientLookup(existing ? existing.id : null);
-  const ingredients = document.getElementById('r-ingredients').value.split('\n')
+  const ingredients = recipeFormIngredientLines()
     .map((line) => parseIngredientLine(line, previousIngredients, knownLookup))
     .filter(Boolean);
   const servings = parseFloat(document.getElementById('r-servings').value) || 1;
@@ -3647,7 +3672,7 @@ async function saveRecipeFromForm(existing) {
   };
   const previousIngredients = existing ? existing.ingredients : [];
   const knownLookup = buildKnownIngredientLookup(existing ? existing.id : null);
-  const ingredients = document.getElementById('r-ingredients').value.split('\n')
+  const ingredients = recipeFormIngredientLines()
     .map((line) => parseIngredientLine(line, previousIngredients, knownLookup))
     .filter(Boolean);
 
