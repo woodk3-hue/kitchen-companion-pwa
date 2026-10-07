@@ -81,17 +81,7 @@ test('a recipe needing gingelly oil suggests an in-kitchen swap', async ({ page 
 
 test('the online search switches get sent to Claude', async ({ page }) => {
   await fakeMealDb(page);
-  let seenPrompt = null;
-  await fakeClaude(page, {});  // installs the SDK bundle and the key
-  await page.route('https://api.anthropic.com/**', async (route) => {
-    const req = route.request();
-    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
-    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
-    const body = req.postDataJSON();
-    seenPrompt = body.messages[0].content.filter((c) => c.type === 'text').map((c) => c.text).join('\n');
-    const result = { meals: [{ name: 'Fish Curry', cuisine: 'Indian', mealTypes: ['Dinner'], whyThisMeal: 'South Indian.', usesExpiring: [], servings: 4, prepMinutes: 15, cookMinutes: 25, difficulty: 'Easy', caloriesPerServing: 400, proteinGramsPerServing: 30, carbsGramsPerServing: 10, fatGramsPerServing: 22, fatLevel: 'Medium', primaryProtein: 'Fish', freezerFriendly: false, leftoverFriendly: true, ingredients: [{ name: 'Fish fillets', quantity: 500, unit: 'g', prepNote: '', category: 'Protein', matchTerms: ['fish'], optional: false, assumedStaple: false, inKitchen: false }], method: ['Cook it.'] }] };
-    return route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify({ id: 'm', type: 'message', role: 'assistant', model: 'claude-opus-5-5', stop_reason: 'end_turn', stop_sequence: null, content: [{ type: 'text', text: JSON.stringify(result) }], usage: { input_tokens: 1, output_tokens: 1 } }) });
-  });
+  const seen = await fakeClaude(page, { meals: { meals: [{ name: 'Fish Curry', cuisine: 'Indian', mealTypes: ['Dinner'], whyThisMeal: 'South Indian.', usesExpiring: [], servings: 4, prepMinutes: 15, cookMinutes: 25, difficulty: 'Easy', caloriesPerServing: 400, proteinGramsPerServing: 30, carbsGramsPerServing: 10, fatGramsPerServing: 22, fatLevel: 'Medium', primaryProtein: 'Fish', freezerFriendly: false, leftoverFriendly: true, ingredients: [{ name: 'Fish fillets', quantity: 500, unit: 'g', prepNote: '', category: 'Protein', matchTerms: ['fish'], optional: false, assumedStaple: false, inKitchen: false }], method: ['Cook it.'] }] } });
   await open(page, 'recipes', '#online-search-btn');
   await page.click('#online-search-btn');
   await page.fill('#online-q', 'kerala fish curry');
@@ -100,6 +90,7 @@ test('the online search switches get sent to Claude', async ({ page }) => {
   await page.check('#ask-pantry');
   await page.click('#online-ai');
   await expect(page.locator('#online-ai-result')).toContainText('Fish Curry');
-  expect(seenPrompt).toContain('Match my eating style');
-  expect(seenPrompt).toContain('Mostly use ingredients from my kitchen');
+  const prompt = seen.prompts.join('\n');
+  expect(prompt).toContain('Match my eating style');
+  expect(prompt).toContain('Mostly use ingredients from my kitchen');
 });
