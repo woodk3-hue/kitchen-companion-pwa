@@ -1283,7 +1283,11 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 .stepper input { text-align: center; min-width: 0; }
 .step-btn { flex: 0 0 40px; height: 40px; border: none; border-radius: 12px; background: var(--color-fill); color: var(--color-ink); font-size: 20px; font-weight: 700; cursor: pointer; }
 .step-btn:active { background: var(--color-accent-tint); }
-.cook-made .cook-num { max-width: 220px; }
+.cook-made .cook-num { max-width: 240px; }
+.plan-portions { display: flex; align-items: center; gap: 10px; background: var(--color-paper); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 10px 12px; margin: 0 0 12px; }
+.plan-portions .stepper { flex: 0 0 132px; }
+.plan-portions .stepper input { width: 44px; padding: 8px 2px; border: none; background: var(--color-fill); border-radius: 10px; font: inherit; font-weight: 700; color: var(--color-ink); text-align: center; }
+.plan-portions .step-btn { flex: 0 0 38px; height: 38px; }
 .cook-dests { background: var(--color-paper); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 4px 12px; }
 .cook-dest { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--color-fill); }
 .cook-dest:first-child { border-top: none; }
@@ -5437,10 +5441,36 @@ async function getPlanEntries(dates) {
   return all.filter((e) => wanted.has(e.date));
 }
 
+// Calories for my portions of a planned meal (kcal is stored per serving)
 function entryKcal(entry, recipesById) {
-  if (entry.kcal) return entry.kcal;
   const r = entry.recipeId ? recipesById.get(entry.recipeId) : null;
-  return r && r.caloriesPerServing ? r.caloriesPerServing : null;
+  const perServing = entry.kcal || (r && r.caloriesPerServing) || null;
+  return perServing ? Math.round(perServing * (entry.portions || 1)) : null;
+}
+
+function portionsText(n) {
+  return `${n} portion${n === 1 ? '' : 's'}`;
+}
+
+/* ---- "My portions" when planning a meal ---- */
+function planPortionsHtml(n) {
+  return `
+    <div class="plan-portions">
+      <span class="cd-label"><strong>My portions</strong><span class="cook-hint">how much you'll have at this meal</span></span>
+      <div class="stepper"><button type="button" class="step-btn pp-btn" data-d="-1" aria-label="Fewer portions">−</button><input type="number" id="plan-portions" min="0.5" step="0.5" inputmode="decimal" value="${n}"><button type="button" class="step-btn pp-btn" data-d="1" aria-label="More portions">+</button></div>
+    </div>`;
+}
+function attachPlanPortions(onChange) {
+  const input = document.getElementById('plan-portions');
+  document.querySelectorAll('.pp-btn').forEach((b) => b.addEventListener('click', () => {
+    input.value = Math.max(0.5, (parseFloat(input.value) || 1) + parseInt(b.dataset.d, 10));
+    if (onChange) onChange(readPlanPortions());
+  }));
+  input.addEventListener('change', () => { if (onChange) onChange(readPlanPortions()); });
+}
+function readPlanPortions() {
+  const input = document.getElementById('plan-portions');
+  return input ? Math.max(0.5, parseFloat(input.value) || 1) : 1;
 }
 
 async function addPlanEntry(entry) {
@@ -5493,6 +5523,7 @@ async function renderPlannerScreen() {
       <span class="plan-title">${icon}${escapeHtml(entry.title)}</span>
       <span class="plan-tags">
         ${entry.cooked ? '<span class="tag kcal-ok">✓ Cooked</span>' : ''}
+        ${entry.type !== 'out' ? `<span class="tag">${portionsText(entry.portions || 1)}</span>` : ''}
         ${kcal ? calorieBadgeHtml(kcal, goals) : ''}
         ${sc && !entry.cooked && sc.expiring.length ? `<span class="tag kcal-over">Uses ${escapeHtml(sc.expiring[0].name)}</span>` : ''}
         ${sc && !entry.cooked && sc.missing.length ? `<span class="tag">Need ${sc.missing.length}</span>` : ''}
@@ -5597,6 +5628,7 @@ async function openSlotPicker(date, meal) {
       <h2>${mealType} · ${formatDayLabel(date)}</h2>
       <button class="close-btn" id="modal-close">×</button>
     </div>
+    ${planPortionsHtml(1)}
     <div class="modal-scroll-area">
       ${ready.length ? `<div class="st-group-title">Already made</div>
         ${ready.map((i) => `<button type="button" class="pick-row" data-item-id="${i.id}">
@@ -5615,13 +5647,15 @@ async function openSlotPicker(date, meal) {
     const q = e.target.value.trim().toLowerCase();
     document.querySelectorAll('#pick-recipes .pick-row').forEach((row) => { row.style.display = !q || row.dataset.name.includes(q) ? '' : 'none'; });
   });
+  attachPlanPortions();
   document.querySelectorAll('.pick-row[data-recipe-id]').forEach((btn) => btn.addEventListener('click', async () => {
     const recipe = recipes.find((r) => r.id === parseInt(btn.dataset.recipeId, 10));
-    await planRecipe(recipe, date, meal, settings);
+    await planRecipe(recipe, date, meal, settings, { portions: readPlanPortions() });
   }));
   document.querySelectorAll('.pick-row[data-item-id]').forEach((btn) => btn.addEventListener('click', async () => {
     const item = items.find((i) => i.id === parseInt(btn.dataset.itemId, 10));
-    await addPlanEntry({ date, meal, type: 'kitchen', itemId: item.id, title: item.name, kcal: null });
+    const recipe = item.recipeId ? recipes.find((r) => r.id === item.recipeId) : null;
+    await addPlanEntry({ date, meal, type: 'kitchen', itemId: item.id, recipeId: recipe ? recipe.id : null, title: item.name, kcal: recipe ? recipe.caloriesPerServing || null : null, portions: readPlanPortions() });
     closeModal();
     showToast(`Planned ${item.name}`);
     renderRoute();
@@ -5634,21 +5668,21 @@ async function openSlotPicker(date, meal) {
 }
 
 // Plan a recipe; if it makes more portions than the household eats, offer the rest as the next meal
-async function planRecipe(recipe, date, meal, settings, { askLeftovers = true } = {}) {
+async function planRecipe(recipe, date, meal, settings, { askLeftovers = true, portions = 1 } = {}) {
   const household = settings.householdSize || 2;
-  const id = await addPlanEntry({ date, meal, type: 'recipe', recipeId: recipe.id, title: recipe.name, kcal: recipe.caloriesPerServing || null, servings: household });
+  const id = await addPlanEntry({ date, meal, type: 'recipe', recipeId: recipe.id, title: recipe.name, kcal: recipe.caloriesPerServing || null, servings: household, portions });
   let leftoverNote = '';
   const spare = (recipe.servings || 0) - household;
   if (askLeftovers && spare >= household && recipe.leftoverFriendly !== false) {
     const next = nextSlot(date, meal);
     const nextTaken = (await getPlanEntries([next.date])).some((e) => e.meal === next.meal);
     if (!nextTaken && confirm(`${recipe.name} serves ${recipe.servings}. Plan the ${spare} leftover portions for ${PLAN_MEAL_LABELS[next.meal].toLowerCase()} on ${formatDayLabel(next.date)}?`)) {
-      await addPlanEntry({ date: next.date, meal: next.meal, type: 'leftover', recipeId: recipe.id, title: `Leftover ${recipe.name}`, kcal: recipe.caloriesPerServing || null, leftoverOf: id });
+      await addPlanEntry({ date: next.date, meal: next.meal, type: 'leftover', recipeId: recipe.id, title: `Leftover ${recipe.name}`, kcal: recipe.caloriesPerServing || null, leftoverOf: id, portions });
       leftoverNote = ' + leftovers';
     }
   }
   closeModal();
-  showToast(`Planned ${recipe.name}${leftoverNote}`);
+  showToast(`Planned ${portionsText(portions)} of ${recipe.name}${leftoverNote}`);
   renderRoute();
   return id;
 }
@@ -5662,18 +5696,25 @@ async function openPlanEntry(id) {
       <button class="close-btn" id="modal-close">×</button>
     </div>
     <p class="recipe-muted" style="margin-top:0;">${PLAN_MEAL_LABELS[entry.meal]} · ${formatDayLabel(entry.date)}${entry.type === 'leftover' ? ' · leftovers' : ''}</p>
+    ${entry.type !== 'out' ? planPortionsHtml(entry.portions || 1) : ''}
     ${entry.type === 'recipe' && entry.recipeId ? `<button type="button" class="btn-primary" id="pe-cooked">${entry.cooked ? '✓ Cooked (cook it again?)' : '🍳 I cooked this'}</button>` : ''}
     ${entry.recipeId ? '<button type="button" class="btn-secondary" id="pe-view">View recipe</button>' : ''}
     <button type="button" class="btn-secondary" id="pe-swap">Swap for something else</button>
     <button type="button" class="btn-danger" id="pe-remove">Remove from plan</button>
   `);
   document.getElementById('modal-close').addEventListener('click', closeModal);
+  if (entry.type !== 'out') attachPlanPortions(async (n) => {
+    entry.portions = n;
+    await dbPut('mealPlans', entry);
+    showToast(`${portionsText(n)} planned`);
+    renderRoute();
+  });
   const view = document.getElementById('pe-view');
   if (view) view.addEventListener('click', () => openRecipeDetail(entry.recipeId));
   const cooked = document.getElementById('pe-cooked');
   if (cooked) cooked.addEventListener('click', async () => {
     const recipe = await dbGet('recipes', entry.recipeId);
-    if (recipe) openCookedThis(recipe, { planEntryId: entry.id, date: localDateString(new Date()), meal: entry.meal });
+    if (recipe) openCookedThis(recipe, { planEntryId: entry.id, date: localDateString(new Date()), meal: entry.meal, myPortions: entry.portions || 1 });
   });
   document.getElementById('pe-swap').addEventListener('click', async () => {
     await removePlanEntry(entry.id);
@@ -5701,7 +5742,8 @@ async function openAddRecipeToPlan(recipe) {
       <h2>📅 Add to plan</h2>
       <button class="close-btn" id="modal-close">×</button>
     </div>
-    <p class="recipe-muted" style="margin-top:0;">${escapeHtml(recipe.name)}: pick a free slot.</p>
+    <p class="recipe-muted" style="margin-top:0;">${escapeHtml(recipe.name)}: choose your portions, then pick a free slot.</p>
+    ${planPortionsHtml(1)}
     <div class="modal-scroll-area">
       ${dates.map((d) => `
         <div class="plan-pick-day"><span>${formatDayLabel(d)}</span>
@@ -5713,8 +5755,9 @@ async function openAddRecipeToPlan(recipe) {
     </div>
   `);
   document.getElementById('modal-close').addEventListener('click', closeModal);
+  attachPlanPortions();
   document.querySelectorAll('.plan-pick:not([disabled])').forEach((btn) => btn.addEventListener('click', () => {
-    planRecipe(recipe, btn.dataset.date, btn.dataset.meal, settings);
+    planRecipe(recipe, btn.dataset.date, btn.dataset.meal, settings, { portions: readPlanPortions() });
   }));
 }
 
@@ -6032,7 +6075,7 @@ async function renderTodayDiaryHtml() {
           </button>`).join('')}
         ${planned.map((p) => `
           <div class="diary-planned">
-            <span class="de-name">📅 ${escapeHtml(p.title)}</span>
+            <span class="de-name">📅 ${escapeHtml(p.title)}${p.type !== 'out' ? `<span class="de-amt"> · ${portionsText(p.portions || 1)}</span>` : ''}</span>
             <button type="button" class="state-chip diary-ate" data-plan-id="${p.id}">✓ Ate this</button>
           </div>`).join('')}
       </div>`;
@@ -6328,9 +6371,9 @@ function openLogKitchenItem(date, meal, item) {
 }
 
 /* ---- A recipe ---- */
-async function openLogRecipe(date, meal, preselectId, planEntryId, onPick) {
+async function openLogRecipe(date, meal, preselectId, planEntryId, onPick, servings = 1) {
   const recipes = (await dbGetAll('recipes')).sort((a, b) => a.name.localeCompare(b.name));
-  if (preselectId) { const r = recipes.find((x) => x.id === preselectId); if (r) return openLogRecipeServings(date, meal, r, planEntryId); }
+  if (preselectId) { const r = recipes.find((x) => x.id === preselectId); if (r) return openLogRecipeServings(date, meal, r, planEntryId, servings); }
   openModal(`
     <div class="modal-title-row"><h2>${onPick ? '🍳 What did you cook?' : '📖 A recipe'}</h2><button class="close-btn" id="modal-close">×</button></div>
     <div class="field recipe-search" style="margin-bottom:8px;"><input type="search" id="lr-search" placeholder="Search recipes"></div>
@@ -6353,11 +6396,11 @@ async function openLogRecipe(date, meal, preselectId, planEntryId, onPick) {
   }));
 }
 
-function openLogRecipeServings(date, meal, recipe, planEntryId) {
+function openLogRecipeServings(date, meal, recipe, planEntryId, servings = 1) {
   openModal(`
     <div class="modal-title-row"><h2>${escapeHtml(recipe.name)}</h2><button class="close-btn" id="modal-close">×</button></div>
     ${mealSelectHtml(meal)}
-    <div class="field" style="margin-top:12px;"><label>Servings</label><input type="number" id="lrs-servings" min="0" step="0.25" inputmode="decimal" value="1"></div>
+    <div class="field" style="margin-top:12px;"><label>Servings</label><input type="number" id="lrs-servings" min="0" step="0.25" inputmode="decimal" value="${servings}"></div>
     ${nutrientFieldsHtml('lrs', {})}
     <p class="recipe-muted" style="margin-top:0;">${recipe.caloriesPerServing ? 'From the recipe\'s per-serving figures (approximate).' : 'This recipe has no calories yet: enter them, or ✨ Estimate in the recipe\'s edit screen later.'}</p>
     <button type="button" class="btn-primary" id="lrs-save">Log it</button>
@@ -6391,13 +6434,17 @@ async function ateThis(planId) {
   if (p.type === 'leftover' && p.recipeId) {
     const portions = (await dbGetAll('inventoryItems')).filter((i) => i.recipeId === p.recipeId && i.portionCount > 0)
       .sort((a, b) => (a.location === 'leftovers' ? 0 : 1) - (b.location === 'leftovers' ? 0 : 1));
-    if (portions.length) return openLogLeftover(p.date, meal, portions[0], p.id);
+    if (portions.length) return openLogLeftover(p.date, meal, portions[0], p.id, p.portions || 1);
   }
   if (p.type === 'recipe' && p.recipeId && !p.cooked) {
     const recipe = await dbGet('recipes', p.recipeId);
-    if (recipe) return openCookedThis(recipe, { planEntryId: p.id, date: p.date, meal });
+    if (recipe) return openCookedThis(recipe, { planEntryId: p.id, date: p.date, meal, myPortions: p.portions || 1 });
   }
-  if (p.recipeId) return openLogRecipe(p.date, meal, p.recipeId, p.id);
+  if (p.type === 'kitchen' && p.itemId) {
+    const item = await dbGet('inventoryItems', p.itemId);
+    if (item && item.recipeId && item.portionCount) return openLogLeftover(p.date, meal, item, p.id, p.portions || 1);
+  }
+  if (p.recipeId) return openLogRecipe(p.date, meal, p.recipeId, p.id, null, p.portions || 1);
   if (p.type === 'kitchen' && p.itemId) return openLogFromKitchen(p.date, meal, p.itemId);
   return openQuickAdd(p.date, meal, { name: p.title, source: 'plan', planEntryId: p.id });
 }
@@ -6834,7 +6881,7 @@ function ingredientUseInItemUnit(ing, item, scale) {
   return null;
 }
 
-async function openCookedThis(recipe, { planEntryId = null, date = null, meal = null, serves = null } = {}) {
+async function openCookedThis(recipe, { planEntryId = null, date = null, meal = null, serves = null, myPortions = 1 } = {}) {
   const [settings, items, profiles] = await Promise.all([getPlanSettings(), dbGetAll('inventoryItems'), dbGet('settings', 'profiles')]);
   const logDate = date || localDateString(new Date());
   const logMeal = meal || defaultLogMeal();
@@ -6842,7 +6889,8 @@ async function openCookedThis(recipe, { planEntryId = null, date = null, meal = 
   const partnerName = (profiles && profiles.partnerProfile && profiles.partnerProfile.name) || 'Partner';
   // Starting point: 1 for me, 1 for my partner if I cook for two or more, anyone else, the rest in the fridge
   const household = settings.householdSize || 2;
-  const start = { me: Math.min(1, made), partner: household >= 2 && made >= 2 ? 1 : 0 };
+  const start = { me: Math.min(myPortions, made) };
+  start.partner = household >= 2 && made - start.me >= 1 ? 1 : 0;
   start.others = Math.max(0, Math.min(household - 2, made - start.me - start.partner));
   start.fridge = made - start.me - start.partner - start.others;
   start.freezer = 0;
@@ -6870,7 +6918,7 @@ async function openCookedThis(recipe, { planEntryId = null, date = null, meal = 
     <div class="modal-title-row"><h2>🍳 I cooked this</h2><button class="close-btn" id="modal-close">×</button></div>
     <div class="modal-scroll-area">
       <p class="recipe-muted" style="margin-top:0;">${escapeHtml(recipe.name)}</p>
-      <div class="cook-made">${numField('ck-made', 'Portions made', made)}</div>
+      <div class="cook-made">${numField('ck-made', 'Portions cooked (the whole pot)', made)}</div>
       <div class="st-group-title">Where does each portion go?</div>
       <div class="portion-dots" id="ck-dots" aria-hidden="true"></div>
       <div class="cook-dests">
@@ -7048,14 +7096,14 @@ async function openCookedThis(recipe, { planEntryId = null, date = null, meal = 
 }
 
 /* ---- Eating leftover portions ---- */
-async function openLogLeftover(date, meal, item, planEntryId = null) {
+async function openLogLeftover(date, meal, item, planEntryId = null, portions = 1) {
   const recipe = item.recipeId ? await dbGet('recipes', item.recipeId) : null;
   const macros = recipe ? recipeMacros(recipe) : { kcal: null, protein: null, carbs: null, fat: null };
   openModal(`
     <div class="modal-title-row"><h2>🍱 ${escapeHtml(item.name)}</h2><button class="close-btn" id="modal-close">×</button></div>
     ${mealSelectHtml(meal)}
     <p class="recipe-muted" style="margin:10px 0 0;">${escapeHtml(LOCATION_LABELS[item.location])}: ${escapeHtml(formatItemQuantity(item))}${item.location === 'freezer' ? '. Defrost it in the fridge first.' : ''}</p>
-    <div class="field" style="margin-top:12px;"><label>Portions</label><input type="number" id="lo-n" min="0" step="0.5" inputmode="decimal" value="1"></div>
+    <div class="field" style="margin-top:12px;"><label>Portions</label><input type="number" id="lo-n" min="0" step="0.5" inputmode="decimal" value="${portions}"></div>
     ${nutrientFieldsHtml('lo', {})}
     <p class="recipe-muted" style="margin-top:0;">${macros.kcal ? 'From the recipe\'s per-serving figures (approximate).' : 'No calories saved for this recipe: enter them above.'}</p>
     <label class="plan-ai-toggle"><input type="checkbox" id="lo-takeout" checked> Take the portions out of my kitchen</label>
