@@ -54,11 +54,14 @@ export async function fakeClaude(page, answers) {
     await page.route('https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@*/+esm', (route) => route.fulfill({ contentType: 'text/javascript', headers: { 'access-control-allow-origin': '*' }, body: bundle }));
   }
   await page.addInitScript(() => localStorage.setItem('kitchenCompanion.anthropicApiKey', 'sk-ant-test-key'));
+  const seen = { prompts: [] };
   await page.route('https://api.anthropic.com/**', async (route) => {
     const req = route.request();
     const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
-    const props = req.postDataJSON().output_config.format.schema.properties;
+    const body = req.postDataJSON();
+    const content = body.messages[0].content; seen.prompts.push(typeof content === 'string' ? content : content.filter((c) => c && c.type === 'text').map((c) => c.text).join('\n'));
+    const props = body.output_config.format.schema.properties;
     const key = Object.keys(answers).find((k) => props[k] !== undefined);
     const result = key ? answers[key] : {};
     return route.fulfill({
@@ -67,4 +70,5 @@ export async function fakeClaude(page, answers) {
       body: JSON.stringify({ id: 'msg_test', type: 'message', role: 'assistant', model: 'claude-opus-5-5', stop_reason: 'end_turn', stop_sequence: null, content: [{ type: 'text', text: JSON.stringify(result) }], usage: { input_tokens: 1, output_tokens: 1 } })
     });
   });
+  return seen;
 }

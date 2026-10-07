@@ -52,3 +52,45 @@ test('Ask Claude gets a recipe for exactly the dish searched (faked) and saves i
   await page.click('#online-ai-result .ai-save-btn');
   await expect.poll(async () => (await readStore(page, 'recipes')).some((r) => r.name === 'South Indian Chicken Biryani')).toBe(true);
 });
+
+test('a recipe needing gingelly oil suggests an in-kitchen swap', async ({ page }) => {
+  const errors = watchErrors(page);
+  await open(page, 'recipes', '#recipe-list');
+  // Pantry: no gingelly oil, but grapeseed, olive oil, coconut oil and ghee
+  for (const name of ['Grapeseed oil', 'Olive oil', 'Coconut oil', 'Ghee']) {
+    await page.evaluate(async (n) => {
+      await new Promise((res) => { const r = indexedDB.open('KitchenCompanionDB'); r.onsuccess = (e) => { e.target.result.transaction('inventoryItems', 'readwrite').objectStore('inventoryItems').put({ name: n, quantity: 1, unit: 'each', location: 'pantry', states: ['Raw'], category: 'Other', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }).onsuccess = () => res(); }; }, n);
+    }, name);
+  }
+  await page.click('#fab-btn');
+  await page.fill('#r-name', 'Fish curry');
+  await page.fill('#r-servings', '4');
+  await page.fill('#r-ingredients', '500 g fish fillets\n2 tbsp gingelly oil\n1 tsp mustard seeds');
+  await page.click('#recipe-form button[type="submit"]');
+  // Swap chip appears: the first in-family item the kitchen has (olive oil)
+  const chip = page.locator('.ing-swap-chip', { hasText: /olive oil/ });
+  await expect(chip).toBeVisible();
+  await chip.click();
+  // The recipe is updated in place
+  await expect(page.locator('.ing-name', { hasText: 'Olive oil' })).toBeVisible();
+  await expect(page.locator('.ing-name', { hasText: /^Gingelly oil/ })).toHaveCount(0);
+  // Saved to the recipe
+  await expect.poll(async () => (await readStore(page, 'recipes')).find((r) => r.name === 'Fish curry')?.ingredients.find((i) => /gingelly/i.test(i.name))).toBeUndefined();
+  expect(errors).toEqual([]);
+});
+
+test('the online search switches get sent to Claude', async ({ page }) => {
+  await fakeMealDb(page);
+  const seen = await fakeClaude(page, { meals: { meals: [{ name: 'Fish Curry', cuisine: 'Indian', mealTypes: ['Dinner'], whyThisMeal: 'South Indian.', usesExpiring: [], servings: 4, prepMinutes: 15, cookMinutes: 25, difficulty: 'Easy', caloriesPerServing: 400, proteinGramsPerServing: 30, carbsGramsPerServing: 10, fatGramsPerServing: 22, fatLevel: 'Medium', primaryProtein: 'Fish', freezerFriendly: false, leftoverFriendly: true, ingredients: [{ name: 'Fish fillets', quantity: 500, unit: 'g', prepNote: '', category: 'Protein', matchTerms: ['fish'], optional: false, assumedStaple: false, inKitchen: false }], method: ['Cook it.'] }] } });
+  await open(page, 'recipes', '#online-search-btn');
+  await page.click('#online-search-btn');
+  await page.fill('#online-q', 'kerala fish curry');
+  await page.press('#online-q', 'Enter');
+  await page.check('#ask-macros');
+  await page.check('#ask-pantry');
+  await page.click('#online-ai');
+  await expect(page.locator('#online-ai-result')).toContainText('Fish Curry');
+  const prompt = seen.prompts.join('\n');
+  expect(prompt).toContain('Match my eating style');
+  expect(prompt).toContain('Mostly use ingredients from my kitchen');
+});

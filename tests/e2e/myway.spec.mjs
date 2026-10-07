@@ -99,3 +99,29 @@ test('a packet label photo can be read for its values (faked)', async ({ page })
   await expect(page.locator('.mw-row.added')).toContainText('20 g Curry Paste');
   await expect(page.locator('.mw-row.added')).toContainText('from the label');
 });
+
+test('Match my calories drops heavy ingredients (ghee, cream) to fit the target', async ({ page }) => {
+  const errors = watchErrors(page);
+  await open(page, 'settings', '#goal-max');
+  await page.fill('#goal-max', '500');
+  await page.dispatchEvent('#goal-max', 'change');
+  await reopen(page, 'recipes', '#recipe-list');
+  await waitForStarterRecipes(page);
+  await reopen(page, 'recipes', '.recipe-card');
+  await page.fill('#recipe-search', 'Creamy Chicken');
+  await page.locator('.recipe-card').first().click();
+  await page.click('#myway-recipe-btn');
+  // The tip says it's over the target
+  await expect(page.locator('.mw-tip', { hasText: 'Match my calories' })).toBeVisible();
+  const kcal = page.locator('#mw-macros .mt-kcal .mt-v');
+  const before = parseInt(await kcal.innerText(), 10);
+  expect(before).toBeGreaterThan(500);
+  await page.click('#mw-trim');
+  // The sheet redraws with the ingredients trimmed; the kcal tile has dropped
+  const after = parseInt(await page.locator('#mw-macros .mt-kcal .mt-v').innerText(), 10);
+  expect(after).toBeLessThan(before);
+  // The amount of ghee (or oil) is now 1 tbsp
+  const trimmed = await page.locator('.mw-row.swapped').allInnerTexts();
+  expect(trimmed.join(" ")).toMatch(/60 ml|1 tbsp/i);
+  expect(errors).toEqual([]);
+});

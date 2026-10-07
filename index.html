@@ -1288,6 +1288,11 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 .plan-add-more { display: block; width: 100%; margin: 2px 0 6px; padding: 6px 10px; border: none; background: none; color: var(--color-accent); font: inherit; font-size: 13px; font-weight: 700; text-align: left; cursor: pointer; }
 .ask-claude { background: var(--color-fill); border-radius: var(--radius-card); padding: 12px; margin: 10px 0 4px; }
 .ask-claude .ai-meal { margin-top: 10px; }
+.ask-switches { gap: 10px; flex-wrap: wrap; margin: 8px 0 0; }
+.ask-switches .plan-ai-toggle { font-size: 13px; margin: 0; }
+.ing-swap-chip { font-size: 11px; padding: 3px 8px; margin-left: 6px; background: var(--color-accent-tint); color: var(--color-accent-dark); border: none; border-radius: 999px; cursor: pointer; font-weight: 700; }
+.ing-swap-chip:hover { background: var(--color-accent); color: #fff; }
+.ing-swapped { color: var(--color-fridge); font-weight: 600; font-size: 12px; margin-left: 6px; }
 .photo-recipe-btn { width: 100%; margin: 0 0 10px; }
 .myway-macros { margin-bottom: 10px; }
 .myway-macros .mt-l b { font-size: 11px; margin-left: 2px; }
@@ -1832,7 +1837,9 @@ const AppState = {
   diaryDate: null,
   planUseAi: false,
   planQuickWeeknights: false,
-  recipeFilters: { search: '', cuisine: 'all', favourites: false, time: 0, highProtein: false, lowCarb: false, keto: false, lowFat: false, freezer: false }
+  recipeFilters: { search: '', cuisine: 'all', favourites: false, time: 0, highProtein: false, lowCarb: false, keto: false, lowFat: false, freezer: false },
+  askMatchMacros: false,
+  askUsePantry: false
 };
 
 /* ============================================================
@@ -3300,17 +3307,24 @@ async function openRecipeDetail(id) {
   const baseServes = recipe.servings || null;
   let serves = baseServes;
   const scaled = (ing) => (baseServes && ing.quantity != null ? { ...ing, quantity: ing.quantity * serves / baseServes } : ing);
+  // Lower-case names of what's in the kitchen, used to suggest swaps
+  const kitchenNames = kitchenItems.map((i) => (i.name || '').toLowerCase());
   const ingredientsListHtml = () => recipe.ingredients.length === 0
     ? '<p class="recipe-muted">No ingredients listed.</p>'
-    : `<ul class="ingredient-list">${recipe.ingredients.map((ing) => `
+    : `<ul class="ingredient-list">${recipe.ingredients.map((ing, i) => {
+      const inKitchen = index.length && findInventoryMatch(ing, index);
+      const swapTo = !inKitchen && !ing.assumedStaple && !ing.optional ? suggestSwapFor(ing, kitchenNames) : null;
+      return `
         <li>
           <span class="ing-qty">${escapeHtml(amountText(scaled(ing)))}</span>
           <span class="ing-name">${escapeHtml(ing.name)}${ing.prepNote ? `<span class="ing-note">, ${escapeHtml(ing.prepNote)}</span>` : ''}
-            ${index.length && findInventoryMatch(ing, index) ? '<span class="ing-have">✓ in kitchen</span>' : ''}
+            ${inKitchen ? '<span class="ing-have">✓ in kitchen</span>' : ''}
+            ${swapTo ? `<button type="button" class="ing-swap-chip" data-i="${i}" data-to="${escapeHtml(swapTo)}">💡 Use ${escapeHtml(swapTo)}</button>` : ''}
             ${ing.optional ? '<span class="ing-flag">optional</span>' : ''}
             ${ing.assumedStaple ? '<span class="ing-flag">staple</span>' : ''}
           </span>
-        </li>`).join('')}</ul>`;
+        </li>`;
+    }).join('')}</ul>`;
 
   const methodHtml = recipe.method.length === 0
     ? '<p class="recipe-muted">No method added.</p>'
@@ -3459,13 +3473,29 @@ async function openRecipeDetail(id) {
     serves = Math.max(1, Math.round(n) || 1);
     document.getElementById('serves-val').value = serves;
     document.getElementById('ingredients-box').innerHTML = ingredientsListHtml();
+    attachSwapChips();
     document.getElementById('serves-note').textContent = serves === baseServes ? `Amounts for ${baseServes} (as written)` : `Amounts changed for ${serves} portions (recipe makes ${baseServes})`;
     document.getElementById('cooked-recipe-btn').textContent = `🍳 I cooked this · ${serves} portion${serves === 1 ? '' : 's'}`;
   };
+  const attachSwapChips = () => document.querySelectorAll('#ingredients-box .ing-swap-chip').forEach((chip) => chip.addEventListener('click', async () => {
+    const i = parseInt(chip.dataset.i, 10);
+    const to = chip.dataset.to;
+    const orig = recipe.ingredients[i];
+    const kitchenItem = kitchenItems.find((k) => (k.name || '').toLowerCase() === to);
+    recipe.ingredients = recipe.ingredients.map((ing, j) => (j === i ? { ...ing, name: kitchenItem ? kitchenItem.name : (to.charAt(0).toUpperCase() + to.slice(1)), matchTerms: [to] } : ing));
+    recipe.userModified = recipe.source === 'built-in' ? true : !!recipe.userModified;
+    recipe.updatedAt = new Date().toISOString();
+    await dbPut('recipes', recipe);
+    showToast(`Swapped ${orig.name} for ${kitchenItem ? kitchenItem.name : to}`);
+    document.getElementById('ingredients-box').innerHTML = ingredientsListHtml();
+    attachSwapChips();
+  }));
+  attachSwapChips();
   document.querySelectorAll('#measure-pref button').forEach((b) => b.addEventListener('click', () => {
     setMeasurePref(b.dataset.val);
     b.parentElement.querySelectorAll('button').forEach((x) => x.classList.toggle('selected', x === b));
     document.getElementById('ingredients-box').innerHTML = ingredientsListHtml();
+    attachSwapChips();
   }));
   if (baseServes) {
     document.getElementById('serves-down').addEventListener('click', () => setServes(serves - 1));
@@ -3962,8 +3992,67 @@ function ingredientLine(ing) {
 // Kept between sheets so scanning a packet can come back to the changes made so far
 const MyWay = { recipe: null, rows: [], added: [] };
 
+// Heavy ingredients the trimmer may reduce, with a floor that keeps the flavour.
+// Checked in order: the first one that drops below its current amount runs first (biggest wins).
+const CALORIE_TRIM = [
+  { match: /\b(ghee|butter|lard)\b/i, unit: 'tbsp', floor: 1, hint: 'Just enough for the tadka' },
+  { match: /^(oil|olive oil|vegetable oil|canola oil|sunflower oil|rice bran oil|grapeseed oil|peanut oil|avocado oil|coconut oil|sesame oil|gingelly oil|mustard oil)$/i, unit: 'tbsp', floor: 1, hint: 'Still enough to cook with' },
+  { match: /\bcream\b/i, unit: 'ml', floor: 60, hint: 'A smaller finish of cream' },
+  { match: /^coconut milk$|^coconut cream$/i, unit: 'ml', floor: 150, hint: 'Lighter, still coconutty', swapTo: 'light coconut milk' },
+  { match: /^cheese$|cheddar|tasty cheese|parmesan|mozzarella/i, unit: 'g', floor: 30, hint: 'Enough to taste' },
+  { match: /^(sugar|brown sugar|honey|jaggery|maple syrup)$/i, unit: null, floor: 0, hint: 'Leave the sugar out' }
+];
+
+// If the recipe is over its calorie budget, step heavy ingredients down to their floor
+// one at a time until it fits (or there's nothing left to trim). Returns the trim steps taken.
+function trimForCalories(rows, added, baseKcal, nowKcal, servings, targetKcal) {
+  const steps = [];
+  if (!nowKcal || !targetKcal || nowKcal <= targetKcal) return steps;
+  for (let i = 0; i < 20; i++) {
+    const current = rows.filter((r) => !r.removed);
+    let best = null;
+    for (const row of current) {
+      const ing = row.cur;
+      const rule = CALORIE_TRIM.find((t) => t.match.test((ing.name || '').trim()));
+      if (!rule) continue;
+      // Current amount in the unit the floor is in
+      const asUnit = (unit) => {
+        if (unit === 'tbsp') {
+          if (ing.unit === 'tbsp') return ing.quantity;
+          if (ing.unit === 'tsp') return ing.quantity / 3;
+          const grams = metricAmount(ing);
+          return grams ? grams.quantity / UNIT_GRAMS.tbsp : (ing.unit === 'g' ? ing.quantity / UNIT_GRAMS.tbsp : null);
+        }
+        if (unit === 'ml') return ing.unit === 'ml' ? ing.quantity : ing.unit === 'L' ? ing.quantity * 1000 : null;
+        return ing.unit === 'g' ? ing.quantity : ing.unit === 'kg' ? ing.quantity * 1000 : null;
+      };
+      const current = asUnit(rule.unit);
+      const floorGrams = rule.unit === 'tbsp' ? rule.floor * UNIT_GRAMS.tbsp : rule.unit === 'ml' ? rule.floor : rule.floor;
+      const currentGrams = rule.unit === 'tbsp' && current != null ? current * UNIT_GRAMS.tbsp : current;
+      if (rule.floor === 0) {
+        if (!row.removed) best = best && best.saving > 50 ? best : { row, remove: true, saving: 50, rule };
+      } else if (currentGrams && currentGrams > floorGrams + 1) {
+        // How many calories per gram, from the ingredient's own values if any, otherwise typical
+        const food = (ing.nutrition && ing.nutrition.kcal) ? { kcal: ing.nutrition.kcal } : (findFood(ing.name) || {});
+        const saving = ((currentGrams - floorGrams) * (food.kcal || 0)) / servings;
+        if (saving > 5 && (!best || saving > best.saving)) best = { row, remove: false, floorGrams, saving, rule };
+      }
+    }
+    if (!best) break;
+    if (best.remove) { best.row.removed = true; steps.push({ name: best.row.cur.name, action: 'removed', why: best.rule.hint }); continue; }
+    const ing = best.row.cur;
+    const unit = best.rule.unit || 'tbsp';
+    const newQty = best.rule.unit === 'tbsp' ? best.rule.floor : (best.rule.unit === 'ml' ? best.rule.floor : best.rule.floor);
+    best.row.cur = normalizeRecipeIngredient({ ...ing, name: best.rule.swapTo || ing.name, quantity: newQty, unit, matchTerms: [(best.rule.swapTo || ing.name).toLowerCase()] });
+    steps.push({ name: ing.name, action: 'trimmed', to: `${newQty} ${unit}${best.rule.swapTo ? ` ${best.rule.swapTo}` : ''}`, why: best.rule.hint });
+    nowKcal -= best.saving;
+    if (nowKcal <= targetKcal) break;
+  }
+  return steps;
+}
+
 async function openMakeItMyWay(recipe, resume = false) {
-  const kitchenItems = await dbGetAll('inventoryItems');
+  const [kitchenItems, goals] = await Promise.all([dbGetAll('inventoryItems'), getHealthGoals()]);
   const serves = recipe.servings || 1;
   const base = recipeMacros(recipe);
   const carryOn = resume && MyWay.recipe && MyWay.recipe.id === recipe.id;
@@ -4034,6 +4123,11 @@ async function openMakeItMyWay(recipe, resume = false) {
   const draw = () => {
     const spices = spiceRows();
     document.getElementById('mw-body').innerHTML = `
+      ${(() => {
+        const m = after().m;
+        const over = base.kcal && goals.caloriesMax && m.kcal > goals.caloriesMax ? Math.round(m.kcal - goals.caloriesMax) : 0;
+        return over ? `<div class="cook-box mw-tip"><span>🎯 ${Math.round(m.kcal)} kcal per serve, ${over} over your ${goals.caloriesMax} target.</span><button type="button" class="btn-secondary" id="mw-trim">Match my calories</button></div>` : '';
+      })()}
       ${spices.length >= 3 ? `<div class="cook-box mw-tip"><span>🧂 ${spices.length} separate spices. Use a packet mix instead?</span><button type="button" class="btn-secondary" id="mw-spice">Swap for a packet mix</button></div>` : ''}
       ${rows.map((r, i) => {
         const ideas = swapIdeasFor(r.orig);
@@ -4110,6 +4204,15 @@ async function openMakeItMyWay(recipe, resume = false) {
     document.getElementById('mw-new').addEventListener('keydown', (e) => { if (e.key === 'Enter') addNew(); });
     document.getElementById('mw-scan').addEventListener('click', openPacketBarcode);
     document.getElementById('mw-label').addEventListener('click', openPacketLabel);
+    const trim = document.getElementById('mw-trim');
+    if (trim) trim.addEventListener('click', () => {
+      const m = after().m;
+      const target = goals.caloriesMax || m.kcal;
+      const steps = trimForCalories(rows, added, base.kcal, m.kcal, serves, target);
+      draw();
+      if (!steps.length) { showToast('Nothing obvious to trim: try removing or swapping ingredients.'); return; }
+      showToast(`${steps.map((s) => s.action === 'removed' ? `removed ${s.name}` : `${s.name} → ${s.to}`).join(', ')}`);
+    });
     const spice = document.getElementById('mw-spice');
     if (spice) spice.addEventListener('click', () => {
       spiceRows().forEach((r) => { r.removed = true; });
@@ -4979,7 +5082,8 @@ async function searchMealDb(query) {
 }
 
 // One recipe for a dish named by the person, from Claude (same shape as meal suggestions)
-async function requestAiNamedRecipe(dish) {
+async function requestAiNamedRecipe(dish, options = {}) {
+  const { matchMacros = false, usePantry = false } = options;
   let Anthropic = null;
   try {
     const loaded = await getAnthropicClient();
@@ -4996,8 +5100,13 @@ async function requestAiNamedRecipe(dish) {
       messages: [{ role: 'user', content: [
         `Give me exactly 1 recipe for: ${dish}.`,
         'Keep it true to the style and region named (e.g. South Indian means South Indian techniques and spices). Use the dish as its name, tidied up.',
-        `If it fits the dish, lean towards ${style.label.toLowerCase()} (${style.ai}) and about ${goals.caloriesMin}-${goals.caloriesMax} kcal per serving, but don't change what the dish is.`,
-        'Use metric quantities; quantity 0 with an empty unit for "to taste". Salt, pepper, oil and dried spices are assumedStaple. Set inKitchen for ingredients in my kitchen list. matchTerms are lower-case names a kitchen item could be called.',
+        matchMacros
+          ? `Match my eating style: ${style.label.toLowerCase()} (${style.ai}) and about ${goals.caloriesMin}-${goals.caloriesMax} kcal per serving. Swap in lighter options where it still works (lean cuts, light coconut milk, less oil, Greek yoghurt for cream); if a swap would make it not that dish any more, keep the dish and say so briefly in whyThisMeal.`
+          : `If it fits the dish, lean towards ${style.label.toLowerCase()} (${style.ai}) and about ${goals.caloriesMin}-${goals.caloriesMax} kcal per serving, but don't change what the dish is.`,
+        usePantry
+          ? 'Mostly use ingredients from my kitchen list. Where the dish needs something I don\'t have, use the closest ingredient I do have if the dish still works (e.g. gingelly oil → sesame oil, then any neutral oil I have; thai basil → regular basil). List what I\'d still need to buy as "needToBuy" items only when there is no reasonable swap. Set inKitchen for ingredients in my kitchen list.'
+          : 'Use metric quantities; quantity 0 with an empty unit for "to taste". Salt, pepper, oil and dried spices are assumedStaple. Set inKitchen for ingredients in my kitchen list. matchTerms are lower-case names a kitchen item could be called.',
+        'Use metric quantities; quantity 0 with an empty unit for "to taste". Salt, pepper, oil and dried spices are assumedStaple. matchTerms are lower-case names a kitchen item could be called.',
         'Calories, protein, carbs and fat are per serving and approximate. usesExpiring lists kitchen items it uses that are close to their use-by. whyThisMeal is one short sentence about the dish.',
         '', 'My kitchen (JSON):',
         JSON.stringify(items.map((i) => ({ name: i.name, daysUntilUseBy: i.expiryDate ? daysUntil(i.expiryDate) : null })))
@@ -5142,18 +5251,24 @@ async function openOnlineSearch() {
         ${mine.map(({ r }) => `<button type="button" class="pick-row mine-result" data-recipe-id="${r.id}"><span class="pick-name">📖 ${escapeHtml(r.name)}</span></button>`).join('')}` : ''}
       <div class="ask-claude">
         <button type="button" class="btn-primary" id="online-ai" style="margin:0;">✨ Get a recipe for “${escapeHtml(q)}” from Claude</button>
-        <p class="recipe-muted" style="margin:6px 0 0;">${hasKey ? 'Any dish, true to the style you name, with calories and macros. Uses your API key.' : 'Add your API key in Settings → AI suggestions to ask Claude for any dish.'}</p>
+        ${hasKey ? `<div class="field-row ask-switches">
+          <label class="plan-ai-toggle"><input type="checkbox" id="ask-macros" ${AppState.askMatchMacros ? 'checked' : ''}> 🎯 Match my macros</label>
+          <label class="plan-ai-toggle"><input type="checkbox" id="ask-pantry" ${AppState.askUsePantry ? 'checked' : ''}> 🧺 Mostly from my pantry</label>
+        </div>
+        <p class="recipe-muted" style="margin:6px 0 0;">Any dish, with calories and macros. Match my macros swaps lighter options to fit your eating style; Mostly from my pantry uses what you have and lists only a few extras. Uses your API key.</p>` : '<p class="recipe-muted" style="margin:6px 0 0;">Add your API key in Settings → AI suggestions to ask Claude for any dish.</p>'}
         <div id="online-ai-result"></div>
       </div>
       <div class="st-group-title">From TheMealDB</div>`);
     out.querySelectorAll('.mine-result').forEach((b) => b.addEventListener('click', () => openRecipeDetail(parseInt(b.dataset.recipeId, 10))));
     document.getElementById('online-ai').addEventListener('click', async (e) => {
       if (!getAiKey()) { closeModal(); navigateTo('settings'); return; }
+      AppState.askMatchMacros = document.getElementById('ask-macros').checked;
+      AppState.askUsePantry = document.getElementById('ask-pantry').checked;
       const btn = e.currentTarget;
       const box = document.getElementById('online-ai-result');
       btn.disabled = true;
       btn.textContent = 'Writing the recipe…';
-      const [outcome, goals] = await Promise.all([requestAiNamedRecipe(q), getHealthGoals()]);
+      const [outcome, goals] = await Promise.all([requestAiNamedRecipe(q, { matchMacros: AppState.askMatchMacros, usePantry: AppState.askUsePantry }), getHealthGoals()]);
       if (!document.getElementById('online-ai-result')) return;
       btn.disabled = false;
       btn.textContent = `✨ Ask again`;
@@ -5396,6 +5511,60 @@ const FOOD_NUTRITION = [
 const UNIT_GRAMS = { g: 1, kg: 1000, ml: 1, L: 1000, tsp: 5, tbsp: 15, cup: 200, clove: 5, bunch: 100, sprig: 1, pinch: 0.4, can: 400 };
 
 const FOOD_NUTRITION_INDEX = FOOD_NUTRITION.flatMap((food) => food.names.map((n) => ({ words: matchWords(n), food })));
+
+// Ingredients that work in the same way: if the recipe asks for one, any of the others does the job.
+// Order matters: items near the start are preferred when swapping.
+const INGREDIENT_FAMILIES = [
+  // Oils and fats
+  ['olive oil', 'extra virgin olive oil', 'vegetable oil', 'canola oil', 'sunflower oil', 'rice bran oil', 'grapeseed oil', 'avocado oil', 'peanut oil', 'sesame oil', 'gingelly oil', 'gingili oil', 'til oil', 'mustard oil', 'coconut oil', 'ghee', 'butter'],
+  // Dairy and alternatives
+  ['milk', 'full cream milk', 'skim milk', 'light milk', 'low fat milk', 'soy milk', 'almond milk', 'oat milk'],
+  ['cream', 'thickened cream', 'pouring cream', 'cooking cream', 'light cooking cream', 'light cream', 'sour cream'],
+  ['yoghurt', 'greek yoghurt', 'plain yoghurt', 'natural yoghurt', 'yogurt', 'greek yogurt'],
+  ['coconut milk', 'light coconut milk', 'lite coconut milk', 'coconut cream'],
+  ['cheese', 'cheddar', 'tasty cheese', 'mozzarella', 'parmesan', 'feta', 'reduced fat cheese', 'light cheese'],
+  // Herbs
+  ['coriander', 'parsley', 'basil', 'thai basil', 'mint'],
+  ['curry leaves', 'bay leaves'],
+  // Chillies and heat
+  ['green chilli', 'red chilli', 'bird eye chilli', 'chilli', 'chillies', 'chilli flakes', 'chilli powder'],
+  // Mince and lean meat
+  ['beef mince', 'lean beef mince', 'extra lean mince', 'mince', 'pork mince', 'lamb mince', 'chicken mince', 'turkey mince'],
+  // Chicken cuts
+  ['chicken breast', 'chicken thigh', 'chicken thigh fillets', 'chicken drumsticks', 'chicken marylands', 'chicken'],
+  // White fish
+  ['barramundi', 'barramundi fillets', 'snapper', 'basa', 'cod', 'haddock', 'flathead', 'hake', 'whiting', 'white fish', 'fish fillets'],
+  // Rice
+  ['basmati rice', 'jasmine rice', 'long grain rice', 'white rice', 'brown rice', 'rice'],
+  // Noodles & pasta
+  ['pasta', 'spaghetti', 'penne', 'fettuccine', 'macaroni', 'small pasta', 'lasagne sheets'],
+  ['noodles', 'egg noodles', 'rice noodles', 'vermicelli'],
+  // Flours
+  ['plain flour', 'self raising flour', 'wholemeal flour', 'atta flour', 'besan', 'chickpea flour'],
+  // Vinegars
+  ['vinegar', 'white vinegar', 'malt vinegar', 'rice vinegar', 'apple cider vinegar'],
+  // Soy & umami sauces
+  ['soy sauce', 'light soy sauce', 'dark soy sauce', 'kecap manis', 'tamari'],
+  ['oyster sauce', 'hoisin sauce', 'fish sauce'],
+  // Lentils and legumes
+  ['red lentils', 'masoor dal', 'brown lentils', 'green lentils', 'split peas', 'moong dal', 'chana dal', 'toor dal', 'dal'],
+  ['chickpeas', 'kidney beans', 'black beans', 'cannellini beans']
+];
+
+// For an ingredient the kitchen doesn't have, suggest the first in-kitchen alternative from its family
+function suggestSwapFor(ing, kitchenNames) {
+  const name = (ing.name || '').toLowerCase().trim();
+  const terms = [name, ...(ing.matchTerms || []).map((t) => t.toLowerCase())];
+  const family = INGREDIENT_FAMILIES.find((f) => f.some((m) => terms.some((t) => t.includes(m))));
+  if (!family) return null;
+  // Something from the kitchen that's in the same family, closest first
+  const pick = family.find((n) => kitchenNames.some((k) => k === n || k.includes(n) || n.includes(k)));
+  if (!pick) return null;
+  const kitchenMatch = kitchenNames.find((k) => k === pick || k.includes(pick) || pick.includes(k)) || pick;
+  // Don't suggest swapping to the same thing
+  if (terms.some((t) => t === kitchenMatch || t.includes(kitchenMatch) || kitchenMatch.includes(t))) return null;
+  return kitchenMatch;
+}
 
 // The most specific food whose name appears as whole words in the text: "lean beef mince" beats "mince"
 function findFood(text) {
