@@ -3705,6 +3705,11 @@ function openRecipeForm(recipe, prefill) {
         <div class="field">
           <label>Ingredients <span style="text-transform:none;font-weight:500;">(one per line, e.g. "500 g chicken thigh, diced")</span></label>
           <textarea id="r-ingredients" rows="8" placeholder="500 g chicken thigh, diced&#10;2 onions, sliced&#10;1 tsp turmeric&#10;coriander, to garnish (optional)">${escapeHtml(r.ingredients.map(ingredientToLine).join('\n'))}</textarea>
+          <div class="field-row" style="margin-top:6px;">
+            <button type="button" class="btn-secondary" id="r-scan-barcode" style="margin:0;flex:1;">▦ Scan a jar / sauce</button>
+            <button type="button" class="btn-secondary" id="r-scan-label" style="margin:0;flex:1;">🏷️ Label photo</button>
+          </div>
+          <p class="recipe-muted" style="margin:6px 0 0;">Scans the packet's barcode or nutrition panel, adds it to this recipe with its per-100 g values, and puts the packet in your pantry.</p>
         </div>
 
         <div class="field">
@@ -3782,8 +3787,13 @@ function openRecipeForm(recipe, prefill) {
     note.textContent = `Per serve: ${p.kcal} kcal · P ${p.protein} g · C ${p.carbs} g · F ${p.fat} g (approximate).${calc.missing.length ? ` Not counted: ${calc.missing.join(', ')}.` : ''}`;
   });
 
+  document.getElementById('r-scan-barcode').addEventListener('click', () => startRecipePacketScan('barcode', isEdit, recipe));
+  document.getElementById('r-scan-label').addEventListener('click', () => startRecipePacketScan('label', isEdit, recipe));
+
   document.getElementById('recipe-form').addEventListener('submit', async (e) => {
     e.preventDefault();
+    // Clear the packet-scan context once the recipe is saved
+    PacketScanContext.target = 'myway'; PacketScanContext.recipeDraft = null; PacketScanContext.isEdit = false;
     await saveRecipeFromForm(recipe);
   });
 }
@@ -4378,7 +4388,104 @@ function packetBackButton() {
   return '<button type="button" class="btn-secondary" id="pk-back">Back to the recipe</button>';
 }
 function attachPacketBack() {
-  document.getElementById('pk-back').addEventListener('click', () => { stopBarcodeCamera(); openMakeItMyWay(MyWay.recipe, true); });
+  document.getElementById('pk-back').addEventListener('click', () => { stopBarcodeCamera(); backToRecipeContext(); });
+}
+
+// Scanning from either Make it my way or the recipe-add/edit form. Set before openPacketBarcode / openPacketLabel.
+const PacketScanContext = { target: 'myway', recipeDraft: null, isEdit: false };
+function backToRecipeContext() {
+  if (PacketScanContext.target === 'recipeForm' && PacketScanContext.recipeDraft) {
+    const draft = PacketScanContext.recipeDraft;
+    openRecipeForm(PacketScanContext.isEdit ? draft : null, PacketScanContext.isEdit ? null : draft);
+  } else {
+    openMakeItMyWay(MyWay.recipe, true);
+  }
+}
+
+// Snapshot every field in the recipe-add/edit form so we can reopen it after a packet scan
+function captureRecipeFormDraft() {
+  const val = (id) => (document.getElementById(id) ? document.getElementById(id).value : '');
+  const toggleOn = (id) => { const el = document.getElementById(id); return el && el.dataset.on === 'true'; };
+  const segVal = (id) => { const el = document.querySelector(`#${id} button.selected`); return el ? el.dataset.val : null; };
+  const prevIngredients = PacketScanContext.recipeDraft ? PacketScanContext.recipeDraft.ingredients : [];
+  const lookup = buildKnownIngredientLookup(PacketScanContext.isEdit && PacketScanContext.recipeDraft ? PacketScanContext.recipeDraft.id : null);
+  const ingredients = val('r-ingredients').split('\n').filter((l) => l.trim())
+    .map((line) => parseIngredientLine(line, prevIngredients, lookup))
+    .filter(Boolean);
+  return normalizeRecipe({
+    ...(PacketScanContext.recipeDraft || {}),
+    name: val('r-name'),
+    cuisine: val('r-cuisine'),
+    mealTypes: Array.from(document.querySelectorAll('#r-mealTypes button.selected')).map((b) => b.dataset.val),
+    servings: val('r-servings'),
+    prepMinutes: val('r-prep'),
+    cookMinutes: val('r-cook'),
+    difficulty: segVal('r-difficulty'),
+    proteinLevel: segVal('r-proteinLevel'),
+    fatLevel: segVal('r-fatLevel'),
+    primaryProtein: val('r-primaryProtein'),
+    caloriesPerServing: val('r-calories'),
+    proteinGramsPerServing: val('r-proteinGrams'),
+    carbsGramsPerServing: val('r-carbsGrams'),
+    fatGramsPerServing: val('r-fatGrams'),
+    freezerFriendly: toggleOn('r-freezer'),
+    leftoverFriendly: toggleOn('r-leftover'),
+    ingredients,
+    method: val('r-method').split('\n').map((s) => s.trim()).filter(Boolean),
+    notes: val('r-notes')
+  });
+}
+
+function startRecipePacketScan(mode, isEdit, existingRecipe) {
+  const draft = captureRecipeFormDraft();
+  if (isEdit && existingRecipe) {
+    // Keep the recipe's own metadata so saving later doesn't wipe id / source / ratings
+    Object.assign(draft, {
+      id: existingRecipe.id, source: existingRecipe.source, seedId: existingRecipe.seedId,
+      userRating: existingRecipe.userRating, partnerRating: existingRecipe.partnerRating,
+      isFavourite: existingRecipe.isFavourite, userModified: existingRecipe.userModified,
+      createdAt: existingRecipe.createdAt
+    });
+  }
+  PacketScanContext.target = 'recipeForm';
+  PacketScanContext.isEdit = !!isEdit;
+  PacketScanContext.recipeDraft = draft;
+  if (mode === 'label') openPacketLabel(); else openPacketBarcode();
+}
+
+// Append a scanned packet to the recipe-form ingredients list and store it in the pantry
+// so the recipe's calculator can read its per-100 g values.
+async function addPacketToRecipeForm(name, quantity, unit, per100, from, pantry) {
+  const now = new Date().toISOString();
+  if (pantry) {
+    const items = await dbGetAll('inventoryItems');
+    const existing = items.find((i) => (pantry.barcode && i.barcode === pantry.barcode) || matchWords(i.name) === matchWords(name));
+    if (existing) {
+      if (existing.quantity != null && pantry.grams && existing.unit === 'g') existing.quantity = Math.round((existing.quantity + pantry.grams) * 10) / 10;
+      Object.assign(existing, { caloriesPer100: per100.kcal, caloriesUnit: 'g', caloriesSource: from === 'label' ? 'label' : 'database', ...macrosFrom({ proteinPer100: per100.p, carbsPer100: per100.c, fatPer100: per100.f }), updatedAt: now });
+      await dbPut('inventoryItems', existing);
+    } else {
+      await dbPut('inventoryItems', {
+        name, quantity: pantry.grams || null, unit: 'g', portionCount: null, portionSize: null, location: 'pantry', subLocation: null,
+        states: ['Raw'], category: 'Spices & Seasonings', isStaple: false, purchaseDate: localDateString(new Date()), expiryDate: null,
+        useByOverrideDays: null, cost: null, notes: '', freezerFriendlyRating: null, linkedPurchaseEventId: null, barcode: pantry.barcode || null,
+        caloriesPer100: per100.kcal, caloriesUnit: 'g', caloriesSource: from === 'label' ? 'label' : 'database',
+        ...macrosFrom({ proteinPer100: per100.p, carbsPer100: per100.c, fatPer100: per100.f }), runningLow: false, createdAt: now, updatedAt: now
+      });
+    }
+  }
+  // Give the ingredient the scanned nutrition so the recipe calculator uses it directly too
+  const kind = packetKind(name);
+  const ing = normalizeRecipeIngredient({
+    name, quantity, unit, category: 'Spices & Seasonings', matchTerms: [name.toLowerCase()],
+    nutrition: { kcal: per100.kcal, p: per100.p, c: per100.c, f: per100.f, from, tsp: kind.tsp || UNIT_GRAMS.tsp, tbsp: kind.tbsp || UNIT_GRAMS.tbsp }
+  });
+  const draft = PacketScanContext.recipeDraft || { ingredients: [] };
+  draft.ingredients = [...(draft.ingredients || []), ing];
+  PacketScanContext.recipeDraft = draft;
+  stopBarcodeCamera();
+  backToRecipeContext();
+  showToast(`Added ${formatIngredientQuantity(ing)} ${name}`);
 }
 
 function openPacketBarcode() {
@@ -4401,7 +4508,9 @@ function openPacketBarcode() {
     const packGrams = row.unit === 'g' ? Math.round(row.quantity) : row.unit === 'kg' ? Math.round(row.quantity * 1000) : null;
     const amt = readPacketAmount(packGrams, row.barcode);
     const name = document.getElementById('pk-name').value.trim() || row.name || 'Packet mix';
-    addPacketToMyWay(name, amt.quantity, amt.unit, { kcal: row.caloriesPer100, p: row.proteinPer100, c: row.carbsPer100, f: row.fatPer100 }, 'barcode', amt.pantry);
+    const per100 = { kcal: row.caloriesPer100, p: row.proteinPer100, c: row.carbsPer100, f: row.fatPer100 };
+    if (PacketScanContext.target === 'recipeForm') addPacketToRecipeForm(name, amt.quantity, amt.unit, per100, 'barcode', amt.pantry);
+    else addPacketToMyWay(name, amt.quantity, amt.unit, per100, 'barcode', amt.pantry);
   });
   attachPacketBack();
   scanNextBarcode();
@@ -4471,7 +4580,9 @@ function openPacketLabel() {
     if (Packet.label) {
       const amt = readPacketAmount(Packet.label.packAmount ? Math.round(Packet.label.packAmount) : null, null);
       const name = document.getElementById('pk-name').value.trim() || Packet.label.name || 'Packet mix';
-      addPacketToMyWay(name, amt.quantity, amt.unit, { kcal: Packet.label.per100.kcal, p: Packet.label.per100.protein, c: Packet.label.per100.carbs, f: Packet.label.per100.fat }, 'label', amt.pantry);
+      const per100 = { kcal: Packet.label.per100.kcal, p: Packet.label.per100.protein, c: Packet.label.per100.carbs, f: Packet.label.per100.fat };
+      if (PacketScanContext.target === 'recipeForm') addPacketToRecipeForm(name, amt.quantity, amt.unit, per100, 'label', amt.pantry);
+      else addPacketToMyWay(name, amt.quantity, amt.unit, per100, 'label', amt.pantry);
       return;
     }
     await readPacketLabel();
