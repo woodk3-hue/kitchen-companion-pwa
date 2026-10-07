@@ -1041,7 +1041,20 @@ h1, h2, h3 {
 .diary-entry .de-num { color: var(--color-ink-soft); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .diary-planned { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0 2px; border-top: 1px dashed var(--color-line); font-size: 13px; color: var(--color-ink-soft); }
 .diary-planned .state-chip { padding: 5px 10px; font-size: 12px; }
+.setup-list { margin: 8px 0 0; padding-left: 20px; color: var(--color-ink); }
+.setup-list li { margin-bottom: 4px; font-size: 14px; }
+.sw-step { font-size: 11px; font-weight: 500; color: var(--color-ink-soft); margin-left: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+.sw-nav { display: flex; justify-content: space-between; gap: 8px; padding: 12px 0 4px; border-top: 1px solid var(--color-border); margin-top: 8px; }
+.sw-nav .btn-primary, .sw-nav .btn-secondary { margin: 0; flex: 1; }
+.sw-starter-head { display: flex; gap: 12px; margin-bottom: 8px; }
+.link-btn { background: none; border: none; color: var(--color-accent); font-size: 13px; font-weight: 600; padding: 0; cursor: pointer; }
+.sw-starter-list { list-style: none; margin: 0; padding: 0; }
+.sw-starter-list li { border-bottom: 1px solid var(--color-border); }
+.sw-starter-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; cursor: pointer; }
+.sw-starter-row input { width: 20px; height: 20px; flex-shrink: 0; }
+.sw-starter-row small { display: block; font-size: 11px; color: var(--color-ink-soft); margin-top: 2px; }
 .add-food-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-bottom: 16px; }
+.add-food-opt small { display: block; font-size: 11px; font-weight: 500; color: var(--color-ink-soft); margin-top: 2px; }
 .add-food-opt {
   display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 8px;
   border: 1px solid var(--color-line); border-radius: var(--radius-sm); background: var(--color-paper);
@@ -1119,7 +1132,12 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 .app-head-row { display: flex; align-items: center; gap: 12px; }
 .app-head-icon { width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0; box-shadow: var(--shadow-card); }
 .app-head-text { display: flex; flex-direction: column; min-width: 0; }
-.app-head-brand { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-accent); }
+.app-head-brand { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  background: linear-gradient(180deg, #F6F7F8 0%, #D7DADD 48%, #8E9298 52%, #B9BDC2 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+}
+:root[data-theme="dark"] .app-head-brand { background: linear-gradient(180deg, #FDFDFE 0%, #B9BDC3 48%, #585B61 52%, #8A8E94 100%); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; }
 #app-content { padding: 8px 16px 16px; }
 
 /* Cards: white, rounded, soft shadow, no outline */
@@ -2227,8 +2245,31 @@ function attachKitchenListeners() {
 
 document.getElementById('fab-btn').addEventListener('click', () => {
   if (AppState.route === 'recipes') openRecipeForm(null);
-  else openItemForm(null);
+  else openAddToKitchen();
 });
+
+function openAddToKitchen() {
+  openModal(`
+    <div class="modal-title-row"><h2>Add to kitchen</h2><button class="close-btn" id="modal-close">×</button></div>
+    <div class="modal-scroll-area">
+      <p class="st-intro">How would you like to add?</p>
+      <div class="add-food-grid">
+        <button type="button" class="add-food-opt" data-how="stocktake"><span>📋</span>Stocktake<small>Tick off common items</small></button>
+        <button type="button" class="add-food-opt" data-how="barcode"><span>▦</span>Scan barcode<small>Online lookup</small></button>
+        <button type="button" class="add-food-opt" data-how="photo"><span>📸</span>Photo scan<small>Read a label</small></button>
+        <button type="button" class="add-food-opt" data-how="manual"><span>✏️</span>Type it in<small>Full item form</small></button>
+      </div>
+    </div>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  const flows = {
+    stocktake: () => { closeModal(); openStocktake(); },
+    barcode: () => { closeModal(); openBarcodeScan(); },
+    photo: () => { closeModal(); openPhotoScan(); },
+    manual: () => { closeModal(); openItemForm(null); }
+  };
+  document.querySelectorAll('.add-food-opt').forEach((b) => b.addEventListener('click', () => flows[b.dataset.how]()));
+}
 
 /* ---- Item Add/Edit Form ---- */
 function openItemForm(item, prefill) {
@@ -2681,69 +2722,84 @@ function stocktakeGroup(title, category, unit, states, isStaple, names) {
   };
 }
 
+// Common household stocktake items, grouped by food type. Each item has its default location so
+// ticking lots at once still puts them in the right place. Spices are last.
 const STOCKTAKE_LIST = {
   pantry: [
-    stocktakeGroup('Spices', 'Spices & Seasonings', 'g', ['Raw'], true, [
-      'Turmeric', 'Cumin seeds', 'Ground cumin', 'Coriander seeds', 'Ground coriander', 'Chilli powder',
-      'Kashmiri chilli powder', 'Garam masala', 'Curry powder', 'Mustard seeds', 'Cardamom', 'Cloves',
-      'Cinnamon', 'Bay leaves', 'Black pepper', 'Dried chillies', 'Fenugreek', 'Asafoetida', 'Paprika', 'Salt'
+    stocktakeGroup('Carbs & grains', 'Carbs & Grains', 'kg', ['Raw'], true, [
+      'Basmati rice', 'Jasmine rice', 'White rice', 'Brown rice', 'Rolled oats', 'Breadcrumbs', 'Couscous', 'Quinoa'
     ]),
-    stocktakeGroup('Rice, grains & flour', 'Carbs & Grains', 'kg', ['Raw'], true, [
-      'Basmati rice', 'Jasmine rice', 'Brown rice', 'Atta flour', 'Plain flour', 'Besan',
-      'Rolled oats', 'Pasta|g', 'Noodles|pack'
+    stocktakeGroup('Flour', 'Carbs & Grains', 'kg', ['Raw'], true, [
+      'Plain flour', 'Self raising flour', 'Wholemeal flour', 'Cornflour', 'Atta flour', 'Besan'
     ]),
-    stocktakeGroup('Dals & lentils', 'Carbs & Grains', 'g', ['Raw'], true, [
-      'Red lentils', 'Toor dal', 'Chana dal', 'Moong dal'
+    stocktakeGroup('Pasta & noodles', 'Carbs & Grains', 'g', ['Raw'], true, [
+      'Spaghetti', 'Penne', 'Fettuccine', 'Macaroni', 'Lasagne sheets', '2-minute noodles|pack', 'Rice noodles', 'Egg noodles', 'Instant ramen|pack'
     ]),
-    stocktakeGroup('Canned', 'Canned & Jarred', 'can', ['Raw'], false, [
-      'Crushed tomatoes', 'Chickpeas', 'Kidney beans', 'Tuna', 'Coconut milk', 'Coconut cream'
+    stocktakeGroup('Dal, lentils & beans', 'Carbs & Grains', 'g', ['Raw'], true, [
+      'Red lentils', 'Brown lentils', 'Green lentils', 'Split peas', 'Toor dal', 'Chana dal', 'Moong dal', 'Dried chickpeas', 'Dried kidney beans'
     ]),
-    stocktakeGroup('Oils & sauces', 'Sauces & Condiments', 'bottle', ['Raw'], true, [
-      'Olive oil', 'Canola oil', 'Coconut oil|jar', 'Soy sauce', 'Oyster sauce', 'Tomato sauce',
-      'BBQ sauce', 'Vinegar', 'Tamarind|jar'
+    stocktakeGroup('Canned goods', 'Canned & Jarred', 'can', ['Raw'], false, [
+      'Crushed tomatoes', 'Diced tomatoes', 'Chickpeas', 'Kidney beans', 'Cannellini beans', 'Black beans', 'Baked beans', 'Tuna', 'Salmon', 'Corn kernels', 'Coconut milk', 'Light coconut milk', 'Coconut cream'
+    ]),
+    stocktakeGroup('Oils', 'Sauces & Condiments', 'bottle', ['Raw'], true, [
+      'Olive oil', 'Extra virgin olive oil', 'Canola oil', 'Vegetable oil', 'Sunflower oil', 'Rice bran oil', 'Sesame oil', 'Coconut oil|jar'
+    ]),
+    stocktakeGroup('Sauces & condiments', 'Sauces & Condiments', 'bottle', ['Raw'], true, [
+      'Soy sauce', 'Oyster sauce', 'Fish sauce', 'Hoisin sauce', 'Sweet chilli sauce', 'Tomato sauce', 'BBQ sauce', 'Worcestershire sauce', 'Vinegar', 'Rice vinegar', 'Balsamic vinegar', 'Honey|jar', 'Tomato paste|jar', 'Mayonnaise|jar', 'Mustard|jar', 'Peanut butter|jar', 'Vegemite|jar'
+    ]),
+    stocktakeGroup('Sweeteners & baking', 'Other', 'kg', ['Raw'], true, [
+      'Sugar', 'Brown sugar', 'Caster sugar', 'Baking powder|g', 'Baking soda|g', 'Yeast|g', 'Vanilla|ml', 'Chocolate chips|g'
     ]),
     stocktakeGroup('Fresh pantry', 'Vegetables', 'kg', ['Fresh'], false, [
-      'Onions', 'Garlic|each', 'Potatoes'
+      'Onions', 'Red onions', 'Garlic|each', 'Potatoes', 'Sweet potato', 'Pumpkin'
     ]),
-    stocktakeGroup('Other', 'Other', 'g', ['Raw'], false, [
-      'Sugar|kg', 'Honey|jar', 'Stock powder|jar', 'Desiccated coconut', 'Nuts|Snacks & Treats'
+    stocktakeGroup('Snacks & drinks', 'Snacks & Treats', 'g', ['Raw'], false, [
+      'Nuts|Snacks & Treats', 'Crackers|Snacks & Treats', 'Biscuits|Snacks & Treats', 'Chips|Snacks & Treats', 'Coffee|jar', 'Tea bags|pack', 'Stock cubes|pack'
+    ]),
+    stocktakeGroup('Herbs (dried)', 'Spices & Seasonings', 'g', ['Raw'], true, [
+      'Oregano', 'Thyme', 'Basil', 'Rosemary', 'Parsley', 'Sage', 'Mint', 'Mixed herbs', 'Bay leaves', 'Chilli flakes'
+    ]),
+    stocktakeGroup('Spices', 'Spices & Seasonings', 'g', ['Raw'], true, [
+      'Salt', 'Black pepper', 'Peppercorns', 'Paprika', 'Smoked paprika', 'Cinnamon', 'Nutmeg', 'Cloves', 'Cardamom', 'Star anise', 'Fennel seeds',
+      'Turmeric', 'Cumin', 'Cumin seeds', 'Ground coriander', 'Coriander seeds', 'Garam masala', 'Curry powder', 'Chilli powder', 'Mustard seeds', 'Fenugreek', 'Asafoetida', 'Kashmiri chilli powder'
     ])
   ],
   fridge: [
     stocktakeGroup('Dairy & eggs', 'Dairy & Refrigerated', 'each', ['Fresh'], false, [
-      'Milk|L', 'Greek yoghurt|g', 'Butter|g', 'Ghee|jar', 'Cheese|g', 'Cream|ml', 'Eggs'
+      'Milk|L', 'Skim milk|L', 'Greek yoghurt|g', 'Plain yoghurt|g', 'Butter|g', 'Ghee|jar', 'Cheese|g', 'Cheddar|g', 'Parmesan|g', 'Feta|g', 'Mozzarella|g', 'Cream|ml', 'Light cream|ml', 'Sour cream|g', 'Eggs'
     ]),
-    stocktakeGroup('Vegetables', 'Vegetables', 'each', ['Fresh'], false, [
-      'Spinach|g', 'Bok choy', 'Chinese broccoli', 'Mushrooms|g', 'Carrots', 'Capsicum',
-      'Zucchini', 'Cucumber', 'Lettuce', 'Broccoli'
+    stocktakeGroup('Fresh vegetables', 'Vegetables', 'each', ['Fresh'], false, [
+      'Tomatoes', 'Capsicum', 'Cucumber', 'Carrots', 'Celery', 'Zucchini', 'Lettuce', 'Spinach|g', 'Baby spinach|g', 'Rocket|g', 'Mushrooms|g', 'Broccoli', 'Cauliflower', 'Cabbage', 'Bok choy', 'Chinese broccoli', 'Green beans|g', 'Peas|g', 'Avocado', 'Corn'
     ]),
-    stocktakeGroup('Herbs & aromatics', 'Vegetables', 'each', ['Fresh'], false, [
-      'Coriander', 'Mint', 'Curry leaves', 'Spring onion', 'Ginger|g', 'Green chillies'
-    ]),
-    stocktakeGroup('Opened sauces & jars', 'Sauces & Condiments', 'jar', ['Opened'], false, [
-      'Mayonnaise', 'Mustard', 'Chutney', 'Pickle', 'Tomato paste'
+    stocktakeGroup('Fresh herbs & aromatics', 'Vegetables', 'bunch', ['Fresh'], false, [
+      'Coriander', 'Parsley', 'Basil', 'Mint', 'Dill', 'Chives', 'Curry leaves', 'Spring onion', 'Ginger|g', 'Chilli'
     ]),
     stocktakeGroup('Fruit', 'Fruit', 'each', ['Fresh'], false, [
-      'Lemons', 'Limes', 'Berries|g'
+      'Lemons', 'Limes', 'Apples', 'Oranges', 'Bananas', 'Berries|g'
+    ]),
+    stocktakeGroup('Opened jars', 'Sauces & Condiments', 'jar', ['Opened'], false, [
+      'Pickle', 'Chutney', 'Jam', 'Salsa', 'Pesto'
     ])
   ],
   freezer: [
     stocktakeGroup('Meat & seafood', 'Protein', 'kg', ['Frozen', 'Raw'], false, [
-      'Chicken breast', 'Chicken thigh', 'Beef mince', 'Barramundi fillets', 'White fish fillets',
-      'Prawns', 'Lamb'
+      'Chicken breast', 'Chicken thigh', 'Chicken mince', 'Beef mince', 'Lean beef mince', 'Steak', 'Diced beef', 'Lamb', 'Pork', 'Sausages|pack', 'Bacon|g', 'Barramundi fillets', 'White fish fillets', 'Salmon fillets', 'Prawns'
     ]),
     stocktakeGroup('Frozen vegetables', 'Vegetables', 'g', ['Frozen'], false, [
-      'Frozen peas', 'Frozen mixed vegetables', 'Frozen spinach', 'Frozen corn'
+      'Frozen peas', 'Frozen corn', 'Frozen mixed vegetables', 'Frozen spinach', 'Frozen broccoli', 'Frozen stir fry mix'
     ]),
-    stocktakeGroup('Prepared portions', 'Ready Meals', 'each', ['Frozen', 'Prepared'], false, [
-      'Bok choy portions|Vegetables', 'Cooked rice portions|Carbs & Grains', 'Curry portions',
-      'Soup portions', 'Roti / paratha|Carbs & Grains'
+    stocktakeGroup('Breads & pastry', 'Carbs & Grains', 'each', ['Frozen'], false, [
+      'Bread', 'Pita bread', 'Wraps|pack', 'Roti', 'Naan', 'Puff pastry|pack', 'Pizza bases|pack'
     ]),
     stocktakeGroup('Ready meals', 'Ready Meals', 'each', ['Frozen'], false, [
-      'Lasagne', 'Bolognese', 'Stroganoff'
+      'Lasagne', 'Pizza', 'Dumplings|pack', 'Frozen meal'
+    ]),
+    stocktakeGroup('Prepared portions', 'Ready Meals', 'each', ['Frozen', 'Prepared'], false, [
+      'Curry portions', 'Soup portions', 'Bolognese portions', 'Cooked rice portions|Carbs & Grains'
     ])
   ]
 };
+
 
 // Stocktake selections live here while the sheet is open, so switching
 // Pantry/Fridge/Freezer keeps what's already been ticked.
@@ -6562,13 +6618,21 @@ async function renderPlannerScreen() {
     const dayEntries = entries.filter((e) => e.date === date);
     const total = dayEntries.reduce((sum, e) => sum + (entryKcal(e, recipesById) || 0), 0);
     return `
-      <div class="plan-day ${date === today ? 'today' : ''} ${date < today ? 'past' : ''}">
-        <div class="plan-day-head">
-          <span>${formatDayLabel(date)}</span>
-          ${total ? `<span class="plan-total">~${total} kcal</span>` : ''}
-        </div>
-        ${PLAN_MEAL_ORDER.filter((m) => meals.includes(m) || dayEntries.some((e) => e.meal === m)).map((m) => slotHtml(date, m)).join('')}
-      </div>`;
+      ${date < today ? `
+        <details class="plan-day past">
+          <summary>
+            <span>${formatDayLabel(date)}</span>
+            <span class="plan-total">${total ? `${total} kcal` : 'nothing logged'}</span>
+          </summary>
+          ${PLAN_MEAL_ORDER.filter((m) => meals.includes(m) || dayEntries.some((e) => e.meal === m)).map((m) => slotHtml(date, m)).join('')}
+        </details>`
+        : `<div class="plan-day ${date === today ? 'today' : ''}">
+          <div class="plan-day-head">
+            <span>${formatDayLabel(date)}</span>
+            ${total ? `<span class="plan-total">~${total} kcal</span>` : ''}
+          </div>
+          ${PLAN_MEAL_ORDER.filter((m) => meals.includes(m) || dayEntries.some((e) => e.meal === m)).map((m) => slotHtml(date, m)).join('')}
+        </div>`}`;
   }).join('');
 
   return `
@@ -6889,6 +6953,228 @@ async function fillMyWeek() {
   }
   showToast(added ? `Planned ${added} meal${added === 1 ? '' : 's'}` : 'Nothing to fill: the week is already planned');
   renderRoute();
+}
+
+/* ============================================================
+   SETUP WIZARD
+   First-run flow: goals → household → cuisines → starter recipes.
+   Also accessible from Settings as "Run setup again".
+   ============================================================ */
+async function needsSetup() {
+  const done = await dbGet('settings', 'setupComplete');
+  return !(done && done.at);
+}
+
+async function openSetupWizard(opts) {
+  const options = opts || {};
+  const goals = await getHealthGoals();
+  const plan = await getPlanSettings();
+  const profiles = (await dbGet('settings', 'profiles')) || { key: 'profiles', userProfile: {}, partnerProfile: {} };
+  const state = {
+    step: 0,
+    householdSize: plan.householdSize || 2,
+    partnerName: (profiles.partnerProfile && profiles.partnerProfile.name) || '',
+    eatingStyle: goals.eatingStyle,
+    dailyCalories: goals.dailyCalories,
+    cuisines: [...goals.preferredCuisines],
+    seed: null,
+    pickedSeedIds: new Set()
+  };
+  // Try to load the starter recipe seed so step 5 can show them
+  try {
+    const res = await fetch(RECIPE_SEED_URL);
+    if (res.ok) state.seed = await res.json();
+  } catch (_) { state.seed = null; }
+
+  const steps = ['welcome', 'household', 'goals', 'cuisines', 'starters'];
+
+  function render() {
+    const name = steps[state.step];
+    let body = '';
+    if (name === 'welcome') {
+      body = `
+        <p class="st-intro">Let's set up PantryFit the way you like it. Four quick steps and you're done — change anything later in Settings.</p>
+        <ul class="setup-list">
+          <li>Who you cook for</li>
+          <li>How you eat (style & calories)</li>
+          <li>Cuisines you like</li>
+          <li>Starter recipes from those cuisines</li>
+        </ul>
+      `;
+    } else if (name === 'household') {
+      body = `
+        <p class="st-intro">How many people do you cook for?</p>
+        <div class="field"><label>Household size</label><input type="number" id="sw-household" min="1" max="12" inputmode="numeric" value="${state.householdSize}"></div>
+        <div class="field"><label>Partner's name <span style="text-transform:none;font-weight:500;">(optional)</span></label><input type="text" id="sw-partner" maxlength="30" placeholder="Partner" value="${escapeHtml(state.partnerName)}"></div>
+      `;
+    } else if (name === 'goals') {
+      body = `
+        <p class="st-intro">Pick your eating style and a daily calorie target. We'll fill in protein / carbs / fat to match.</p>
+        <label class="goal-subhead">Eating style</label>
+        <div class="state-chip-grid" id="sw-style">
+          ${Object.entries(EATING_STYLES).map(([k, st]) => `<button type="button" data-val="${k}" class="state-chip ${state.eatingStyle === k ? 'selected' : ''}">${st.label}</button>`).join('')}
+        </div>
+        <p class="recipe-muted" id="sw-style-desc" style="margin:6px 0 12px;">${escapeHtml((EATING_STYLES[state.eatingStyle] || {}).desc || '')}</p>
+        <div class="field"><label>Daily calories</label><input type="number" id="sw-kcal" min="500" step="50" inputmode="numeric" value="${state.dailyCalories}"></div>
+      `;
+    } else if (name === 'cuisines') {
+      body = `
+        <p class="st-intro">Which cuisines do you like? Pick as many as you want — starter recipes and AI suggestions follow this.</p>
+        <div id="sw-cuisines">
+          ${CUISINE_GROUPS.map((g) => {
+            const chosen = g.cuisines.filter((c) => state.cuisines.includes(c)).length;
+            return `<details class="cuisine-group" ${chosen ? 'open' : ''}>
+              <summary>${g.region}${chosen ? ` · ${chosen}` : ''}</summary>
+              <div class="state-chip-grid">${g.cuisines.map((c) => `<button type="button" data-val="${c}" class="state-chip ${state.cuisines.includes(c) ? 'selected' : ''}">${c}</button>`).join('')}</div>
+            </details>`;
+          }).join('')}
+        </div>
+      `;
+    } else if (name === 'starters') {
+      if (!state.seed || !Array.isArray(state.seed.recipes)) {
+        body = `<p class="st-intro">Couldn't load the starter recipes right now — maybe no internet. You can add them from Settings later.</p>`;
+      } else {
+        const picked = state.cuisines.length
+          ? state.seed.recipes.filter((r) => state.cuisines.includes(r.cuisine))
+          : state.seed.recipes;
+        if (state.pickedSeedIds.size === 0 && picked.length) {
+          picked.forEach((r) => state.pickedSeedIds.add(r.seedId));
+        }
+        body = `
+          <p class="st-intro">${picked.length ? `${picked.length} starter recipe${picked.length === 1 ? '' : 's'} match your cuisines. Tick the ones you want — the rest will be left out.` : 'No starter recipes match your cuisines. You can still add your own later.'}</p>
+          ${picked.length ? `<div class="sw-starter-head">
+            <button type="button" class="link-btn" id="sw-all">Select all</button>
+            <button type="button" class="link-btn" id="sw-none">Clear</button>
+          </div>` : ''}
+          <ul class="sw-starter-list">
+            ${picked.map((r) => `<li>
+              <label class="sw-starter-row">
+                <input type="checkbox" data-sid="${escapeHtml(r.seedId)}" ${state.pickedSeedIds.has(r.seedId) ? 'checked' : ''}>
+                <span><strong>${escapeHtml(r.name)}</strong><small>${escapeHtml(r.cuisine || 'Basics')}${r.caloriesPerServing ? ` · ${r.caloriesPerServing} kcal` : ''}</small></span>
+              </label>
+            </li>`).join('')}
+          </ul>
+        `;
+      }
+    }
+    const title = { welcome: 'Welcome', household: 'Household', goals: 'Your goals', cuisines: 'Cuisines', starters: 'Starter recipes' }[name];
+    const isLast = state.step === steps.length - 1;
+    const html = `
+      <div class="modal-title-row"><h2>${title} <span class="sw-step">${state.step + 1} of ${steps.length}</span></h2><button class="close-btn" id="sw-close">×</button></div>
+      <div class="modal-scroll-area">
+        ${body}
+      </div>
+      <div class="sw-nav">
+        ${state.step > 0 ? '<button type="button" class="btn-secondary" id="sw-back">Back</button>' : '<span></span>'}
+        <button type="button" class="btn-primary" id="sw-next">${isLast ? 'Finish' : 'Next'}</button>
+      </div>
+    `;
+    openModal(html);
+    attach(name);
+  }
+
+  function captureStep(name) {
+    if (name === 'household') {
+      const h = parseInt(document.getElementById('sw-household').value, 10);
+      state.householdSize = Math.max(1, Math.min(12, h || 2));
+      state.partnerName = document.getElementById('sw-partner').value.trim();
+    } else if (name === 'goals') {
+      const kcal = parseInt(document.getElementById('sw-kcal').value, 10);
+      state.dailyCalories = kcal >= 500 ? kcal : DEFAULT_HEALTH_GOALS.dailyCalories;
+    }
+  }
+
+  function attach(name) {
+    document.getElementById('sw-close').addEventListener('click', () => {
+      if (options.firstRun && !confirm('Close setup? You can run it again later from Settings.')) return;
+      closeModal();
+    });
+    document.getElementById('sw-next').addEventListener('click', async () => {
+      captureStep(name);
+      if (state.step < steps.length - 1) {
+        state.step++;
+        if (steps[state.step] === 'starters') state.pickedSeedIds = new Set();
+        render();
+      } else {
+        await finish();
+      }
+    });
+    const back = document.getElementById('sw-back');
+    if (back) back.addEventListener('click', () => {
+      captureStep(name);
+      state.step--;
+      render();
+    });
+    if (name === 'goals') {
+      document.querySelectorAll('#sw-style button').forEach((btn) => btn.addEventListener('click', () => {
+        state.eatingStyle = btn.dataset.val;
+        document.querySelectorAll('#sw-style button').forEach((b) => b.classList.toggle('selected', b === btn));
+        document.getElementById('sw-style-desc').textContent = (EATING_STYLES[state.eatingStyle] || {}).desc || '';
+      }));
+    }
+    if (name === 'cuisines') {
+      document.querySelectorAll('#sw-cuisines button').forEach((btn) => btn.addEventListener('click', () => {
+        const v = btn.dataset.val;
+        if (state.cuisines.includes(v)) state.cuisines = state.cuisines.filter((c) => c !== v);
+        else state.cuisines.push(v);
+        btn.classList.toggle('selected');
+      }));
+    }
+    if (name === 'starters') {
+      document.querySelectorAll('.sw-starter-list input[type=checkbox]').forEach((cb) => cb.addEventListener('change', () => {
+        if (cb.checked) state.pickedSeedIds.add(cb.dataset.sid);
+        else state.pickedSeedIds.delete(cb.dataset.sid);
+      }));
+      const all = document.getElementById('sw-all');
+      const none = document.getElementById('sw-none');
+      if (all) all.addEventListener('click', () => {
+        document.querySelectorAll('.sw-starter-list input[type=checkbox]').forEach((cb) => { cb.checked = true; state.pickedSeedIds.add(cb.dataset.sid); });
+      });
+      if (none) none.addEventListener('click', () => {
+        document.querySelectorAll('.sw-starter-list input[type=checkbox]').forEach((cb) => { cb.checked = false; state.pickedSeedIds.delete(cb.dataset.sid); });
+      });
+    }
+  }
+
+  async function finish() {
+    // Save plan settings
+    await dbPut('settings', {
+      ...DEFAULT_PLAN_SETTINGS,
+      householdSize: state.householdSize,
+      planBreakfast: plan.planBreakfast,
+      planSnacks: plan.planSnacks
+    });
+    // Save partner name
+    const freshProfiles = (await dbGet('settings', 'profiles')) || { key: 'profiles', userProfile: {}, partnerProfile: {} };
+    freshProfiles.partnerProfile = { ...(freshProfiles.partnerProfile || {}), name: state.partnerName };
+    await dbPut('settings', freshProfiles);
+    // Save health goals with macros derived from eating style + kcal
+    const macros = eatingStyleMacros(state.eatingStyle, state.dailyCalories);
+    await dbPut('settings', {
+      ...DEFAULT_HEALTH_GOALS,
+      ...(await getHealthGoals()),
+      eatingStyle: state.eatingStyle,
+      dailyCalories: state.dailyCalories,
+      dailyProtein: macros.dailyProtein,
+      dailyCarbs: macros.dailyCarbs,
+      dailyFat: macros.dailyFat,
+      preferredCuisines: state.cuisines,
+      cuisinesVersion: 2
+    });
+    // Add the picked starter recipes
+    if (state.seed && Array.isArray(state.seed.recipes)) {
+      const allIds = state.seed.recipes.map((r) => r.seedId);
+      const deleted = allIds.filter((id) => !state.pickedSeedIds.has(id));
+      await dbPut('settings', { key: 'recipeSeed', version: 0, deletedSeedIds: deleted, builtInsOff: state.pickedSeedIds.size === 0 });
+      if (state.pickedSeedIds.size > 0) await syncRecipeSeed();
+    }
+    await dbPut('settings', { key: 'setupComplete', at: new Date().toISOString() });
+    closeModal();
+    showToast('Setup saved');
+    renderRoute();
+  }
+
+  render();
 }
 
 /* ============================================================
@@ -8603,29 +8889,13 @@ async function renderSettingsScreen() {
   const hasKey = !!getAiKey();
   return `
     ${installCardHtml('settings')}
-    <div class="settings-row" id="export-row">
+    <div class="settings-row" id="setup-row">
       <div>
-        <div class="label">Export kitchen data</div>
-        <div class="desc">Download a full backup as JSON</div>
+        <div class="label">Run setup again</div>
+        <div class="desc">Goals, cuisines and starter recipes — your current settings stay unless you change them</div>
       </div>
       <span class="chev">›</span>
     </div>
-    <div class="settings-row" id="import-row">
-      <div>
-        <div class="label">Import kitchen data</div>
-        <div class="desc">Restore from a backup file</div>
-      </div>
-      <span class="chev">›</span>
-    </div>
-    <input type="file" id="import-file-input" accept="application/json" style="display:none;">
-    <div class="settings-row" id="import-recipes-row">
-      <div>
-        <div class="label">Import recipes</div>
-        <div class="desc">Add recipes from a file — keeps everything else</div>
-      </div>
-      <span class="chev">›</span>
-    </div>
-    <input type="file" id="import-recipes-input" accept=".json,application/json" style="display:none;">
 
     <div class="section-heading" style="margin-top:22px;"><h2>Appearance</h2></div>
     <div class="settings-card">
@@ -8718,11 +8988,37 @@ async function renderSettingsScreen() {
       <p class="recipe-muted" style="margin-top:0;">Clear your kitchen, meal plans and the recipes you added, to set the app up again from scratch. You'll be offered a backup first.</p>
       <button type="button" class="btn-danger" id="start-fresh-btn" style="margin-top:0;">Start fresh</button>
     </div>
+
+    <div class="section-heading" style="margin-top:22px;"><h2>Backup</h2></div>
+    <div class="settings-row" id="export-row">
+      <div>
+        <div class="label">Export kitchen data</div>
+        <div class="desc">Download a full backup as JSON</div>
+      </div>
+      <span class="chev">›</span>
+    </div>
+    <div class="settings-row" id="import-row">
+      <div>
+        <div class="label">Import kitchen data</div>
+        <div class="desc">Restore from a backup file</div>
+      </div>
+      <span class="chev">›</span>
+    </div>
+    <input type="file" id="import-file-input" accept="application/json" style="display:none;">
+    <div class="settings-row" id="import-recipes-row">
+      <div>
+        <div class="label">Import recipes</div>
+        <div class="desc">Add recipes from a file — keeps everything else</div>
+      </div>
+      <span class="chev">›</span>
+    </div>
+    <input type="file" id="import-recipes-input" accept=".json,application/json" style="display:none;">
   `;
 }
 
 function attachSettingsListeners() {
   attachInstallListener('settings');
+  document.getElementById('setup-row').addEventListener('click', () => openSetupWizard({ firstRun: false }));
   document.getElementById('export-row').addEventListener('click', exportKitchenData);
   document.getElementById('import-row').addEventListener('click', () => {
     document.getElementById('import-file-input').click();
@@ -9090,6 +9386,23 @@ window.addEventListener('hashchange', handleHashChange);
     registerServiceWorker();
     handleHashChange();
     runLaunchAction();
+    // First-run setup: let the user pick their goals, cuisines and starter recipes.
+    // On an existing install (recipes already in the book), skip the wizard and keep syncing.
+    // Tests can skip the wizard with localStorage['pantryfit.skipSetup'] = '1'.
+    const existingRecipes = (await dbGetAll('recipes')).length;
+    const skipSetup = (() => { try { return localStorage.getItem('pantryfit.skipSetup') === '1'; } catch (_) { return false; } })();
+    if (await needsSetup() && !skipSetup) {
+      if (existingRecipes === 0) {
+        // Fresh install: hold back the automatic seed so the wizard controls it
+        await dbPut('settings', { key: 'recipeSeed', version: 0, deletedSeedIds: [], builtInsOff: true });
+      } else {
+        // Existing user before this update: setup is implicitly done
+        await dbPut('settings', { key: 'setupComplete', at: new Date().toISOString() });
+      }
+      if (existingRecipes === 0) openSetupWizard({ firstRun: true });
+    } else if (skipSetup && await needsSetup()) {
+      await dbPut('settings', { key: 'setupComplete', at: new Date().toISOString() });
+    }
     // Built-in recipes load in the background so a slow network never delays opening the app
     syncRecipeSeed()
       .then((changed) => { if (changed && AppState.route === 'recipes') renderRoute(); })

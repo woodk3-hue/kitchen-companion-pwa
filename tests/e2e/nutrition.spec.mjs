@@ -21,6 +21,7 @@ test('a new recipe gets calories and macros from its ingredients', async ({ page
 test('a kitchen item gets typical values from its name', async ({ page }) => {
   await open(page, 'kitchen', '#fab-btn');
   await page.click('#fab-btn');
+  await page.click('.add-food-opt[data-how="manual"]');
   await page.fill('#f-name', 'Jasmine rice');
   await expect(page.locator('#f-kcal')).toHaveValue('360');
   await expect(page.locator('#f-carbs')).toHaveValue('79');

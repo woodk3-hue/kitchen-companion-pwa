@@ -10,11 +10,13 @@ export function watchErrors(page) {
 }
 
 export async function open(page, route, waitFor) {
+  await page.addInitScript(() => { try { localStorage.setItem('pantryfit.skipSetup', '1'); } catch (_) {} });
   await page.goto(`/index.html#${route}`);
   await page.waitForSelector(waitFor);
 }
 
 export async function reopen(page, route, waitFor) {
+  await page.addInitScript(() => { try { localStorage.setItem('pantryfit.skipSetup', '1'); } catch (_) {} });
   await page.goto(`/index.html#${route}`);
   await page.reload();
   await page.waitForSelector(waitFor);
