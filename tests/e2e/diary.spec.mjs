@@ -43,3 +43,16 @@ test('quick add estimate and label photo use Claude (faked)', async ({ page }) =
   await expect(page.locator('.diary-entry', { hasText: 'Protein shake' }).locator('.macro-line')).toContainText('P 100 g');
   expect(errors).toEqual([]);
 });
+
+test('describing a plate uses Claude when there is an API key (faked)', async ({ page }) => {
+  await fakeClaude(page, { items: { items: [{ name: 'Chicken curry', portion: '1 cup', kcal: 360, protein: 30, carbs: 12, fat: 21 }] } });
+  await open(page, 'home', '.diary-add');
+  await page.click('.diary-add[data-meal="lunch"]');
+  await page.click('.add-food-opt[data-how="photo"]');
+  await page.fill('#pp-text', 'a cup of chicken curry');
+  await expect(page.locator('#pp-action')).toHaveText('Estimate from my description');
+  await page.click('#pp-action');
+  await expect(page.locator('.ps-row')).toHaveCount(1);
+  await page.click('#pp-action');
+  await expect.poll(async () => (await readStore(page, 'foodLog')).map((e) => e.kcal)).toEqual([360]);
+});

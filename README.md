@@ -125,6 +125,8 @@ Each ingredient stores `matchTerms` (inventory names that count as having it, e.
 ## Step 3: Meal plan
 
 - **Planner tab**: the week from Monday to Sunday, with lunch and dinner for each day (turn on **Plan breakfast too** in Settings). Use ‹ › to move between weeks. Each planned meal shows its kcal (✓ inside your target), food it uses up ("Uses Spinach") and how many ingredients you'd need to buy, with a daily kcal total.
+- **What you eat shows in the planner**: anything logged on Today appears in the planner on that day and meal, marked **✓ Eaten** (breakfast and snacks rows appear when something's logged there). A planned meal you log with ✓ Ate this is ticked as eaten rather than added twice. A meal can hold several things, with **+ Add to dinner** under them. Tap a planned meal you didn't eat to remove it ("Didn't eat it: remove" on past days); removing a logged item from the planner keeps it in the diary, and removing it from the diary takes it off the planner. **Clear week** keeps what was eaten.
+- **My portions**: when you add a meal (from **+ Add** or **📅 Add to plan** on a recipe), choose how many portions you'll have, 1 by default. The planner shows "1 portion · 216 kcal", the day total uses it, and tapping a planned meal lets you change it. On Today the planned meal shows its portions, and **✓ Ate this** starts with that many for you (in *I cooked this*, the servings log or the leftovers log). In *I cooked this*, **Portions cooked** is the whole pot; *Me* is your share.
 - **+ Add** on a meal opens a picker: things already made (leftovers, cooked portions, ready meals in your kitchen), your recipes ranked best match first, or "Eating out / skip".
 - **Leftovers**: when a recipe makes more portions than you cook for (Settings → Meal plan, default 2), the app offers to plan the spare portions as the next meal (dinner → next day's lunch). Removing the dinner removes its leftovers.
 - **🪄 Fill my week**: fills empty meals from today onwards, choosing recipes that use food closest to its use-by first, then best match, inside your calorie target, with a mix of cuisines and no repeats. Dinners with enough spare portions fill the next lunch. **✨ Include new ideas from Claude** first adds 3 fresh AI recipes to choose from (uses your API key).
@@ -155,7 +157,7 @@ The **Today** tab (formerly Home) is a food diary, like a fitness tracker:
   - **From my kitchen**: pick an item, enter how much (e.g. 150 g); calories and macros are worked out from its per-100 g values. **Take out of my kitchen** is ticked by default and subtracts what you ate (or removes the item when it runs out), logged in the item's history.
   - **A recipe**: per-serving calories and protein × servings. Also **🍽️ Log a serving** on every recipe page.
   - **Scan barcode**: Open Food Facts calories, protein, carbs and fat; starts at the product's serving size. If that product is in your kitchen, it can take one out.
-  - **Photo of my plate**: Claude estimates each food's portion, calories and macros; untick or adjust, then log (uses your API key / an AI credit).
+  - **Photo or description of my plate**: take a photo, or if you forgot, **type what you ate** ("chicken curry about a cup, 3/4 cup rice, a small naan"). Claude estimates each food's portion, calories and macros; untick or adjust, then log (uses your API key / an AI credit). Without an API key, describe it with amounts ("150 g chicken curry, 120 g cooked rice, 1 naan") and the app uses its built-in typical values; anything it can't count is listed.
   - **Packaged meal, drink or shake** (🏷️): photograph a ready meal, frozen meal, drink, protein shake or protein powder (front, plus the nutrition panel if you can). Claude reads the name, the serve size (e.g. "1 scoop (30 g)") and the calories and macros per serve; set how many serves you had. Tick **Also add to my kitchen** to keep it with its per-100 g values. Also offered when a scanned barcode isn't in Open Food Facts. Uses your API key.
   - **I cooked a recipe** (🍳): see *I cooked this* below.
   - **Quick add**: type what you had with the amount, e.g. "12 oz coffee with skim milk", and tap **✨ Estimate calories & macros**: Claude converts the amount to metric and fills in kcal, protein, carbs and fat with a note on what it assumed, for you to check. Or type the numbers in yourself.
@@ -173,9 +175,17 @@ The **Today** tab (formerly Home) is a food diary, like a fitness tracker:
 
 ## Recipe page: serves and macros
 
-- **Serves − / +** on a recipe page scales every ingredient amount (e.g. 4 → 6 serves: 600 g mince becomes 900 g). The recipe itself isn't changed. **I cooked this** then starts with that many portions.
+- **How many portions are you making?** sits above the ingredients on every recipe page: tap − / + or type a number and every ingredient amount changes to match (e.g. 4 → 6 portions: 600 g mince becomes 900 g). The recipe itself isn't changed. The button below then reads **🍳 I cooked this · 6 portions** and starts with that many.
 - **Calories, protein, carbs and fat** per serving are shown as four tiles on the recipe page, and as a coloured "P · C · F" line on each recipe card.
 - On **Today**, every logged food shows its protein, carbs and fat under its name, and each meal shows its totals. Recipe servings logged before carbs and fat were tracked are filled in from the recipe the next time Today opens.
+
+## Calories and macros without an API key
+
+PantryFit has typical values (per 100 g, raw or as bought) for about 120 common foods built in: rice, pasta, flour, meats, fish, eggs, dairy, oils, vegetables, fruit, sauces, legumes and spices. They're in `FOOD_NUTRITION` in `index.html` and work offline.
+- **Recipes**: leave the nutrition boxes empty and the calories, protein, carbs and fat per serve are worked out from the ingredients when you save (e.g. "240 g jasmine rice", 4 serves → 216 kcal, 47 g carbs). Or tap **🧮 Work out from ingredients** in Edit recipe → Nutrition & details. A saved recipe with no calories has a **🧮 Work out from the ingredients** button on its page. Ingredients the app doesn't know, or without an amount, are listed as not counted. Amounts are treated as uncooked; write "cooked rice" for cooked. Kitchen items with their own values (from a label or barcode) are used first. Food bought on the bone (whole chicken, drumsticks, chops) only counts the part you eat.
+- **Kitchen items**: typing a name such as "Jasmine rice" fills in typical calories and macros per 100 g, marked *typical values*; change them if your pack says different. Items added by stocktake or from the shopping list get them too, and logging an item with no calories saved uses them.
+- **Quick add** without an API key: type an amount and a food ("240 g jasmine rice") and tap ✨ Estimate. With an API key, Claude estimates anything ("12 oz coffee with skim milk").
+- The **High protein** tag uses the protein grams per serve when a recipe has them (25 g or more).
 
 ## Fast & easy meals
 

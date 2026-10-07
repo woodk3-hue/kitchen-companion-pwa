@@ -1276,14 +1276,18 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 .mt-protein .mt-v { color: var(--macro-protein); }
 .mt-carbs .mt-v { color: var(--macro-carbs); }
 .mt-fat .mt-v { color: var(--macro-fat); }
-.serves-stat .v { display: flex; align-items: center; justify-content: center; gap: 6px; }
-.serves-btn { width: 24px; height: 24px; border-radius: 50%; border: none; background: var(--color-fill); color: var(--color-ink); font-size: 16px; font-weight: 800; line-height: 1; padding: 0; cursor: pointer; }
-.section-heading #serves-note { font-size: 12px; font-weight: 600; }
+.portion-bar { margin-top: 4px; }
 .stepper { display: flex; align-items: center; gap: 6px; }
 .stepper input { text-align: center; min-width: 0; }
 .step-btn { flex: 0 0 40px; height: 40px; border: none; border-radius: 12px; background: var(--color-fill); color: var(--color-ink); font-size: 20px; font-weight: 700; cursor: pointer; }
 .step-btn:active { background: var(--color-accent-tint); }
-.cook-made .cook-num { max-width: 220px; }
+.cook-made .cook-num { max-width: 240px; }
+.plan-slot.filled.eaten { opacity: 0.92; }
+.plan-add-more { display: block; width: 100%; margin: 2px 0 6px; padding: 6px 10px; border: none; background: none; color: var(--color-accent); font: inherit; font-size: 13px; font-weight: 700; text-align: left; cursor: pointer; }
+.plan-portions { display: flex; align-items: center; gap: 10px; background: var(--color-paper); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 10px 12px; margin: 0 0 12px; }
+.plan-portions .stepper { flex: 0 0 132px; }
+.plan-portions .stepper input { width: 44px; padding: 8px 2px; border: none; background: var(--color-fill); border-radius: 10px; font: inherit; font-weight: 700; color: var(--color-ink); text-align: center; }
+.plan-portions .step-btn { flex: 0 0 38px; height: 38px; }
 .cook-dests { background: var(--color-paper); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 4px 12px; }
 .cook-dest { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--color-fill); }
 .cook-dest:first-child { border-top: none; }
@@ -2354,6 +2358,28 @@ function openItemForm(item, prefill) {
   // Calories: typing marks them as entered by hand; the Estimate button asks Claude from the item's name
   const kcalInput = document.getElementById('f-kcal');
   kcalInput.dataset.source = (seed && seed.caloriesSource) || '';
+  // Typical values follow the name until calories are typed, estimated or read from a label
+  const fillTypical = () => {
+    if (kcalInput.value && kcalInput.dataset.source !== 'typical') return;
+    const t = typicalNutritionFor(document.getElementById('f-name').value.trim());
+    if (!t) {
+      if (kcalInput.dataset.source === 'typical') {
+        ['f-kcal', 'f-protein', 'f-carbs', 'f-fat'].forEach((id) => { document.getElementById(id).value = ''; });
+        kcalInput.dataset.source = '';
+        document.getElementById('f-kcal-source').textContent = '(optional)';
+      }
+      return;
+    }
+    kcalInput.value = t.caloriesPer100;
+    document.getElementById('f-kcal-unit').value = t.caloriesUnit;
+    document.getElementById('f-protein').value = t.proteinPer100;
+    document.getElementById('f-carbs').value = t.carbsPer100;
+    document.getElementById('f-fat').value = t.fatPer100;
+    kcalInput.dataset.source = 'typical';
+    document.getElementById('f-kcal-source').textContent = '(typical values: change if your pack says different)';
+  };
+  document.getElementById('f-name').addEventListener('input', debounce(fillTypical, 300));
+  if (!item) fillTypical();
   kcalInput.addEventListener('input', () => {
     kcalInput.dataset.source = 'manual';
     document.getElementById('f-kcal-source').textContent = '(entered)';
@@ -2863,6 +2889,7 @@ async function saveStocktake() {
         notes: '',
         freezerFriendlyRating: null,
         linkedPurchaseEventId: null,
+        ...typicalItemFields(pick.name),
         createdAt: now,
         updatedAt: now
       };
@@ -3246,12 +3273,17 @@ async function openRecipeDetail(id) {
       ${recipe.sourceName ? `<p class="recipe-muted" style="margin:0 0 10px;">From ${escapeHtml(recipe.sourceName)}</p>` : ''}
 
       <div class="recipe-stats">
-        ${baseServes ? `<div class="recipe-stat serves-stat"><span class="v"><button type="button" class="serves-btn" id="serves-down" aria-label="Fewer serves">−</button><span id="serves-val">${baseServes}</span><button type="button" class="serves-btn" id="serves-up" aria-label="More serves">+</button></span><span class="l">Serves</span></div>` : ''}
+        ${stat('Serves', baseServes)}
         ${stat('Prep', recipe.prepMinutes ? recipe.prepMinutes + ' min' : '')}
         ${stat('Cook', recipe.cookMinutes ? recipe.cookMinutes + ' min' : '')}
         ${stat('Difficulty', recipe.difficulty)}
       </div>
-      ${macroPanelHtml}
+      ${macros.kcal ? macroPanelHtml : `
+        <div class="cook-box" style="margin-bottom:14px;">
+          <p class="recipe-muted" style="margin:0 0 8px;">No calories or macros saved for this recipe yet.</p>
+          <button type="button" class="btn-primary" id="recipe-calc-btn" style="margin:0;">🧮 Work out from the ingredients</button>
+          <p class="recipe-muted" id="recipe-calc-note" style="margin:6px 0 0;"></p>
+        </div>`}
 
       <div class="rating-row">
         <span class="rating-label">You</span>
@@ -3265,7 +3297,12 @@ async function openRecipeDetail(id) {
         ${recipe.isFavourite ? '★ Favourite (tap to remove)' : '☆ Add to favourites'}
       </button>
 
-      <div class="section-heading" style="margin-top:18px;"><h2>Ingredients</h2><span class="recipe-muted" id="serves-note"></span></div>
+      <div class="section-heading" style="margin-top:18px;"><h2>Ingredients</h2></div>
+      ${baseServes ? `
+        <div class="plan-portions portion-bar">
+          <span class="cd-label"><strong>How many portions are you making?</strong><span class="cook-hint" id="serves-note">Amounts for ${baseServes} (as written)</span></span>
+          <div class="stepper"><button type="button" class="step-btn" id="serves-down" aria-label="Fewer portions">−</button><input type="number" id="serves-val" min="1" step="1" inputmode="numeric" value="${baseServes}"><button type="button" class="step-btn" id="serves-up" aria-label="More portions">+</button></div>
+        </div>` : ''}
       <div id="ingredients-box">${ingredientsListHtml()}</div>
 
       <div class="section-heading" style="margin-top:18px;"><h2>Method</h2></div>
@@ -3274,7 +3311,7 @@ async function openRecipeDetail(id) {
       ${recipe.notes ? `<div class="section-heading" style="margin-top:18px;"><h2>Notes</h2></div><p class="recipe-notes">${escapeHtml(recipe.notes)}</p>` : ''}
     </div>
     <div class="modal-action-bar">
-      <button type="button" class="btn-primary" id="cooked-recipe-btn">🍳 I cooked this</button>
+      <button type="button" class="btn-primary" id="cooked-recipe-btn">🍳 I cooked this${baseServes ? ` · ${baseServes} portions` : ''}</button>
       <div class="field-row" style="gap:8px;">
         <button type="button" class="btn-secondary" id="log-recipe-btn">🍽️ Log a serving</button>
         <button type="button" class="btn-secondary" id="plan-recipe-btn">📅 Add to plan</button>
@@ -3312,17 +3349,45 @@ async function openRecipeDetail(id) {
   });
 
   document.getElementById('edit-recipe-btn').addEventListener('click', () => openRecipeForm(recipe));
+  const calcBtn = document.getElementById('recipe-calc-btn');
+  if (calcBtn) calcBtn.addEventListener('click', async () => {
+    let calc = nutritionFromIngredients(recipe.ingredients, recipe.servings || 1, kitchenItems);
+    // Ingredients without amounts: an amount in the notes ("240 grams") is that much of the recipe itself
+    if (!calc.counted.length) {
+      const m = (recipe.notes || '').match(/(\d+(?:[.,]\d+)?)\s*(g|gram|grams|kg|ml|l|litre|litres|cups?)\b/i);
+      const ing = m ? parseIngredientLine(`${m[1]} ${m[2]} ${recipe.name}`, [], new Map()) : null;
+      if (ing) calc = nutritionFromIngredients([ing], recipe.servings || 1, kitchenItems);
+    }
+    if (!calc.counted.length) {
+      document.getElementById('recipe-calc-note').textContent = 'None of the ingredients have amounts the app knows. Tap Edit recipe and add them one per line, e.g. "240 g jasmine rice".';
+      return;
+    }
+    const p = calc.perServing;
+    Object.assign(recipe, {
+      caloriesPerServing: p.kcal, proteinGramsPerServing: p.protein, carbsGramsPerServing: p.carbs, fatGramsPerServing: p.fat,
+      proteinLevel: p.protein >= 25 ? 'High' : p.protein >= 12 ? 'Medium' : 'Low',
+      fatLevel: p.fat > 20 ? 'High' : p.fat > 12 ? 'Medium' : 'Low',
+      userModified: recipe.source === 'built-in' ? true : !!recipe.userModified,
+      updatedAt: new Date().toISOString()
+    });
+    await dbPut('recipes', recipe);
+    showToast(calc.missing.length ? `Worked out. Not counted: ${calc.missing.join(', ')}` : 'Calories and macros worked out');
+    openRecipeDetail(id);
+    renderRoute();
+  });
   document.getElementById('plan-recipe-btn').addEventListener('click', () => openAddRecipeToPlan(recipe));
   document.getElementById('cooked-recipe-btn').addEventListener('click', () => openCookedThis(recipe, { serves }));
-  const changeServes = (d) => {
-    serves = Math.max(1, serves + d);
-    document.getElementById('serves-val').textContent = serves;
+  const setServes = (n) => {
+    serves = Math.max(1, Math.round(n) || 1);
+    document.getElementById('serves-val').value = serves;
     document.getElementById('ingredients-box').innerHTML = ingredientsListHtml();
-    document.getElementById('serves-note').textContent = serves === baseServes ? '' : `for ${serves} serves (recipe makes ${baseServes})`;
+    document.getElementById('serves-note').textContent = serves === baseServes ? `Amounts for ${baseServes} (as written)` : `Amounts changed for ${serves} portions (recipe makes ${baseServes})`;
+    document.getElementById('cooked-recipe-btn').textContent = `🍳 I cooked this · ${serves} portion${serves === 1 ? '' : 's'}`;
   };
   if (baseServes) {
-    document.getElementById('serves-down').addEventListener('click', () => changeServes(-1));
-    document.getElementById('serves-up').addEventListener('click', () => changeServes(1));
+    document.getElementById('serves-down').addEventListener('click', () => setServes(serves - 1));
+    document.getElementById('serves-up').addEventListener('click', () => setServes(serves + 1));
+    document.getElementById('serves-val').addEventListener('change', (e) => setServes(parseFloat(e.target.value)));
   }
   document.getElementById('log-recipe-btn').addEventListener('click', () => openLogRecipeServings(localDateString(new Date()), defaultLogMeal(), recipe));
   document.getElementById('delete-recipe-btn').addEventListener('click', () => deleteRecipe(recipe));
@@ -3384,6 +3449,12 @@ function parseIngredientLine(line, previousIngredients, knownLookup) {
   if (/\(optional\)\s*$/i.test(text)) {
     optional = true;
     text = text.replace(/\(optional\)\s*$/i, '').trim();
+  }
+
+  // "Jasmine rice 240 grams" or "Jasmine rice - 240g": move the amount to the front
+  if (!/^[\d½¼¾⅓⅔]/.test(text)) {
+    const tail = text.match(/^(.*?[A-Za-z)])[\s,:\-–]+(\d+(?:[.,]\d+)?)\s*([A-Za-z]+)?\.?$/);
+    if (tail && (!tail[3] || RECIPE_UNIT_ALIASES[tail[3].toLowerCase()])) text = `${tail[2]} ${tail[3] || ''} ${tail[1]}`.replace(/\s+/g, ' ').trim();
   }
 
   let quantity = null;
@@ -3493,6 +3564,8 @@ function openRecipeForm(recipe) {
                 ${PRIMARY_PROTEINS.map((p) => `<option value="${p}" ${r.primaryProtein === p ? 'selected' : ''}>${p}</option>`).join('')}
               </select>
             </div>
+            <button type="button" class="btn-secondary" id="r-calc" style="margin:0 0 6px;">🧮 Work out from ingredients</button>
+            <p class="recipe-muted" id="r-calc-note" style="margin:0 0 10px;">Uses typical values for each ingredient and its amount, divided by the serves. Left empty, they're worked out when you save.</p>
             <div class="field-row">
               <div class="field"><label>Calories / serve</label><input type="number" id="r-calories" min="0" value="${r.caloriesPerServing ?? ''}" placeholder="approx."></div>
               <div class="field"><label>Protein g / serve</label><input type="number" id="r-proteinGrams" min="0" value="${r.proteinGramsPerServing ?? ''}" placeholder="approx."></div>
@@ -3534,15 +3607,64 @@ function openRecipeForm(recipe) {
     });
   });
 
+  document.getElementById('r-calc').addEventListener('click', async () => {
+    const calc = await calcRecipeFormNutrition(recipe);
+    const note = document.getElementById('r-calc-note');
+    if (!calc.counted.length) {
+      note.textContent = 'No ingredients with amounts the app knows. Add them one per line, e.g. "240 g jasmine rice".';
+      return;
+    }
+    const p = calc.perServing;
+    document.getElementById('r-calories').value = p.kcal;
+    document.getElementById('r-proteinGrams').value = p.protein;
+    document.getElementById('r-carbsGrams').value = p.carbs;
+    document.getElementById('r-fatGrams').value = p.fat;
+    note.textContent = `Per serve: ${p.kcal} kcal · P ${p.protein} g · C ${p.carbs} g · F ${p.fat} g (approximate).${calc.missing.length ? ` Not counted: ${calc.missing.join(', ')}.` : ''}`;
+  });
+
   document.getElementById('recipe-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     await saveRecipeFromForm(recipe);
   });
 }
 
+// Nutrition per serve from what's typed in the recipe form right now
+// The ingredient lines typed in the recipe form. A line that's only an amount ("240 grams") is that
+// amount of the recipe itself; with no ingredients at all, an amount written in the notes is used the same way.
+function recipeFormIngredientLines() {
+  const recipeName = document.getElementById('r-name').value.trim();
+  const amountOnly = /^\s*(\d+(?:[.,]\d+)?)\s*([A-Za-z]+)?\.?\s*$/;
+  let lines = document.getElementById('r-ingredients').value.split('\n').filter((l) => l.trim());
+  if (!lines.length && recipeName) {
+    const inNotes = (document.getElementById('r-notes').value || '').match(/(\d+(?:[.,]\d+)?)\s*(g|gram|grams|kg|ml|l|litre|litres|cups?)\b/i);
+    if (inNotes) lines = [`${inNotes[1]} ${inNotes[2]}`];
+  }
+  return lines.map((l) => (amountOnly.test(l) && recipeName ? `${l.trim()} ${recipeName}` : l));
+}
+
+async function calcRecipeFormNutrition(existing) {
+  const previousIngredients = existing ? existing.ingredients : [];
+  const knownLookup = buildKnownIngredientLookup(existing ? existing.id : null);
+  const ingredients = recipeFormIngredientLines()
+    .map((line) => parseIngredientLine(line, previousIngredients, knownLookup))
+    .filter(Boolean);
+  const servings = parseFloat(document.getElementById('r-servings').value) || 1;
+  return nutritionFromIngredients(ingredients, servings, await dbGetAll('inventoryItems'));
+}
+
 async function saveRecipeFromForm(existing) {
   const name = document.getElementById('r-name').value.trim();
   if (!name) return;
+
+  // Nothing typed for nutrition: work it out from the ingredients
+  const nutritionIds = ['r-calories', 'r-proteinGrams', 'r-carbsGrams', 'r-fatGrams'];
+  if (nutritionIds.every((id) => document.getElementById(id).value === '')) {
+    const calc = await calcRecipeFormNutrition(existing);
+    if (calc.counted.length) {
+      const p = calc.perServing;
+      [p.kcal, p.protein, p.carbs, p.fat].forEach((v, i) => { document.getElementById(nutritionIds[i]).value = v; });
+    }
+  }
 
   const selectedVal = (id) => {
     const el = document.querySelector(`#${id} button.selected`);
@@ -3550,7 +3672,7 @@ async function saveRecipeFromForm(existing) {
   };
   const previousIngredients = existing ? existing.ingredients : [];
   const knownLookup = buildKnownIngredientLookup(existing ? existing.id : null);
-  const ingredients = document.getElementById('r-ingredients').value.split('\n')
+  const ingredients = recipeFormIngredientLines()
     .map((line) => parseIngredientLine(line, previousIngredients, knownLookup))
     .filter(Boolean);
 
@@ -3702,7 +3824,7 @@ function recipeDiet(recipe) {
   const lowCarb = carbs != null ? carbs <= 20 && mainStarch === 0 : mainStarch === 0;
   const keto = carbs != null ? carbs <= 10 && mainStarch === 0 : (mainStarch === 0 && !sides.length && recipe.fatLevel !== 'Low');
   const lowFat = fat != null ? fat <= 12 : recipe.fatLevel === 'Low';
-  const highProtein = recipe.proteinLevel === 'High' || (recipe.proteinGramsPerServing || 0) >= 30;
+  const highProtein = recipe.proteinGramsPerServing != null ? recipe.proteinGramsPerServing >= 25 : recipe.proteinLevel === 'High';
   return { lowCarb, keto, lowFat, highProtein, skip: lowCarb ? sides.map((i) => i.name) : [] };
 }
 
@@ -4342,7 +4464,218 @@ function macrosFrom(source) {
   return { proteinPer100: macroOrNull(source.proteinPer100), carbsPer100: macroOrNull(source.carbsPer100), fatPer100: macroOrNull(source.fatPer100) };
 }
 
-const CALORIE_SOURCE_LABELS = { label: 'from label', database: 'from barcode database', estimated: 'estimated', manual: 'entered' };
+/* ============================================================
+   TYPICAL NUTRITION (built in, works offline)
+   Approximate values per 100 g (per 100 ml for liquids), raw or as
+   bought, for common ingredients. Used to work out a recipe's
+   calories and macros from its ingredients, and to fill in a kitchen
+   item's values from its name. `each`, `can`, `bunch`, `cup`, `tsp`
+   and `tbsp` give grams for that food where they differ from the defaults;
+   `edible` is the part that's eaten for food bought on the bone.
+   ============================================================ */
+const FOOD_NUTRITION = [
+  // Rice, grains, flour, bread
+  { names: ['rice', 'basmati rice', 'jasmine rice', 'white rice', 'long grain rice', 'sushi rice'], kcal: 360, p: 7, c: 79, f: 0.6, cup: 185 },
+  { names: ['brown rice'], kcal: 362, p: 7.5, c: 76, f: 2.7, cup: 185 },
+  { names: ['cooked rice', 'steamed rice', 'microwave rice'], kcal: 130, p: 2.7, c: 28, f: 0.3, cup: 160 },
+  { names: ['pasta', 'spaghetti', 'penne', 'fettuccine', 'macaroni', 'small pasta', 'lasagne sheets'], kcal: 357, p: 12.5, c: 72, f: 1.5 },
+  { names: ['egg noodles', 'noodles'], kcal: 380, p: 14, c: 71, f: 4 },
+  { names: ['rice noodles', 'vermicelli'], kcal: 360, p: 6, c: 80, f: 0.6 },
+  { names: ['plain flour', 'flour', 'self raising flour', 'atta flour', 'wholemeal flour'], kcal: 350, p: 10, c: 73, f: 1.2, cup: 125, tbsp: 9 },
+  { names: ['besan', 'chickpea flour'], kcal: 387, p: 22, c: 58, f: 6.7, cup: 110 },
+  { names: ['cornflour', 'cornstarch'], kcal: 381, p: 0.3, c: 91, f: 0.1, tsp: 3, tbsp: 9 },
+  { names: ['oats', 'rolled oats'], kcal: 380, p: 13, c: 60, f: 7, cup: 90 },
+  { names: ['bread', 'toast', 'wholemeal bread'], kcal: 250, p: 9, c: 46, f: 3, each: 35 },
+  { names: ['naan'], kcal: 290, p: 9, c: 50, f: 6, each: 90 },
+  { names: ['roti', 'chapati', 'tortilla', 'wrap'], kcal: 300, p: 9, c: 50, f: 7, each: 40 },
+  { names: ['couscous'], kcal: 376, p: 13, c: 77, f: 0.6, cup: 175 },
+  { names: ['quinoa'], kcal: 368, p: 14, c: 64, f: 6, cup: 170 },
+  { names: ['breadcrumbs'], kcal: 395, p: 13, c: 72, f: 5, cup: 110 },
+  // Starchy veg and legumes
+  { names: ['potato', 'potatoes', 'baby potatoes'], kcal: 77, p: 2, c: 17, f: 0.1, each: 170 },
+  { names: ['sweet potato'], kcal: 86, p: 1.6, c: 20, f: 0.1, each: 250 },
+  { names: ['pumpkin', 'butternut', 'butternut pumpkin'], kcal: 40, p: 1, c: 8, f: 0.1 },
+  { names: ['lentils', 'red lentils', 'masoor dal', 'dal', 'toor dal', 'moong dal', 'chana dal', 'split peas', 'brown lentils'], kcal: 350, p: 24, c: 60, f: 1.5, cup: 190 },
+  { names: ['chickpeas'], kcal: 120, p: 7, c: 16, f: 2.5, can: 240 },
+  { names: ['beans', 'kidney beans', 'black beans', 'cannellini beans', 'baked beans'], kcal: 105, p: 7, c: 15, f: 0.6, can: 240 },
+  { names: ['corn', 'sweetcorn', 'corn kernels'], kcal: 86, p: 3.3, c: 19, f: 1.4, each: 200, can: 300 },
+  // Meat, fish, eggs, tofu
+  { names: ['whole chicken', 'chicken whole'], kcal: 150, p: 19, c: 0, f: 8, edible: 0.65 },
+  { names: ['chicken'], kcal: 150, p: 19, c: 0, f: 8 },
+  { names: ['chicken thigh', 'chicken thighs', 'chicken thigh fillets'], kcal: 135, p: 19, c: 0, f: 6.5 },
+  { names: ['chicken breast', 'chicken breasts', 'chicken breast fillets'], kcal: 110, p: 23, c: 0, f: 1.5 },
+  { names: ['chicken drumsticks', 'chicken wings', 'chicken marylands', 'drumsticks'], kcal: 165, p: 18, c: 0, f: 10, edible: 0.7 },
+  { names: ['lamb chops', 'lamb shanks', 'pork chops', 'cutlets'], kcal: 230, p: 19, c: 0, f: 17, edible: 0.75 },
+  { names: ['beef mince', 'mince', 'pork mince', 'lamb mince'], kcal: 200, p: 19, c: 0, f: 14 },
+  { names: ['lean beef mince', 'lean mince', 'extra lean mince', 'chicken mince', 'turkey mince'], kcal: 140, p: 21, c: 0, f: 6 },
+  { names: ['beef', 'steak', 'rump steak', 'chuck steak', 'gravy beef', 'stewing beef', 'diced beef', 'sirloin', 'blade steak'], kcal: 140, p: 21, c: 0, f: 6 },
+  { names: ['lamb', 'lamb shoulder', 'lamb leg', 'diced lamb'], kcal: 200, p: 19, c: 0, f: 14 },
+  { names: ['pork', 'pork shoulder', 'pork loin', 'pork belly', 'diced pork'], kcal: 180, p: 20, c: 0, f: 11 },
+  { names: ['bacon', 'ham'], kcal: 200, p: 18, c: 1, f: 14 },
+  { names: ['sausages', 'sausage'], kcal: 260, p: 13, c: 5, f: 21, each: 70 },
+  { names: ['fish', 'white fish', 'fish fillets', 'barramundi', 'barramundi fillets', 'snapper', 'basa', 'cod', 'haddock', 'flathead', 'hake', 'whiting'], kcal: 95, p: 20, c: 0, f: 1.5, each: 150 },
+  { names: ['smoked fish', 'smoked haddock'], kcal: 100, p: 23, c: 0, f: 1 },
+  { names: ['salmon', 'salmon fillets', 'trout'], kcal: 200, p: 20, c: 0, f: 13, each: 150 },
+  { names: ['prawns', 'shrimp'], kcal: 85, p: 19, c: 0, f: 1 },
+  { names: ['tuna', 'canned tuna'], kcal: 110, p: 25, c: 0, f: 1, can: 185 },
+  { names: ['egg', 'eggs'], kcal: 140, p: 12.5, c: 0.5, f: 10, each: 50 },
+  { names: ['tofu', 'firm tofu'], kcal: 120, p: 13, c: 2, f: 7 },
+  { names: ['paneer'], kcal: 300, p: 18, c: 4, f: 24 },
+  // Dairy and fats
+  { names: ['milk', 'full cream milk'], kcal: 64, p: 3.4, c: 4.8, f: 3.6, cup: 250 },
+  { names: ['skim milk', 'light milk', 'low fat milk'], kcal: 38, p: 3.6, c: 5, f: 0.3, cup: 250 },
+  { names: ['yoghurt', 'greek yoghurt', 'plain yoghurt', 'natural yoghurt', 'yogurt', 'greek yogurt'], kcal: 100, p: 9, c: 4, f: 5, cup: 250 },
+  { names: ['cheese', 'cheddar', 'tasty cheese'], kcal: 400, p: 25, c: 0.5, f: 33 },
+  { names: ['parmesan'], kcal: 430, p: 38, c: 0, f: 30 },
+  { names: ['mozzarella', 'feta'], kcal: 280, p: 20, c: 2, f: 21 },
+  { names: ['butter'], kcal: 720, p: 0.6, c: 0, f: 80, tbsp: 14 },
+  { names: ['ghee'], kcal: 880, p: 0, c: 0, f: 99.5, tbsp: 13, tsp: 4.5 },
+  { names: ['cream', 'thickened cream', 'pouring cream'], kcal: 340, p: 2, c: 3, f: 35 },
+  { names: ['light cream', 'light cooking cream', 'cooking cream'], kcal: 190, p: 3, c: 5, f: 18 },
+  { names: ['sour cream'], kcal: 200, p: 3, c: 4, f: 19 },
+  { names: ['coconut milk'], kcal: 200, p: 2, c: 3, f: 20, can: 400 },
+  { names: ['light coconut milk', 'lite coconut milk'], kcal: 95, p: 1, c: 2, f: 9, can: 400 },
+  { names: ['coconut cream'], kcal: 230, p: 2, c: 3, f: 24, can: 400 },
+  { names: ['oil', 'olive oil', 'vegetable oil', 'canola oil', 'sunflower oil', 'coconut oil', 'sesame oil', 'mustard oil', 'peanut oil', 'rice bran oil'], kcal: 884, p: 0, c: 0, f: 100, tsp: 4.5, tbsp: 13 },
+  // Vegetables and herbs
+  { names: ['onion', 'brown onion', 'red onion', 'white onion', 'shallots'], kcal: 40, p: 1.1, c: 9, f: 0.1, each: 150 },
+  { names: ['spring onion', 'spring onions', 'green onion', 'scallions'], kcal: 32, p: 1.8, c: 7, f: 0.2, each: 15, bunch: 100 },
+  { names: ['garlic'], kcal: 149, p: 6.4, c: 33, f: 0.5, each: 40, clove: 5 },
+  { names: ['ginger'], kcal: 80, p: 1.8, c: 18, f: 0.8 },
+  { names: ['tomato', 'tomatoes', 'cherry tomatoes'], kcal: 18, p: 0.9, c: 3.9, f: 0.2, each: 120 },
+  { names: ['crushed tomatoes', 'diced tomatoes', 'canned tomatoes', 'tinned tomatoes', 'chopped tomatoes', 'whole peeled tomatoes'], kcal: 25, p: 1.2, c: 4, f: 0.2, can: 400 },
+  { names: ['tomato paste', 'tomato puree'], kcal: 82, p: 4.3, c: 19, f: 0.5, tbsp: 16 },
+  { names: ['passata'], kcal: 30, p: 1.5, c: 6, f: 0.2 },
+  { names: ['capsicum', 'green capsicum', 'red capsicum', 'bell pepper'], kcal: 26, p: 1, c: 6, f: 0.3, each: 160 },
+  { names: ['carrot', 'carrots'], kcal: 41, p: 0.9, c: 10, f: 0.2, each: 120 },
+  { names: ['celery'], kcal: 16, p: 0.7, c: 3, f: 0.2, each: 40 },
+  { names: ['peas', 'green peas', 'frozen peas'], kcal: 80, p: 5.4, c: 14, f: 0.4, cup: 150 },
+  { names: ['spinach', 'baby spinach', 'english spinach'], kcal: 23, p: 2.9, c: 3.6, f: 0.4, bunch: 250, cup: 30 },
+  { names: ['broccoli', 'broccolini'], kcal: 34, p: 2.8, c: 7, f: 0.4, each: 300, bunch: 200 },
+  { names: ['chinese broccoli', 'gai lan'], kcal: 22, p: 1.1, c: 3.8, f: 0.7, bunch: 300 },
+  { names: ['bok choy', 'pak choy', 'baby bok choy'], kcal: 13, p: 1.5, c: 2.2, f: 0.2, each: 150, bunch: 300 },
+  { names: ['cabbage'], kcal: 25, p: 1.3, c: 6, f: 0.1, each: 900 },
+  { names: ['cauliflower'], kcal: 25, p: 1.9, c: 5, f: 0.3, each: 600 },
+  { names: ['zucchini'], kcal: 17, p: 1.2, c: 3.1, f: 0.3, each: 200 },
+  { names: ['eggplant'], kcal: 25, p: 1, c: 6, f: 0.2, each: 300 },
+  { names: ['mushrooms', 'mushroom'], kcal: 22, p: 3.1, c: 3.3, f: 0.3 },
+  { names: ['green beans', 'beans green', 'snake beans'], kcal: 31, p: 1.8, c: 7, f: 0.1 },
+  { names: ['mixed vegetables', 'vegetables', 'frozen vegetables', 'stir fry vegetables'], kcal: 45, p: 2, c: 8, f: 0.3 },
+  { names: ['lettuce', 'salad leaves', 'rocket'], kcal: 15, p: 1.4, c: 2.9, f: 0.2, each: 500 },
+  { names: ['cucumber'], kcal: 15, p: 0.7, c: 3.6, f: 0.1, each: 300 },
+  { names: ['avocado'], kcal: 160, p: 2, c: 9, f: 15, each: 170 },
+  { names: ['chilli', 'chillies', 'green chilli', 'red chilli', 'bird eye chilli'], kcal: 40, p: 1.9, c: 9, f: 0.4, each: 10 },
+  { names: ['coriander', 'parsley', 'mint', 'basil', 'dill', 'curry leaves', 'thai basil'], kcal: 23, p: 2, c: 4, f: 0.5, bunch: 50, sprig: 1 },
+  { names: ['lemon', 'lime', 'lemon juice', 'lime juice'], kcal: 29, p: 1.1, c: 9, f: 0.3, each: 60 },
+  { names: ['bean sprouts'], kcal: 30, p: 3, c: 6, f: 0.2 },
+  // Cooked dishes (for describing a plate)
+  { names: ['curry', 'chicken curry', 'beef curry', 'lamb curry', 'fish curry', 'egg curry', 'kofta curry', 'butter chicken', 'stew', 'casserole'], kcal: 150, p: 11, c: 6, f: 9, cup: 240 },
+  { names: ['cooked dal', 'dal tadka', 'tadka dal', 'dhal', 'sambar', 'chana masala'], kcal: 120, p: 6, c: 16, f: 3.5, cup: 240 },
+  { names: ['salad', 'side salad', 'garden salad'], kcal: 20, p: 1, c: 3, f: 0.3, each: 100, cup: 60 },
+  { names: ['soup', 'vegetable soup', 'pumpkin soup', 'chicken soup'], kcal: 50, p: 2.5, c: 6, f: 1.5, cup: 250 },
+  { names: ['bolognese', 'bolognese sauce', 'mince sauce'], kcal: 140, p: 10, c: 5, f: 9, cup: 240 },
+  { names: ['cooked pasta'], kcal: 158, p: 5.8, c: 31, f: 0.9, cup: 140 },
+  { names: ['mashed potato', 'mash'], kcal: 100, p: 2, c: 15, f: 4, cup: 210 },
+  { names: ['fried rice'], kcal: 170, p: 4.5, c: 26, f: 5.5, cup: 200 },
+  { names: ['biryani'], kcal: 180, p: 8, c: 22, f: 7, cup: 200 },
+  // Fruit
+  { names: ['banana', 'bananas'], kcal: 89, p: 1.1, c: 23, f: 0.3, each: 120 },
+  { names: ['apple', 'apples'], kcal: 52, p: 0.3, c: 14, f: 0.2, each: 180 },
+  { names: ['orange', 'oranges'], kcal: 47, p: 0.9, c: 12, f: 0.1, each: 150 },
+  { names: ['berries', 'blueberries', 'strawberries'], kcal: 50, p: 0.8, c: 12, f: 0.3, cup: 150 },
+  { names: ['raisins', 'sultanas'], kcal: 299, p: 3, c: 79, f: 0.5, tbsp: 10 },
+  // Sauces, sweeteners, nuts, stock
+  { names: ['sugar', 'brown sugar', 'jaggery', 'caster sugar'], kcal: 400, p: 0, c: 100, f: 0, tsp: 4, tbsp: 12 },
+  { names: ['honey', 'maple syrup'], kcal: 304, p: 0.3, c: 82, f: 0, tbsp: 21 },
+  { names: ['soy sauce', 'light soy sauce', 'dark soy sauce', 'kecap manis'], kcal: 53, p: 8, c: 5, f: 0.6, tbsp: 18 },
+  { names: ['oyster sauce', 'hoisin sauce'], kcal: 100, p: 1.5, c: 22, f: 0.5, tbsp: 18 },
+  { names: ['fish sauce'], kcal: 35, p: 5, c: 4, f: 0, tbsp: 18 },
+  { names: ['tomato sauce', 'ketchup', 'bbq sauce', 'sweet chilli sauce'], kcal: 110, p: 1, c: 26, f: 0.1, tbsp: 18 },
+  { names: ['tamarind', 'tamarind paste'], kcal: 240, p: 3, c: 57, f: 0.6 },
+  { names: ['vinegar', 'white vinegar', 'malt vinegar', 'rice vinegar'], kcal: 20, p: 0, c: 1, f: 0 },
+  { names: ['curry paste', 'red curry paste', 'green curry paste', 'tikka paste'], kcal: 150, p: 2, c: 10, f: 11, tbsp: 16 },
+  { names: ['peanut butter'], kcal: 590, p: 25, c: 20, f: 50, tbsp: 16 },
+  { names: ['nuts', 'almonds', 'cashews', 'peanuts', 'walnuts'], kcal: 600, p: 20, c: 20, f: 52, cup: 140 },
+  { names: ['stock', 'chicken stock', 'beef stock', 'vegetable stock', 'broth'], kcal: 5, p: 0.5, c: 0.5, f: 0.1, cup: 250 },
+  { names: ['protein powder', 'whey protein', 'whey'], kcal: 380, p: 75, c: 8, f: 5, each: 30 },
+  { names: ['water', 'salt', 'sea salt', 'ice'], kcal: 0, p: 0, c: 0, f: 0 },
+  // Dried spices: a teaspoon is about 2.5 g
+  { names: ['spices', 'turmeric', 'cumin', 'cumin seeds', 'ground cumin', 'coriander seeds', 'ground coriander', 'garam masala', 'curry powder', 'chilli powder', 'kashmiri chilli powder', 'paprika', 'smoked paprika', 'cinnamon', 'cardamom', 'cloves', 'black pepper', 'pepper', 'peppercorns', 'black peppercorns', 'mustard seeds', 'fenugreek', 'bay leaves', 'asafoetida', 'fennel seeds', 'star anise', 'nutmeg', 'oregano', 'thyme', 'mixed herbs', 'dried herbs', 'chilli flakes', 'sambar powder', 'rasam powder'], kcal: 330, p: 12, c: 50, f: 12, tsp: 2.5, tbsp: 7 }
+];
+
+// Grams for one of each unit when the food doesn't say
+const UNIT_GRAMS = { g: 1, kg: 1000, ml: 1, L: 1000, tsp: 5, tbsp: 15, cup: 200, clove: 5, bunch: 100, sprig: 1, pinch: 0.4, can: 400 };
+
+const FOOD_NUTRITION_INDEX = FOOD_NUTRITION.flatMap((food) => food.names.map((n) => ({ words: matchWords(n), food })));
+
+// The most specific food whose name appears as whole words in the text: "lean beef mince" beats "mince"
+function findFood(text) {
+  const words = ` ${matchWords(text)} `;
+  let best = null;
+  for (const entry of FOOD_NUTRITION_INDEX) {
+    if (entry.words && words.includes(` ${entry.words} `) && (!best || entry.words.length > best.words.length)) best = entry;
+  }
+  return best ? best.food : null;
+}
+
+function gramsOf(quantity, unit, food) {
+  if (quantity == null || !Number.isFinite(quantity)) return null;
+  const u = unit || 'each';
+  if (u === 'each') return food.each ? quantity * food.each : null;
+  const per = food[u] || UNIT_GRAMS[u];
+  return per ? quantity * per : null;
+}
+
+// The calorie fields for a new kitchen item, from typical values when the app knows the food
+function typicalItemFields(name) {
+  const t = typicalNutritionFor(name);
+  return t ? { ...t, caloriesSource: 'typical' } : {};
+}
+
+// Typical per-100 g values for a kitchen item's name, or null if it isn't a food the app knows
+function typicalNutritionFor(name) {
+  const food = findFood(name);
+  if (!food || !food.kcal) return null;
+  const liquid = /\b(milk|stock|broth|juice|oil|sauce|cream|water)\b/i.test(name);
+  return { caloriesPer100: food.kcal, caloriesUnit: liquid ? 'ml' : 'g', proteinPer100: food.p, carbsPer100: food.c, fatPer100: food.f };
+}
+
+/* Works out calories and macros per serving from a list of ingredients.
+   A kitchen item with its own saved values (e.g. from its label) is used before the typical values.
+   Returns the per-serving numbers and which ingredients were and weren't counted. */
+function nutritionFromIngredients(ingredients, servings, kitchenItems = []) {
+  const index = buildInventoryIndex(kitchenItems.filter((i) => i.caloriesPer100));
+  const total = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+  const counted = [];
+  const missing = [];
+  for (const ing of ingredients || []) {
+    if (ing.optional) continue;
+    const kitchen = index.length ? findInventoryMatch(ing, index) : null;
+    const typical = findFood([ing.name, ...(ing.matchTerms || [])].join(' | '));
+    // Kitchen item values win; the typical entry still supplies weights like "1 each = 150 g"
+    const food = kitchen
+      ? { ...(typical || {}), kcal: kitchen.item.caloriesPer100, p: kitchen.item.proteinPer100 ?? (typical ? typical.p : 0), c: kitchen.item.carbsPer100 ?? (typical ? typical.c : 0), f: kitchen.item.fatPer100 ?? (typical ? typical.f : 0) }
+      : typical;
+    if (!food) { if (!ing.assumedStaple) missing.push(ing.name); continue; }
+    if (ing.quantity == null) { if (food.kcal && !ing.assumedStaple && !/salt|pepper|water/i.test(ing.name)) missing.push(`${ing.name} (no amount)`); continue; }
+    const grams = gramsOf(ing.quantity, ing.unit, food);
+    if (grams == null) { missing.push(`${ing.name} (${ing.unit || 'each'})`); continue; }
+    const k = (grams * (food.edible || 1)) / 100;
+    total.kcal += food.kcal * k;
+    total.protein += (food.p || 0) * k;
+    total.carbs += (food.c || 0) * k;
+    total.fat += (food.f || 0) * k;
+    counted.push(ing.name);
+  }
+  const s = servings && servings > 0 ? servings : 1;
+  return {
+    perServing: { kcal: Math.round(total.kcal / s), protein: Math.round(total.protein / s), carbs: Math.round(total.carbs / s), fat: Math.round(total.fat / s) },
+    counted,
+    missing
+  };
+}
+
+const CALORIE_SOURCE_LABELS = { label: 'from label', database: 'from barcode database', estimated: 'estimated', manual: 'entered', typical: 'typical values' };
 
 function itemCaloriesText(item) {
   if (!item.caloriesPer100) return '';
@@ -5109,7 +5442,8 @@ function openBarcodeScan() {
    Weeks start on Monday.
    ============================================================ */
 const PLAN_MEALS = ['breakfast', 'lunch', 'dinner'];
-const PLAN_MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner' };
+const PLAN_MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snacks' };
+const PLAN_MEAL_ORDER = ['breakfast', 'lunch', 'dinner', 'snacks'];
 const DEFAULT_PLAN_SETTINGS = { key: 'mealPlanSettings', householdSize: 2, planBreakfast: false };
 
 async function getPlanSettings() {
@@ -5150,10 +5484,36 @@ async function getPlanEntries(dates) {
   return all.filter((e) => wanted.has(e.date));
 }
 
+// Calories for my portions of a planned meal (kcal is stored per serving)
 function entryKcal(entry, recipesById) {
-  if (entry.kcal) return entry.kcal;
   const r = entry.recipeId ? recipesById.get(entry.recipeId) : null;
-  return r && r.caloriesPerServing ? r.caloriesPerServing : null;
+  const perServing = entry.kcal || (r && r.caloriesPerServing) || null;
+  return perServing ? Math.round(perServing * (entry.portions || 1)) : null;
+}
+
+function portionsText(n) {
+  return `${n} portion${n === 1 ? '' : 's'}`;
+}
+
+/* ---- "My portions" when planning a meal ---- */
+function planPortionsHtml(n) {
+  return `
+    <div class="plan-portions">
+      <span class="cd-label"><strong>My portions</strong><span class="cook-hint">how much you'll have at this meal</span></span>
+      <div class="stepper"><button type="button" class="step-btn pp-btn" data-d="-1" aria-label="Fewer portions">−</button><input type="number" id="plan-portions" min="0.5" step="0.5" inputmode="decimal" value="${n}"><button type="button" class="step-btn pp-btn" data-d="1" aria-label="More portions">+</button></div>
+    </div>`;
+}
+function attachPlanPortions(onChange) {
+  const input = document.getElementById('plan-portions');
+  document.querySelectorAll('.pp-btn').forEach((b) => b.addEventListener('click', () => {
+    input.value = Math.max(0.5, (parseFloat(input.value) || 1) + parseInt(b.dataset.d, 10));
+    if (onChange) onChange(readPlanPortions());
+  }));
+  input.addEventListener('change', () => { if (onChange) onChange(readPlanPortions()); });
+}
+function readPlanPortions() {
+  const input = document.getElementById('plan-portions');
+  return input ? Math.max(0.5, parseFloat(input.value) || 1) : 1;
 }
 
 async function addPlanEntry(entry) {
@@ -5188,27 +5548,36 @@ async function renderPlannerScreen() {
   const today = localDateString(new Date());
   const isThisWeek = AppState.planWeekStart === localDateString(startOfWeek(new Date()));
   const weekLabel = `${parseLocalDate(dates[0]).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – ${parseLocalDate(dates[6]).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`;
-  const plannedCount = entries.length;
+  const plannedCount = entries.filter((e) => e.type !== 'logged' && !e.eaten).length;
 
+  // A meal can hold several things: what was planned, and what was logged in the food diary
   const slotHtml = (date, meal) => {
-    const entry = entries.find((e) => e.date === date && e.meal === meal);
+    const list = entries.filter((e) => e.date === date && e.meal === meal);
     const past = date < today;
-    if (!entry) {
+    if (!list.length) {
       return `<button type="button" class="plan-slot empty" data-date="${date}" data-meal="${meal}" ${past ? 'disabled' : ''}>
         <span class="plan-meal">${PLAN_MEAL_LABELS[meal]}</span><span class="plan-add">${past ? '—' : '+ Add'}</span></button>`;
     }
+    return list.map((entry, i) => entryHtml(entry, i === 0 ? PLAN_MEAL_LABELS[meal] : '')).join('')
+      + (past ? '' : `<button type="button" class="plan-add-more" data-date="${date}" data-meal="${meal}">+ Add to ${PLAN_MEAL_LABELS[meal].toLowerCase()}</button>`);
+  };
+
+  const entryHtml = (entry, mealLabel) => {
     const kcal = entryKcal(entry, recipesById);
+    const eaten = entry.type === 'logged' || entry.eaten;
     const recipe = entry.recipeId ? recipesById.get(entry.recipeId) : null;
     const sc = recipe && index.length && entry.type === 'recipe' ? scoreRecipe(recipe, index) : null;
     const icon = entry.type === 'leftover' ? '🍱 ' : entry.type === 'kitchen' ? '🧊 ' : entry.type === 'out' ? '🍽️ ' : '';
-    return `<button type="button" class="plan-slot filled type-${entry.type}" data-entry-id="${entry.id}">
-      <span class="plan-meal">${PLAN_MEAL_LABELS[meal]}</span>
+    return `<button type="button" class="plan-slot filled type-${entry.type} ${eaten ? 'eaten' : ''}" data-entry-id="${entry.id}">
+      <span class="plan-meal">${mealLabel}</span>
       <span class="plan-title">${icon}${escapeHtml(entry.title)}</span>
       <span class="plan-tags">
-        ${entry.cooked ? '<span class="tag kcal-ok">✓ Cooked</span>' : ''}
+        ${eaten ? '<span class="tag kcal-ok">✓ Eaten</span>' : ''}
+        ${entry.cooked && !eaten ? '<span class="tag kcal-ok">✓ Cooked</span>' : ''}
+        ${entry.type !== 'out' && entry.type !== 'logged' ? `<span class="tag">${portionsText(entry.portions || 1)}</span>` : ''}
         ${kcal ? calorieBadgeHtml(kcal, goals) : ''}
-        ${sc && !entry.cooked && sc.expiring.length ? `<span class="tag kcal-over">Uses ${escapeHtml(sc.expiring[0].name)}</span>` : ''}
-        ${sc && !entry.cooked && sc.missing.length ? `<span class="tag">Need ${sc.missing.length}</span>` : ''}
+        ${sc && !entry.cooked && !eaten && sc.expiring.length ? `<span class="tag kcal-over">Uses ${escapeHtml(sc.expiring[0].name)}</span>` : ''}
+        ${sc && !entry.cooked && !eaten && sc.missing.length ? `<span class="tag">Need ${sc.missing.length}</span>` : ''}
       </span>
     </button>`;
   };
@@ -5222,7 +5591,7 @@ async function renderPlannerScreen() {
           <span>${formatDayLabel(date)}</span>
           ${total ? `<span class="plan-total">~${total} kcal</span>` : ''}
         </div>
-        ${meals.map((m) => slotHtml(date, m)).join('')}
+        ${PLAN_MEAL_ORDER.filter((m) => meals.includes(m) || dayEntries.some((e) => e.meal === m)).map((m) => slotHtml(date, m)).join('')}
       </div>`;
   }).join('');
 
@@ -5262,7 +5631,7 @@ function attachPlannerListeners() {
   document.getElementById('plan-quick').addEventListener('change', (e) => { AppState.planQuickWeeknights = e.target.checked; });
   document.getElementById('plan-fill').addEventListener('click', fillMyWeek);
   document.getElementById('plan-clear').addEventListener('click', clearPlanWeek);
-  document.querySelectorAll('.plan-slot.empty').forEach((btn) => {
+  document.querySelectorAll('.plan-slot.empty, .plan-add-more').forEach((btn) => {
     btn.addEventListener('click', () => openSlotPicker(btn.dataset.date, btn.dataset.meal));
   });
   document.querySelectorAll('.plan-slot.filled').forEach((btn) => {
@@ -5271,9 +5640,9 @@ function attachPlannerListeners() {
 }
 
 async function clearPlanWeek() {
-  if (!confirm('Clear every meal planned for this week?')) return;
+  if (!confirm('Clear every meal planned for this week? What you\'ve logged as eaten stays.')) return;
   const entries = await getPlanEntries(weekDates(parseLocalDate(AppState.planWeekStart)));
-  for (const e of entries) await dbDelete('mealPlans', e.id);
+  for (const e of entries.filter((x) => x.type !== 'logged' && !x.eaten)) await dbDelete('mealPlans', e.id);
   showToast('Week cleared');
   renderRoute();
 }
@@ -5310,6 +5679,7 @@ async function openSlotPicker(date, meal) {
       <h2>${mealType} · ${formatDayLabel(date)}</h2>
       <button class="close-btn" id="modal-close">×</button>
     </div>
+    ${planPortionsHtml(1)}
     <div class="modal-scroll-area">
       ${ready.length ? `<div class="st-group-title">Already made</div>
         ${ready.map((i) => `<button type="button" class="pick-row" data-item-id="${i.id}">
@@ -5328,13 +5698,15 @@ async function openSlotPicker(date, meal) {
     const q = e.target.value.trim().toLowerCase();
     document.querySelectorAll('#pick-recipes .pick-row').forEach((row) => { row.style.display = !q || row.dataset.name.includes(q) ? '' : 'none'; });
   });
+  attachPlanPortions();
   document.querySelectorAll('.pick-row[data-recipe-id]').forEach((btn) => btn.addEventListener('click', async () => {
     const recipe = recipes.find((r) => r.id === parseInt(btn.dataset.recipeId, 10));
-    await planRecipe(recipe, date, meal, settings);
+    await planRecipe(recipe, date, meal, settings, { portions: readPlanPortions() });
   }));
   document.querySelectorAll('.pick-row[data-item-id]').forEach((btn) => btn.addEventListener('click', async () => {
     const item = items.find((i) => i.id === parseInt(btn.dataset.itemId, 10));
-    await addPlanEntry({ date, meal, type: 'kitchen', itemId: item.id, title: item.name, kcal: null });
+    const recipe = item.recipeId ? recipes.find((r) => r.id === item.recipeId) : null;
+    await addPlanEntry({ date, meal, type: 'kitchen', itemId: item.id, recipeId: recipe ? recipe.id : null, title: item.name, kcal: recipe ? recipe.caloriesPerServing || null : null, portions: readPlanPortions() });
     closeModal();
     showToast(`Planned ${item.name}`);
     renderRoute();
@@ -5347,21 +5719,21 @@ async function openSlotPicker(date, meal) {
 }
 
 // Plan a recipe; if it makes more portions than the household eats, offer the rest as the next meal
-async function planRecipe(recipe, date, meal, settings, { askLeftovers = true } = {}) {
+async function planRecipe(recipe, date, meal, settings, { askLeftovers = true, portions = 1 } = {}) {
   const household = settings.householdSize || 2;
-  const id = await addPlanEntry({ date, meal, type: 'recipe', recipeId: recipe.id, title: recipe.name, kcal: recipe.caloriesPerServing || null, servings: household });
+  const id = await addPlanEntry({ date, meal, type: 'recipe', recipeId: recipe.id, title: recipe.name, kcal: recipe.caloriesPerServing || null, servings: household, portions });
   let leftoverNote = '';
   const spare = (recipe.servings || 0) - household;
   if (askLeftovers && spare >= household && recipe.leftoverFriendly !== false) {
     const next = nextSlot(date, meal);
     const nextTaken = (await getPlanEntries([next.date])).some((e) => e.meal === next.meal);
     if (!nextTaken && confirm(`${recipe.name} serves ${recipe.servings}. Plan the ${spare} leftover portions for ${PLAN_MEAL_LABELS[next.meal].toLowerCase()} on ${formatDayLabel(next.date)}?`)) {
-      await addPlanEntry({ date: next.date, meal: next.meal, type: 'leftover', recipeId: recipe.id, title: `Leftover ${recipe.name}`, kcal: recipe.caloriesPerServing || null, leftoverOf: id });
+      await addPlanEntry({ date: next.date, meal: next.meal, type: 'leftover', recipeId: recipe.id, title: `Leftover ${recipe.name}`, kcal: recipe.caloriesPerServing || null, leftoverOf: id, portions });
       leftoverNote = ' + leftovers';
     }
   }
   closeModal();
-  showToast(`Planned ${recipe.name}${leftoverNote}`);
+  showToast(`Planned ${portionsText(portions)} of ${recipe.name}${leftoverNote}`);
   renderRoute();
   return id;
 }
@@ -5374,21 +5746,30 @@ async function openPlanEntry(id) {
       <h2>${escapeHtml(entry.title)}</h2>
       <button class="close-btn" id="modal-close">×</button>
     </div>
-    <p class="recipe-muted" style="margin-top:0;">${PLAN_MEAL_LABELS[entry.meal]} · ${formatDayLabel(entry.date)}${entry.type === 'leftover' ? ' · leftovers' : ''}</p>
+    <p class="recipe-muted" style="margin-top:0;">${PLAN_MEAL_LABELS[entry.meal]} · ${formatDayLabel(entry.date)}${entry.type === 'leftover' ? ' · leftovers' : ''}${entry.type === 'logged' || entry.eaten ? ' · ✓ eaten (in your food diary)' : ''}</p>
+    ${entry.type === 'logged' ? `<p class="recipe-muted">Added from your food diary${entry.kcal ? `: ${Math.round(entry.kcal)} kcal` : ''}. Removing it here keeps it in the diary.</p>` : ''}
+    ${entry.type !== 'out' && entry.type !== 'logged' ? planPortionsHtml(entry.portions || 1) : ''}
     ${entry.type === 'recipe' && entry.recipeId ? `<button type="button" class="btn-primary" id="pe-cooked">${entry.cooked ? '✓ Cooked (cook it again?)' : '🍳 I cooked this'}</button>` : ''}
     ${entry.recipeId ? '<button type="button" class="btn-secondary" id="pe-view">View recipe</button>' : ''}
-    <button type="button" class="btn-secondary" id="pe-swap">Swap for something else</button>
-    <button type="button" class="btn-danger" id="pe-remove">Remove from plan</button>
+    ${entry.type === 'logged' ? '' : '<button type="button" class="btn-secondary" id="pe-swap">Swap for something else</button>'}
+    <button type="button" class="btn-danger" id="pe-remove">${entry.type === 'logged' ? 'Remove from planner' : entry.date < localDateString(new Date()) && !entry.eaten ? 'Didn\'t eat it: remove' : 'Remove from plan'}</button>
   `);
   document.getElementById('modal-close').addEventListener('click', closeModal);
+  if (entry.type !== 'out' && entry.type !== 'logged') attachPlanPortions(async (n) => {
+    entry.portions = n;
+    await dbPut('mealPlans', entry);
+    showToast(`${portionsText(n)} planned`);
+    renderRoute();
+  });
   const view = document.getElementById('pe-view');
   if (view) view.addEventListener('click', () => openRecipeDetail(entry.recipeId));
   const cooked = document.getElementById('pe-cooked');
   if (cooked) cooked.addEventListener('click', async () => {
     const recipe = await dbGet('recipes', entry.recipeId);
-    if (recipe) openCookedThis(recipe, { planEntryId: entry.id, date: localDateString(new Date()), meal: entry.meal });
+    if (recipe) openCookedThis(recipe, { planEntryId: entry.id, date: localDateString(new Date()), meal: entry.meal, myPortions: entry.portions || 1 });
   });
-  document.getElementById('pe-swap').addEventListener('click', async () => {
+  const swap = document.getElementById('pe-swap');
+  if (swap) swap.addEventListener('click', async () => {
     await removePlanEntry(entry.id);
     renderRoute();
     openSlotPicker(entry.date, entry.meal);
@@ -5414,7 +5795,8 @@ async function openAddRecipeToPlan(recipe) {
       <h2>📅 Add to plan</h2>
       <button class="close-btn" id="modal-close">×</button>
     </div>
-    <p class="recipe-muted" style="margin-top:0;">${escapeHtml(recipe.name)}: pick a free slot.</p>
+    <p class="recipe-muted" style="margin-top:0;">${escapeHtml(recipe.name)}: choose your portions, then pick a free slot.</p>
+    ${planPortionsHtml(1)}
     <div class="modal-scroll-area">
       ${dates.map((d) => `
         <div class="plan-pick-day"><span>${formatDayLabel(d)}</span>
@@ -5426,8 +5808,9 @@ async function openAddRecipeToPlan(recipe) {
     </div>
   `);
   document.getElementById('modal-close').addEventListener('click', closeModal);
+  attachPlanPortions();
   document.querySelectorAll('.plan-pick:not([disabled])').forEach((btn) => btn.addEventListener('click', () => {
-    planRecipe(recipe, btn.dataset.date, btn.dataset.meal, settings);
+    planRecipe(recipe, btn.dataset.date, btn.dataset.meal, settings, { portions: readPlanPortions() });
   }));
 }
 
@@ -5655,7 +6038,7 @@ async function getLogEntries(date) {
 }
 
 async function addLogEntry(entry) {
-  return dbPut('foodLog', {
+  const id = await dbPut('foodLog', {
     kcal: 0, protein: null, carbs: null, fat: null, amount: null, amountUnit: null,
     ...entry,
     kcal: Math.round(entry.kcal || 0),
@@ -5664,6 +6047,30 @@ async function addLogEntry(entry) {
     fat: entry.fat == null ? null : round1(entry.fat),
     createdAt: new Date().toISOString()
   });
+  await linkLogToPlan(entry, id);
+  return id;
+}
+
+// What's logged shows in the planner for that day: a planned meal is ticked as eaten,
+// anything else is added to that meal (and can be removed from the planner later)
+async function linkLogToPlan(entry, logId) {
+  if (entry.planEntryId) {
+    const plan = await dbGet('mealPlans', entry.planEntryId);
+    if (plan) { plan.eaten = true; await dbPut('mealPlans', plan); return; }
+  }
+  await dbPut('mealPlans', {
+    date: entry.date, meal: entry.meal, type: 'logged', title: entry.name, kcal: Math.round(entry.kcal || 0),
+    recipeId: entry.recipeId || null, logEntryId: logId, createdAt: new Date().toISOString()
+  });
+}
+
+async function unlinkLogFromPlan(logEntry) {
+  for (const p of (await dbGetAll('mealPlans')).filter((x) => x.logEntryId === logEntry.id)) await dbDelete('mealPlans', p.id);
+  if (logEntry.planEntryId) {
+    const stillLogged = (await getLogEntries(logEntry.date)).some((x) => x.planEntryId === logEntry.planEntryId);
+    const plan = await dbGet('mealPlans', logEntry.planEntryId);
+    if (plan && !stillLogged) { plan.eaten = false; await dbPut('mealPlans', plan); }
+  }
 }
 
 function dayTotals(entries) {
@@ -5727,7 +6134,7 @@ async function renderTodayDiaryHtml() {
 
   const mealCard = (meal) => {
     const list = entries.filter((e) => e.meal === meal);
-    const planned = plans.filter((p) => p.meal === meal && !loggedPlanIds.has(p.id));
+    const planned = plans.filter((p) => p.meal === meal && p.type !== 'logged' && !p.eaten && !loggedPlanIds.has(p.id));
     const mt = dayTotals(list);
     return `
       <div class="diary-meal">
@@ -5745,7 +6152,7 @@ async function renderTodayDiaryHtml() {
           </button>`).join('')}
         ${planned.map((p) => `
           <div class="diary-planned">
-            <span class="de-name">📅 ${escapeHtml(p.title)}</span>
+            <span class="de-name">📅 ${escapeHtml(p.title)}${p.type !== 'out' ? `<span class="de-amt"> · ${portionsText(p.portions || 1)}</span>` : ''}</span>
             <button type="button" class="state-chip diary-ate" data-plan-id="${p.id}">✓ Ate this</button>
           </div>`).join('')}
       </div>`;
@@ -5806,10 +6213,12 @@ async function openLogEntry(id) {
     Object.assign(e, readNutrientFields('le'));
     e.kcal = Math.round(e.kcal || 0);
     await dbPut('foodLog', e);
+    for (const p of (await dbGetAll('mealPlans')).filter((x) => x.logEntryId === e.id)) { p.kcal = e.kcal; await dbPut('mealPlans', p); }
     closeModal(); showToast('Updated'); renderRoute();
   });
   document.getElementById('le-delete').addEventListener('click', async () => {
     await dbDelete('foodLog', id);
+    await unlinkLogFromPlan(e);
     closeModal(); showToast('Removed from diary'); renderRoute();
   });
 }
@@ -5848,7 +6257,7 @@ function openAddFood(date, meal) {
       <button type="button" class="add-food-opt" data-how="kitchen"><span>🧺</span>From my kitchen</button>
       <button type="button" class="add-food-opt" data-how="recipe"><span>📖</span>A recipe</button>
       <button type="button" class="add-food-opt" data-how="barcode"><span>▦</span>Scan barcode</button>
-      <button type="button" class="add-food-opt" data-how="photo"><span>📸</span>Photo of my plate</button>
+      <button type="button" class="add-food-opt" data-how="photo"><span>📸</span>Photo or description of my plate</button>
       <button type="button" class="add-food-opt" data-how="label"><span>🏷️</span>Packaged meal, drink or shake</button>
       <button type="button" class="add-food-opt" data-how="cooked"><span>🍳</span>I cooked a recipe</button>
       <button type="button" class="add-food-opt wide" data-how="quick"><span>⚡</span>Quick add (✨ estimate from a description)</button>
@@ -5899,7 +6308,18 @@ function openQuickAdd(date, meal, prefill = {}) {
     const text = document.getElementById('qa-name').value.trim();
     const note = document.getElementById('qa-note');
     if (!text) { showToast('Describe what you had first'); return; }
-    if (!getAiKey()) { note.textContent = 'Estimates use Claude: add your API key in Settings → AI suggestions. Or type the numbers in.'; return; }
+    if (!getAiKey()) {
+      // Without Claude: work it out from typical values when it's "amount + food", e.g. "240 g jasmine rice"
+      const ing = parseIngredientLine(text, [], new Map());
+      const calc = ing && ing.quantity ? nutritionFromIngredients([ing], 1) : null;
+      if (calc && calc.counted.length) {
+        setNutrientFields('qa', calc.perServing);
+        note.textContent = `Typical values for ${formatIngredientQuantity(ing)} ${ing.name}. Check and adjust before logging.`;
+      } else {
+        note.textContent = 'Type an amount and a food (e.g. "240 g jasmine rice") to use typical values, or add your API key in Settings → AI suggestions for estimates of anything (like "12 oz coffee with skim milk").';
+      }
+      return;
+    }
     btn.disabled = true;
     btn.textContent = 'Estimating…';
     const r = await estimateFoodMacros(text);
@@ -5946,6 +6366,11 @@ async function openLogFromKitchen(date, meal, preselectId) {
 
 function openLogKitchenItem(date, meal, item) {
   if (item.recipeId && item.portionCount) return openLogLeftover(date, meal, item);
+  // No calories saved for this item: use typical values for the food if the app knows it
+  if (!item.caloriesPer100) {
+    const t = typicalNutritionFor(item.name);
+    if (t) item = { ...item, ...t, caloriesSource: 'typical' };
+  }
   const per100 = item.caloriesPer100;
   const eatenUnit = item.caloriesUnit === 'ml' ? 'ml' : 'g';
   const hasQty = item.quantity != null && item.quantity > 0;
@@ -6025,9 +6450,9 @@ function openLogKitchenItem(date, meal, item) {
 }
 
 /* ---- A recipe ---- */
-async function openLogRecipe(date, meal, preselectId, planEntryId, onPick) {
+async function openLogRecipe(date, meal, preselectId, planEntryId, onPick, servings = 1) {
   const recipes = (await dbGetAll('recipes')).sort((a, b) => a.name.localeCompare(b.name));
-  if (preselectId) { const r = recipes.find((x) => x.id === preselectId); if (r) return openLogRecipeServings(date, meal, r, planEntryId); }
+  if (preselectId) { const r = recipes.find((x) => x.id === preselectId); if (r) return openLogRecipeServings(date, meal, r, planEntryId, servings); }
   openModal(`
     <div class="modal-title-row"><h2>${onPick ? '🍳 What did you cook?' : '📖 A recipe'}</h2><button class="close-btn" id="modal-close">×</button></div>
     <div class="field recipe-search" style="margin-bottom:8px;"><input type="search" id="lr-search" placeholder="Search recipes"></div>
@@ -6050,11 +6475,11 @@ async function openLogRecipe(date, meal, preselectId, planEntryId, onPick) {
   }));
 }
 
-function openLogRecipeServings(date, meal, recipe, planEntryId) {
+function openLogRecipeServings(date, meal, recipe, planEntryId, servings = 1) {
   openModal(`
     <div class="modal-title-row"><h2>${escapeHtml(recipe.name)}</h2><button class="close-btn" id="modal-close">×</button></div>
     ${mealSelectHtml(meal)}
-    <div class="field" style="margin-top:12px;"><label>Servings</label><input type="number" id="lrs-servings" min="0" step="0.25" inputmode="decimal" value="1"></div>
+    <div class="field" style="margin-top:12px;"><label>Servings</label><input type="number" id="lrs-servings" min="0" step="0.25" inputmode="decimal" value="${servings}"></div>
     ${nutrientFieldsHtml('lrs', {})}
     <p class="recipe-muted" style="margin-top:0;">${recipe.caloriesPerServing ? 'From the recipe\'s per-serving figures (approximate).' : 'This recipe has no calories yet: enter them, or ✨ Estimate in the recipe\'s edit screen later.'}</p>
     <button type="button" class="btn-primary" id="lrs-save">Log it</button>
@@ -6088,13 +6513,17 @@ async function ateThis(planId) {
   if (p.type === 'leftover' && p.recipeId) {
     const portions = (await dbGetAll('inventoryItems')).filter((i) => i.recipeId === p.recipeId && i.portionCount > 0)
       .sort((a, b) => (a.location === 'leftovers' ? 0 : 1) - (b.location === 'leftovers' ? 0 : 1));
-    if (portions.length) return openLogLeftover(p.date, meal, portions[0], p.id);
+    if (portions.length) return openLogLeftover(p.date, meal, portions[0], p.id, p.portions || 1);
   }
   if (p.type === 'recipe' && p.recipeId && !p.cooked) {
     const recipe = await dbGet('recipes', p.recipeId);
-    if (recipe) return openCookedThis(recipe, { planEntryId: p.id, date: p.date, meal });
+    if (recipe) return openCookedThis(recipe, { planEntryId: p.id, date: p.date, meal, myPortions: p.portions || 1 });
   }
-  if (p.recipeId) return openLogRecipe(p.date, meal, p.recipeId, p.id);
+  if (p.type === 'kitchen' && p.itemId) {
+    const item = await dbGet('inventoryItems', p.itemId);
+    if (item && item.recipeId && item.portionCount) return openLogLeftover(p.date, meal, item, p.id, p.portions || 1);
+  }
+  if (p.recipeId) return openLogRecipe(p.date, meal, p.recipeId, p.id, null, p.portions || 1);
   if (p.type === 'kitchen' && p.itemId) return openLogFromKitchen(p.date, meal, p.itemId);
   return openQuickAdd(p.date, meal, { name: p.title, source: 'plan', planEntryId: p.id });
 }
@@ -6408,41 +6837,75 @@ function plateSchema() {
 }
 
 function openPlatePhoto(date, meal) {
-  if (!getAiKey()) { showToast('Add your API key in Settings → AI suggestions to use plate photos'); return; }
+  const hasKey = !!getAiKey();
   PlatePhoto.photo = null;
   PlatePhoto.rows = [];
+  PlatePhoto.note = '';
   openModal(`
-    <div class="modal-title-row"><h2>📸 Photo of my plate</h2><button class="close-btn" id="modal-close">×</button></div>
+    <div class="modal-title-row"><h2>📸 My plate</h2><button class="close-btn" id="modal-close">×</button></div>
     ${mealSelectHtml(meal)}
     <div class="modal-scroll-area" id="pp-body" style="margin-top:12px;">
-      <p class="st-intro">Take a photo of your meal from above. Claude estimates each part and its calories, and you check them before logging.</p>
-      <div class="ps-thumbs"><label class="ps-add">📷<span>Take photo</span><input type="file" id="pp-file" accept="image/*" capture="environment" hidden></label></div>
+      <p class="st-intro">Take a photo of your meal from above, or describe what you ate. ${hasKey ? 'Claude' : 'The app'} estimates each part and its calories, and you check them before logging.</p>
+      ${hasKey ? '<div class="ps-thumbs"><label class="ps-add">📷<span>Take photo</span><input type="file" id="pp-file" accept="image/*" capture="environment" hidden></label></div>' : ''}
+      <div class="field" style="margin-top:12px;">
+        <label>${hasKey ? 'Or describe it' : 'Describe what you ate'} <span style="text-transform:none;font-weight:500;">(one thing per line or separated by commas)</span></label>
+        <textarea id="pp-text" rows="4" placeholder="${hasKey ? 'e.g. chicken curry about 1 cup, 3/4 cup basmati rice, a small naan, side salad' : 'e.g. 150 g chicken curry, 120 g cooked rice, 1 naan'}"></textarea>
+      </div>
+      ${hasKey ? '' : '<p class="recipe-muted" style="margin:0;">Without an API key, give an amount for each food (e.g. "120 g cooked rice"). Add your key in Settings → AI suggestions for photos and freer descriptions.</p>'}
       <p class="ai-error" id="pp-error"></p>
     </div>
-    <div class="modal-action-bar"><button type="button" class="btn-primary" id="pp-action" disabled>Take a photo first</button></div>
+    <div class="modal-action-bar"><button type="button" class="btn-primary" id="pp-action" disabled>${hasKey ? 'Take a photo or describe it' : 'Describe it first'}</button></div>
   `);
   document.getElementById('modal-sheet').classList.add('tall');
   document.getElementById('modal-close').addEventListener('click', closeModal);
   attachMealSelect();
-  document.getElementById('pp-file').addEventListener('change', async (e) => {
+  const refreshAction = () => {
+    const btn = document.getElementById('pp-action');
+    const text = document.getElementById('pp-text').value.trim();
+    btn.disabled = !PlatePhoto.photo && !text;
+    btn.textContent = PlatePhoto.photo ? 'Estimate calories' : text ? 'Estimate from my description' : (hasKey ? 'Take a photo or describe it' : 'Describe it first');
+  };
+  const fileInput = document.getElementById('pp-file');
+  if (fileInput) fileInput.addEventListener('change', async (e) => {
     const f = e.target.files && e.target.files[0];
     if (!f) return;
     try { PlatePhoto.photo = await photoToBase64Jpeg(f); } catch (err) { showToast(err.message); return; }
     document.querySelector('#pp-body .ps-thumbs').innerHTML = `<div class="ps-thumb"><img src="${PlatePhoto.photo.preview}" alt="Your plate"></div>`;
-    const btn = document.getElementById('pp-action');
-    btn.disabled = false;
-    btn.textContent = 'Estimate calories';
+    refreshAction();
   });
+  document.getElementById('pp-text').addEventListener('input', refreshAction);
   document.getElementById('pp-action').addEventListener('click', () => (PlatePhoto.rows.length ? savePlate(date, meal) : readPlate()));
+}
+
+// Without an API key: each "amount + food" part of the description, from typical values
+function estimatePlateOffline(text) {
+  const parts = text.split(/\n|,|;|\band\b|\bwith\b/i).map((t) => t.trim()).filter(Boolean);
+  const rows = [];
+  const skipped = [];
+  for (const part of parts) {
+    const ing = parseIngredientLine(part, [], new Map());
+    const calc = ing && ing.quantity ? nutritionFromIngredients([ing], 1) : null;
+    if (calc && calc.counted.length) {
+      const n = calc.perServing;
+      rows.push({ name: ing.name.charAt(0).toUpperCase() + ing.name.slice(1), portion: formatIngredientQuantity(ing), kcal: n.kcal, protein: n.protein, carbs: n.carbs, fat: n.fat, selected: true });
+    } else skipped.push(part);
+  }
+  return { rows, skipped };
 }
 
 async function readPlate() {
   const btn = document.getElementById('pp-action');
+  const description = (document.getElementById('pp-text') || { value: '' }).value.trim();
   btn.disabled = true;
-  btn.textContent = 'Looking at your plate…';
+  btn.textContent = PlatePhoto.photo ? 'Looking at your plate…' : 'Working it out…';
   let Anthropic = null;
   let error = null;
-  try {
+  if (!getAiKey()) {
+    const { rows, skipped } = estimatePlateOffline(description);
+    PlatePhoto.rows = rows;
+    if (!rows.length) error = 'Give an amount for each food, e.g. "150 g chicken curry, 120 g cooked rice".';
+    else if (skipped.length) PlatePhoto.note = `Not counted (no amount, or a food the app doesn't know): ${skipped.join(', ')}. Add them with Quick add.`;
+  } else try {
     const loaded = await getAnthropicClient();
     Anthropic = loaded.Anthropic;
     const response = await loaded.client.beta.messages.create({
@@ -6452,15 +6915,17 @@ async function readPlate() {
       fallbacks: 'default',
       output_config: { effort: 'medium', format: { type: 'json_schema', schema: plateSchema() } },
       messages: [{ role: 'user', content: [
-        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: PlatePhoto.photo.data } },
-        { type: 'text', text: 'This is one person\'s serving of a meal. List each food on the plate with an estimated portion (e.g. "1 cup cooked rice", "150 g chicken curry") and its kcal, protein, carbs and fat in grams for that portion. If there is no food in the photo, return an empty list.' }
+        ...(PlatePhoto.photo ? [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: PlatePhoto.photo.data } }] : []),
+        { type: 'text', text: PlatePhoto.photo
+          ? `This is one person's serving of a meal. List each food on the plate with an estimated portion (e.g. "1 cup cooked rice", "150 g chicken curry") and its kcal, protein, carbs and fat in grams for that portion. If there is no food in the photo, return an empty list.${description ? `\nThey describe it as: ${description}` : ''}`
+          : `Someone in Australia describes one person's serving of a meal they ate: "${description}".\nList each food with an estimated portion in metric (e.g. "1 cup cooked rice (160 g)", "150 g chicken curry"), using the amounts they give or a typical serve if they don't, and its kcal, protein, carbs and fat in grams for that portion. If it isn't food, return an empty list.` }
       ] }]
     });
     if (response.stop_reason === 'refusal') error = 'Claude couldn\'t read this photo. Try another, or use Quick add.';
     else {
       const parsed = JSON.parse(response.content.filter((b) => b.type === 'text').map((b) => b.text).join(''));
       PlatePhoto.rows = (parsed.items || []).map((it) => ({ ...it, selected: true }));
-      if (!PlatePhoto.rows.length) error = 'No food was recognised. Try a closer photo from above.';
+      if (!PlatePhoto.rows.length) error = PlatePhoto.photo ? 'No food was recognised. Try a closer photo from above, or describe it.' : 'No food was recognised in the description. Try naming each food.';
     }
   } catch (err) {
     error = err instanceof SyntaxError ? 'Claude\'s reply couldn\'t be read. Please try again.' : describeAiError(err, Anthropic);
@@ -6473,8 +6938,9 @@ async function readPlate() {
     return;
   }
   document.getElementById('pp-body').innerHTML = `
-    <div class="ps-thumbs" style="margin-bottom:10px;"><div class="ps-thumb"><img src="${PlatePhoto.photo.preview}" alt="Your plate"></div></div>
-    <p class="st-intro">Estimated by Claude. Untick anything wrong and adjust the numbers.</p>
+    ${PlatePhoto.photo ? `<div class="ps-thumbs" style="margin-bottom:10px;"><div class="ps-thumb"><img src="${PlatePhoto.photo.preview}" alt="Your plate"></div></div>` : `<p class="recipe-muted" style="margin-top:0;">“${escapeHtml(description)}”</p>`}
+    <p class="st-intro">${getAiKey() ? 'Estimated by Claude' : 'From typical values'}. Untick anything wrong and adjust the numbers.</p>
+    ${PlatePhoto.note ? `<p class="recipe-muted">${escapeHtml(PlatePhoto.note)}</p>` : ''}
     ${PlatePhoto.rows.map((r, i) => `
       <div class="st-row ps-row ticked" data-i="${i}">
         <div class="ps-top"><button type="button" class="st-box ps-tick">✓</button><input type="text" class="ps-name" value="${escapeHtml(r.name)}"></div>
@@ -6531,7 +6997,7 @@ function ingredientUseInItemUnit(ing, item, scale) {
   return null;
 }
 
-async function openCookedThis(recipe, { planEntryId = null, date = null, meal = null, serves = null } = {}) {
+async function openCookedThis(recipe, { planEntryId = null, date = null, meal = null, serves = null, myPortions = 1 } = {}) {
   const [settings, items, profiles] = await Promise.all([getPlanSettings(), dbGetAll('inventoryItems'), dbGet('settings', 'profiles')]);
   const logDate = date || localDateString(new Date());
   const logMeal = meal || defaultLogMeal();
@@ -6539,7 +7005,8 @@ async function openCookedThis(recipe, { planEntryId = null, date = null, meal = 
   const partnerName = (profiles && profiles.partnerProfile && profiles.partnerProfile.name) || 'Partner';
   // Starting point: 1 for me, 1 for my partner if I cook for two or more, anyone else, the rest in the fridge
   const household = settings.householdSize || 2;
-  const start = { me: Math.min(1, made), partner: household >= 2 && made >= 2 ? 1 : 0 };
+  const start = { me: Math.min(myPortions, made) };
+  start.partner = household >= 2 && made - start.me >= 1 ? 1 : 0;
   start.others = Math.max(0, Math.min(household - 2, made - start.me - start.partner));
   start.fridge = made - start.me - start.partner - start.others;
   start.freezer = 0;
@@ -6567,7 +7034,7 @@ async function openCookedThis(recipe, { planEntryId = null, date = null, meal = 
     <div class="modal-title-row"><h2>🍳 I cooked this</h2><button class="close-btn" id="modal-close">×</button></div>
     <div class="modal-scroll-area">
       <p class="recipe-muted" style="margin-top:0;">${escapeHtml(recipe.name)}</p>
-      <div class="cook-made">${numField('ck-made', 'Portions made', made)}</div>
+      <div class="cook-made">${numField('ck-made', 'Portions cooked (the whole pot)', made)}</div>
       <div class="st-group-title">Where does each portion go?</div>
       <div class="portion-dots" id="ck-dots" aria-hidden="true"></div>
       <div class="cook-dests">
@@ -6745,14 +7212,14 @@ async function openCookedThis(recipe, { planEntryId = null, date = null, meal = 
 }
 
 /* ---- Eating leftover portions ---- */
-async function openLogLeftover(date, meal, item, planEntryId = null) {
+async function openLogLeftover(date, meal, item, planEntryId = null, portions = 1) {
   const recipe = item.recipeId ? await dbGet('recipes', item.recipeId) : null;
   const macros = recipe ? recipeMacros(recipe) : { kcal: null, protein: null, carbs: null, fat: null };
   openModal(`
     <div class="modal-title-row"><h2>🍱 ${escapeHtml(item.name)}</h2><button class="close-btn" id="modal-close">×</button></div>
     ${mealSelectHtml(meal)}
     <p class="recipe-muted" style="margin:10px 0 0;">${escapeHtml(LOCATION_LABELS[item.location])}: ${escapeHtml(formatItemQuantity(item))}${item.location === 'freezer' ? '. Defrost it in the fridge first.' : ''}</p>
-    <div class="field" style="margin-top:12px;"><label>Portions</label><input type="number" id="lo-n" min="0" step="0.5" inputmode="decimal" value="1"></div>
+    <div class="field" style="margin-top:12px;"><label>Portions</label><input type="number" id="lo-n" min="0" step="0.5" inputmode="decimal" value="${portions}"></div>
     ${nutrientFieldsHtml('lo', {})}
     <p class="recipe-muted" style="margin-top:0;">${macros.kcal ? 'From the recipe\'s per-serving figures (approximate).' : 'No calories saved for this recipe: enter them above.'}</p>
     <label class="plan-ai-toggle"><input type="checkbox" id="lo-takeout" checked> Take the portions out of my kitchen</label>
@@ -7121,7 +7588,7 @@ async function openShoppingToKitchen() {
           states, category: r.entry.category || 'Other', isStaple: false, purchaseDate: localDateString(new Date()),
           expiryDate: suggestion ? localDateString(addDays(new Date(), suggestion.suggestedDaysMax)) : null,
           useByOverrideDays: null, cost: null, notes: '', freezerFriendlyRating: null, linkedPurchaseEventId: null,
-          runningLow: false, createdAt: now, updatedAt: now
+          runningLow: false, ...typicalItemFields(r.entry.name), createdAt: now, updatedAt: now
         });
         await logHistory(newId, 'created', qty, null, location, 'Bought (shopping list)');
       }
