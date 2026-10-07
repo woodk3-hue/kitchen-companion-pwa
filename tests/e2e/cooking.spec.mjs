@@ -55,7 +55,8 @@ test('changing serves scales the ingredient amounts', async ({ page }) => {
   await expect(firstQty).toHaveText('600 g');
   await page.click('#serves-up');
   await page.click('#serves-up');
-  await expect(page.locator('#serves-val')).toHaveText('6');
+  await expect(page.locator('#serves-val')).toHaveValue('6');
+  await expect(page.locator('#cooked-recipe-btn')).toContainText('6 portions');
   await expect(firstQty).toHaveText('900 g');
   await expect(page.locator('.macro-tiles')).toContainText('Protein');
   await page.click('#cooked-recipe-btn');

@@ -1276,9 +1276,7 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 .mt-protein .mt-v { color: var(--macro-protein); }
 .mt-carbs .mt-v { color: var(--macro-carbs); }
 .mt-fat .mt-v { color: var(--macro-fat); }
-.serves-stat .v { display: flex; align-items: center; justify-content: center; gap: 6px; }
-.serves-btn { width: 24px; height: 24px; border-radius: 50%; border: none; background: var(--color-fill); color: var(--color-ink); font-size: 16px; font-weight: 800; line-height: 1; padding: 0; cursor: pointer; }
-.section-heading #serves-note { font-size: 12px; font-weight: 600; }
+.portion-bar { margin-top: 4px; }
 .stepper { display: flex; align-items: center; gap: 6px; }
 .stepper input { text-align: center; min-width: 0; }
 .step-btn { flex: 0 0 40px; height: 40px; border: none; border-radius: 12px; background: var(--color-fill); color: var(--color-ink); font-size: 20px; font-weight: 700; cursor: pointer; }
@@ -3275,7 +3273,7 @@ async function openRecipeDetail(id) {
       ${recipe.sourceName ? `<p class="recipe-muted" style="margin:0 0 10px;">From ${escapeHtml(recipe.sourceName)}</p>` : ''}
 
       <div class="recipe-stats">
-        ${baseServes ? `<div class="recipe-stat serves-stat"><span class="v"><button type="button" class="serves-btn" id="serves-down" aria-label="Fewer serves">−</button><span id="serves-val">${baseServes}</span><button type="button" class="serves-btn" id="serves-up" aria-label="More serves">+</button></span><span class="l">Serves</span></div>` : ''}
+        ${stat('Serves', baseServes)}
         ${stat('Prep', recipe.prepMinutes ? recipe.prepMinutes + ' min' : '')}
         ${stat('Cook', recipe.cookMinutes ? recipe.cookMinutes + ' min' : '')}
         ${stat('Difficulty', recipe.difficulty)}
@@ -3299,7 +3297,12 @@ async function openRecipeDetail(id) {
         ${recipe.isFavourite ? '★ Favourite (tap to remove)' : '☆ Add to favourites'}
       </button>
 
-      <div class="section-heading" style="margin-top:18px;"><h2>Ingredients</h2><span class="recipe-muted" id="serves-note"></span></div>
+      <div class="section-heading" style="margin-top:18px;"><h2>Ingredients</h2></div>
+      ${baseServes ? `
+        <div class="plan-portions portion-bar">
+          <span class="cd-label"><strong>How many portions are you making?</strong><span class="cook-hint" id="serves-note">Amounts for ${baseServes} (as written)</span></span>
+          <div class="stepper"><button type="button" class="step-btn" id="serves-down" aria-label="Fewer portions">−</button><input type="number" id="serves-val" min="1" step="1" inputmode="numeric" value="${baseServes}"><button type="button" class="step-btn" id="serves-up" aria-label="More portions">+</button></div>
+        </div>` : ''}
       <div id="ingredients-box">${ingredientsListHtml()}</div>
 
       <div class="section-heading" style="margin-top:18px;"><h2>Method</h2></div>
@@ -3308,7 +3311,7 @@ async function openRecipeDetail(id) {
       ${recipe.notes ? `<div class="section-heading" style="margin-top:18px;"><h2>Notes</h2></div><p class="recipe-notes">${escapeHtml(recipe.notes)}</p>` : ''}
     </div>
     <div class="modal-action-bar">
-      <button type="button" class="btn-primary" id="cooked-recipe-btn">🍳 I cooked this</button>
+      <button type="button" class="btn-primary" id="cooked-recipe-btn">🍳 I cooked this${baseServes ? ` · ${baseServes} portions` : ''}</button>
       <div class="field-row" style="gap:8px;">
         <button type="button" class="btn-secondary" id="log-recipe-btn">🍽️ Log a serving</button>
         <button type="button" class="btn-secondary" id="plan-recipe-btn">📅 Add to plan</button>
@@ -3368,15 +3371,17 @@ async function openRecipeDetail(id) {
   });
   document.getElementById('plan-recipe-btn').addEventListener('click', () => openAddRecipeToPlan(recipe));
   document.getElementById('cooked-recipe-btn').addEventListener('click', () => openCookedThis(recipe, { serves }));
-  const changeServes = (d) => {
-    serves = Math.max(1, serves + d);
-    document.getElementById('serves-val').textContent = serves;
+  const setServes = (n) => {
+    serves = Math.max(1, Math.round(n) || 1);
+    document.getElementById('serves-val').value = serves;
     document.getElementById('ingredients-box').innerHTML = ingredientsListHtml();
-    document.getElementById('serves-note').textContent = serves === baseServes ? '' : `for ${serves} serves (recipe makes ${baseServes})`;
+    document.getElementById('serves-note').textContent = serves === baseServes ? `Amounts for ${baseServes} (as written)` : `Amounts changed for ${serves} portions (recipe makes ${baseServes})`;
+    document.getElementById('cooked-recipe-btn').textContent = `🍳 I cooked this · ${serves} portion${serves === 1 ? '' : 's'}`;
   };
   if (baseServes) {
-    document.getElementById('serves-down').addEventListener('click', () => changeServes(-1));
-    document.getElementById('serves-up').addEventListener('click', () => changeServes(1));
+    document.getElementById('serves-down').addEventListener('click', () => setServes(serves - 1));
+    document.getElementById('serves-up').addEventListener('click', () => setServes(serves + 1));
+    document.getElementById('serves-val').addEventListener('change', (e) => setServes(parseFloat(e.target.value)));
   }
   document.getElementById('log-recipe-btn').addEventListener('click', () => openLogRecipeServings(localDateString(new Date()), defaultLogMeal(), recipe));
   document.getElementById('delete-recipe-btn').addEventListener('click', () => deleteRecipe(recipe));
