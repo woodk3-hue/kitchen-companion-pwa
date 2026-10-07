@@ -1283,7 +1283,26 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 .stepper input { text-align: center; min-width: 0; }
 .step-btn { flex: 0 0 40px; height: 40px; border: none; border-radius: 12px; background: var(--color-fill); color: var(--color-ink); font-size: 20px; font-weight: 700; cursor: pointer; }
 .step-btn:active { background: var(--color-accent-tint); }
-.cook-left { font-size: 14px; font-weight: 700; margin: 4px 0 8px; }
+.cook-made .cook-num { max-width: 220px; }
+.cook-dests { background: var(--color-paper); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 4px 12px; }
+.cook-dest { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--color-fill); }
+.cook-dest:first-child { border-top: none; }
+.cd-icon { font-size: 20px; width: 26px; text-align: center; }
+.cd-label { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 15px; }
+.cd-label .cook-hint { margin-top: 0; }
+.cook-dest .stepper { flex: 0 0 132px; }
+.cook-dest .stepper input { width: 44px; padding: 8px 2px; border: none; background: var(--color-fill); border-radius: 10px; font: inherit; font-weight: 700; color: var(--color-ink); }
+.cook-dest .step-btn { flex: 0 0 38px; height: 38px; }
+.cook-me-extra { padding: 0 0 10px 36px; }
+.cook-me-extra .segmented { flex-wrap: wrap; }
+.portion-dots { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.pdot { width: 22px; height: 22px; border-radius: 50%; }
+.pd-me { background: var(--color-accent); }
+.pd-partner { background: #8B5CF6; }
+.pd-others { background: var(--color-leftovers); }
+.pd-fridge { background: var(--color-fridge); }
+.pd-freezer { background: var(--color-freezer); }
+.pd-none { background: transparent; border: 2px dashed var(--color-line); }
 .cook-hint { display: block; font-size: 12px; color: var(--color-ink-soft); margin-top: 3px; }
 .cook-check { font-size: 13px; font-weight: 600; margin: 2px 0 12px; }
 .cook-check.ok { color: var(--color-fridge); }
@@ -6513,11 +6532,17 @@ function ingredientUseInItemUnit(ing, item, scale) {
 }
 
 async function openCookedThis(recipe, { planEntryId = null, date = null, meal = null, serves = null } = {}) {
-  const [settings, items] = await Promise.all([getPlanSettings(), dbGetAll('inventoryItems')]);
+  const [settings, items, profiles] = await Promise.all([getPlanSettings(), dbGetAll('inventoryItems'), dbGet('settings', 'profiles')]);
   const logDate = date || localDateString(new Date());
   const logMeal = meal || defaultLogMeal();
   const made = serves || recipe.servings || 4;
-  const eaten = Math.min(settings.householdSize || 2, made);
+  const partnerName = (profiles && profiles.partnerProfile && profiles.partnerProfile.name) || 'Partner';
+  // Starting point: 1 for me, 1 for my partner if I cook for two or more, anyone else, the rest in the fridge
+  const household = settings.householdSize || 2;
+  const start = { me: Math.min(1, made), partner: household >= 2 && made >= 2 ? 1 : 0 };
+  start.others = Math.max(0, Math.min(household - 2, made - start.me - start.partner));
+  start.fridge = made - start.me - start.partner - start.others;
+  start.freezer = 0;
   const index = buildInventoryIndex(items);
   const scaleFor = (portions) => (recipe.servings ? portions / recipe.servings : 1);
   const uses = (recipe.ingredients || [])
@@ -6531,30 +6556,32 @@ async function openCookedThis(recipe, { planEntryId = null, date = null, meal = 
     <div class="field cook-num"><label>${label}</label>
       <div class="stepper"><button type="button" class="step-btn" data-for="${id}" data-d="-1" aria-label="One less">−</button><input type="number" id="${id}" min="0" step="1" inputmode="numeric" value="${value}"><button type="button" class="step-btn" data-for="${id}" data-d="1" aria-label="One more">+</button></div>
       ${hint ? `<span class="cook-hint">${hint}</span>` : ''}</div>`;
+  const destRow = (key, icon, label, hint, value) => `
+    <div class="cook-dest dest-${key}">
+      <span class="cd-icon">${icon}</span>
+      <span class="cd-label"><strong>${label}</strong><span class="cook-hint">${hint}</span></span>
+      <div class="stepper"><button type="button" class="step-btn" data-for="ck-${key}" data-d="-1" aria-label="One less for ${label}">−</button><input type="number" id="ck-${key}" min="0" step="1" inputmode="numeric" value="${value}"><button type="button" class="step-btn" data-for="ck-${key}" data-d="1" aria-label="One more for ${label}">+</button></div>
+    </div>`;
 
   openModal(`
     <div class="modal-title-row"><h2>🍳 I cooked this</h2><button class="close-btn" id="modal-close">×</button></div>
     <div class="modal-scroll-area">
       <p class="recipe-muted" style="margin-top:0;">${escapeHtml(recipe.name)}</p>
-      <div class="field-row cook-split">
-        ${numField('ck-made', 'Portions made', made)}
-        ${numField('ck-eaten', 'Eaten now', eaten, 'by everyone')}
-      </div>
-      <div class="cook-left" id="ck-left"></div>
-      <div class="field-row cook-split">
-        ${numField('ck-fridge', '🧊 Fridge', made - eaten, `eat within ${LEFTOVER_FRIDGE_DAYS} days`)}
-        ${numField('ck-freezer', '❄️ Freezer', 0, 'keeps ~3 months')}
+      <div class="cook-made">${numField('ck-made', 'Portions made', made)}</div>
+      <div class="st-group-title">Where does each portion go?</div>
+      <div class="portion-dots" id="ck-dots" aria-hidden="true"></div>
+      <div class="cook-dests">
+        ${destRow('me', '🙋', 'Me', 'goes in my food diary', start.me)}
+        <div class="cook-me-extra" id="ck-me-extra">
+          ${mealSelectHtml(logMeal)}
+          <p class="recipe-muted" id="ck-mine-kcal" style="margin:6px 0 0;"></p>
+        </div>
+        ${destRow('partner', '💑', escapeHtml(partnerName), 'eaten now', start.partner)}
+        ${destRow('others', '👥', 'Others', 'family or guests', start.others)}
+        ${destRow('fridge', '🧊', 'Fridge', `eat within ${LEFTOVER_FRIDGE_DAYS} days`, start.fridge)}
+        ${destRow('freezer', '❄️', 'Freezer', 'keeps about 3 months', start.freezer)}
       </div>
       <p class="cook-check" id="ck-check"></p>
-
-      <div class="cook-box">
-        <label class="plan-ai-toggle" style="margin:0;"><input type="checkbox" id="ck-log" checked> Add my portion to the food diary</label>
-        <div id="ck-log-fields">
-          <div class="field cook-num" style="margin:8px 0;"><label>My portions · ${escapeHtml(formatDayLabel(logDate))}</label><input type="number" id="ck-mine" min="0" step="0.5" inputmode="decimal" value="1"></div>
-          ${mealSelectHtml(logMeal)}
-          <p class="recipe-muted" id="ck-mine-kcal" style="margin:4px 0 0;"></p>
-        </div>
-      </div>
 
       <div class="st-group-title">Take out of my kitchen</div>
       ${uses.length ? uses.map((u, i) => {
@@ -6585,48 +6612,59 @@ async function openCookedThis(recipe, { planEntryId = null, date = null, meal = 
       input.value = amt == null ? '' : Math.min(amt, u.item.quantity);
     });
   };
+  const DESTS = ['me', 'partner', 'others', 'fridge', 'freezer'];
+  const placed = () => DESTS.reduce((t, k) => t + val(`ck-${k}`), 0);
   const check = () => {
     const made = val('ck-made');
-    const total = val('ck-eaten') + val('ck-fridge') + val('ck-freezer');
+    const total = placed();
     const el = document.getElementById('ck-check');
     el.className = 'cook-check' + (total === made ? ' ok' : ' warn');
+    const parts = [['me', 'me'], ['partner', partnerName], ['others', 'others'], ['fridge', 'fridge'], ['freezer', 'freezer']]
+      .filter(([k]) => val(`ck-${k}`)).map(([k, l]) => `${val(`ck-${k}`)} ${l}`);
     el.textContent = total === made
-      ? `✓ ${made} made = ${val('ck-eaten')} eaten + ${val('ck-fridge')} fridge + ${val('ck-freezer')} freezer`
-      : `${made} made, but ${total} accounted for${total < made ? ` (${made - total} not kept)` : ''}`;
-    const mine = val('ck-mine');
+      ? `✓ All ${made} placed: ${parts.join(' · ')}`
+      : total < made ? `${made - total} portion${made - total === 1 ? '' : 's'} still to place` : `${total - made} more than you made`;
+    // One dot per portion, coloured by where it goes
+    const dots = [];
+    DESTS.forEach((k) => { for (let i = 0; i < Math.floor(val(`ck-${k}`)); i++) dots.push(`<span class="pdot pd-${k}"></span>`); });
+    for (let i = dots.length; i < made; i++) dots.push('<span class="pdot pd-none"></span>');
+    document.getElementById('ck-dots').innerHTML = dots.join('');
+    const mine = val('ck-me');
+    document.getElementById('ck-me-extra').style.display = mine > 0 ? '' : 'none';
     document.getElementById('ck-mine-kcal').textContent = macros.kcal
-      ? `≈ ${Math.round(macros.kcal * mine)} kcal${macros.protein != null ? ` · ${Math.round(macros.protein * mine)} g protein` : ''}`
+      ? `${mine} portion${mine === 1 ? '' : 's'} for ${formatDayLabel(logDate).replace(/ · .*/, '').toLowerCase()} ≈ ${Math.round(macros.kcal * mine)} kcal${macros.protein != null ? ` · ${Math.round(macros.protein * mine)} g protein` : ''}`
       : 'This recipe has no calories yet; you can edit the diary entry after.';
   };
-  // What's left over is split between fridge and freezer: changing one moves the rest to the other
-  const setVal = (id, n) => { document.getElementById(id).value = Math.max(0, n); };
-  const leftOver = () => Math.max(0, val('ck-made') - val('ck-eaten'));
-  const rebalance = (changed) => {
-    const left = leftOver();
-    if (changed === 'ck-fridge') setVal('ck-freezer', left - Math.min(val('ck-fridge'), left));
-    else if (changed === 'ck-freezer') setVal('ck-fridge', left - Math.min(val('ck-freezer'), left));
-    else { setVal('ck-freezer', Math.min(val('ck-freezer'), left)); setVal('ck-fridge', left - val('ck-freezer')); }
-    if (val('ck-fridge') > left) setVal('ck-fridge', left);
-    if (val('ck-freezer') > left) setVal('ck-freezer', left);
-    document.getElementById('ck-left').textContent = left
-      ? `${left} portion${left === 1 ? '' : 's'} left over: split them between the fridge and freezer`
-      : 'Nothing left over';
+  const bump = (id, d) => {
+    const input = document.getElementById(id);
+    const next = Math.max(0, (parseFloat(input.value) || 0) + d);
+    // When every portion is already placed, adding one somewhere moves it from the fridge
+    // (or the freezer, then others); only if there's nowhere to take it from were more made
+    if (id !== 'ck-made' && d > 0 && placed() >= val('ck-made')) {
+      const donor = ['fridge', 'freezer', 'others'].map((k) => `ck-${k}`).find((k) => k !== id && val(k) > 0);
+      if (donor) document.getElementById(donor).value = val(donor) - 1;
+      else document.getElementById('ck-made').value = val('ck-made') + d;
+    }
+    // Making fewer takes them back off the fridge, then the freezer
+    if (id === 'ck-made' && d < 0 && placed() > next) {
+      for (const k of ['fridge', 'freezer', 'others', 'partner', 'me']) {
+        const el = document.getElementById(`ck-${k}`);
+        if (val(`ck-${k}`) > 0) { el.value = val(`ck-${k}`) - 1; break; }
+      }
+    }
+    if (id === 'ck-made' && d > 0) document.getElementById('ck-fridge').value = val('ck-fridge') + d;
+    input.value = next;
+    if (id === 'ck-made') fillUses();
     check();
   };
-  ['ck-made', 'ck-eaten', 'ck-fridge', 'ck-freezer'].forEach((id) => document.getElementById(id).addEventListener('input', () => {
-    rebalance(id);
+  document.querySelectorAll('.step-btn').forEach((b) => b.addEventListener('click', () => bump(b.dataset.for, parseInt(b.dataset.d, 10))));
+  ['ck-made', ...DESTS.map((k) => `ck-${k}`)].forEach((id) => document.getElementById(id).addEventListener('input', () => {
     if (id === 'ck-made') fillUses();
+    check();
   }));
-  document.querySelectorAll('.step-btn').forEach((b) => b.addEventListener('click', () => {
-    const input = document.getElementById(b.dataset.for);
-    input.value = Math.max(0, (parseFloat(input.value) || 0) + parseInt(b.dataset.d, 10));
-    input.dispatchEvent(new Event('input'));
-  }));
-  document.getElementById('ck-mine').addEventListener('input', check);
-  document.getElementById('ck-log').addEventListener('change', (e) => { document.getElementById('ck-log-fields').style.display = e.target.checked ? '' : 'none'; });
   document.querySelectorAll('.ck-use-qty').forEach((i) => i.addEventListener('input', () => { i.dataset.touched = '1'; }));
   fillUses();
-  rebalance('ck-made');
+  check();
 
   document.getElementById('ck-save').addEventListener('click', async (ev) => {
     const btn = ev.currentTarget;
@@ -6635,6 +6673,7 @@ async function openCookedThis(recipe, { planEntryId = null, date = null, meal = 
     const today = localDateString(new Date());
     const fridge = val('ck-fridge');
     const freezer = val('ck-freezer');
+    if (placed() > val('ck-made') && !confirm(`That's ${placed()} portions but you made ${val('ck-made')}. Save anyway?`)) { btn.disabled = false; return; }
     const note = `Cooked ${recipe.name}`;
 
     // 1. Ingredients out of the kitchen
@@ -6664,8 +6703,8 @@ async function openCookedThis(recipe, { planEntryId = null, date = null, meal = 
     }
 
     // 2. My portion in the food diary
-    const mine = val('ck-mine');
-    if (document.getElementById('ck-log').checked && mine > 0) {
+    const mine = val('ck-me');
+    if (mine > 0) {
       await addLogEntry({
         date: logDate, meal: selectedMeal(logMeal), name: recipe.name, amount: mine, amountUnit: 'serving',
         kcal: (macros.kcal || 0) * mine,
@@ -6692,7 +6731,7 @@ async function openCookedThis(recipe, { planEntryId = null, date = null, meal = 
     await leftover(freezer, 'freezer', ['Cooked', 'Frozen'], LEFTOVER_FREEZER_DAYS);
 
     // 4. A record of the cook, and tick it off the plan
-    await dbPut('batchCookEvents', { recipeId: recipe.id, recipeName: recipe.name, date: today, portionsMade: val('ck-made'), eaten: val('ck-eaten'), fridge, freezer, createdAt: now });
+    await dbPut('batchCookEvents', { recipeId: recipe.id, recipeName: recipe.name, date: today, portionsMade: val('ck-made'), me: mine, partner: val('ck-partner'), others: val('ck-others'), fridge, freezer, createdAt: now });
     if (planEntryId) {
       const entry = await dbGet('mealPlans', planEntryId);
       if (entry) { entry.cooked = true; await dbPut('mealPlans', entry); }
@@ -7100,6 +7139,8 @@ async function openShoppingToKitchen() {
 async function renderSettingsScreen() {
   const goals = await getHealthGoals();
   const planSettings = await getPlanSettings();
+  const profiles = await dbGet('settings', 'profiles');
+  const partnerName = (profiles && profiles.partnerProfile && profiles.partnerProfile.name) || '';
   const starterCount = (await dbGetAll('recipes')).filter((r) => r.source === 'built-in').length;
   const hasKey = !!getAiKey();
   return `
@@ -7171,6 +7212,7 @@ async function renderSettingsScreen() {
     <div class="section-heading" style="margin-top:22px;"><h2>Meal plan</h2></div>
     <div class="settings-card">
       <div class="field" style="margin:0;"><label>How many people you cook for</label><input type="number" id="plan-household" min="1" max="12" inputmode="numeric" value="${planSettings.householdSize}"></div>
+      <div class="field" style="margin:12px 0 0;"><label>Partner's name <span style="text-transform:none;font-weight:500;">(optional, shown in I cooked this and ratings)</span></label><input type="text" id="plan-partner" maxlength="30" placeholder="Partner" value="${escapeHtml(partnerName)}"></div>
       <div class="staple-toggle-row" style="margin:12px 0 0;">
         <div class="label-group"><span class="label">Plan breakfast too</span><span class="desc">Otherwise the planner shows lunch and dinner</span></div>
         <button type="button" id="plan-breakfast" class="toggle-switch ${planSettings.planBreakfast ? 'on' : ''}" data-on="${planSettings.planBreakfast ? 'true' : 'false'}"></button>
@@ -7274,6 +7316,12 @@ function attachSettingsListeners() {
     showToast('Meal plan settings saved');
   };
   document.getElementById('plan-household').addEventListener('change', savePlanSettings);
+  document.getElementById('plan-partner').addEventListener('change', async (e) => {
+    const profiles = (await dbGet('settings', 'profiles')) || { key: 'profiles', userProfile: {}, partnerProfile: {} };
+    profiles.partnerProfile = { ...(profiles.partnerProfile || {}), name: e.target.value.trim() };
+    await dbPut('settings', profiles);
+    showToast('Saved');
+  });
   document.getElementById('plan-breakfast').addEventListener('click', (e) => {
     const b = e.currentTarget;
     const on = b.dataset.on !== 'true';
