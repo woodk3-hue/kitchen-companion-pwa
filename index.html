@@ -2354,6 +2354,28 @@ function openItemForm(item, prefill) {
   // Calories: typing marks them as entered by hand; the Estimate button asks Claude from the item's name
   const kcalInput = document.getElementById('f-kcal');
   kcalInput.dataset.source = (seed && seed.caloriesSource) || '';
+  // Typical values follow the name until calories are typed, estimated or read from a label
+  const fillTypical = () => {
+    if (kcalInput.value && kcalInput.dataset.source !== 'typical') return;
+    const t = typicalNutritionFor(document.getElementById('f-name').value.trim());
+    if (!t) {
+      if (kcalInput.dataset.source === 'typical') {
+        ['f-kcal', 'f-protein', 'f-carbs', 'f-fat'].forEach((id) => { document.getElementById(id).value = ''; });
+        kcalInput.dataset.source = '';
+        document.getElementById('f-kcal-source').textContent = '(optional)';
+      }
+      return;
+    }
+    kcalInput.value = t.caloriesPer100;
+    document.getElementById('f-kcal-unit').value = t.caloriesUnit;
+    document.getElementById('f-protein').value = t.proteinPer100;
+    document.getElementById('f-carbs').value = t.carbsPer100;
+    document.getElementById('f-fat').value = t.fatPer100;
+    kcalInput.dataset.source = 'typical';
+    document.getElementById('f-kcal-source').textContent = '(typical values: change if your pack says different)';
+  };
+  document.getElementById('f-name').addEventListener('input', debounce(fillTypical, 300));
+  if (!item) fillTypical();
   kcalInput.addEventListener('input', () => {
     kcalInput.dataset.source = 'manual';
     document.getElementById('f-kcal-source').textContent = '(entered)';
@@ -2863,6 +2885,7 @@ async function saveStocktake() {
         notes: '',
         freezerFriendlyRating: null,
         linkedPurchaseEventId: null,
+        ...typicalItemFields(pick.name),
         createdAt: now,
         updatedAt: now
       };
@@ -3251,7 +3274,12 @@ async function openRecipeDetail(id) {
         ${stat('Cook', recipe.cookMinutes ? recipe.cookMinutes + ' min' : '')}
         ${stat('Difficulty', recipe.difficulty)}
       </div>
-      ${macroPanelHtml}
+      ${macros.kcal ? macroPanelHtml : `
+        <div class="cook-box" style="margin-bottom:14px;">
+          <p class="recipe-muted" style="margin:0 0 8px;">No calories or macros saved for this recipe yet.</p>
+          <button type="button" class="btn-primary" id="recipe-calc-btn" style="margin:0;">🧮 Work out from the ingredients</button>
+          <p class="recipe-muted" id="recipe-calc-note" style="margin:6px 0 0;"></p>
+        </div>`}
 
       <div class="rating-row">
         <span class="rating-label">You</span>
@@ -3312,6 +3340,26 @@ async function openRecipeDetail(id) {
   });
 
   document.getElementById('edit-recipe-btn').addEventListener('click', () => openRecipeForm(recipe));
+  const calcBtn = document.getElementById('recipe-calc-btn');
+  if (calcBtn) calcBtn.addEventListener('click', async () => {
+    const calc = nutritionFromIngredients(recipe.ingredients, recipe.servings || 1, kitchenItems);
+    if (!calc.counted.length) {
+      document.getElementById('recipe-calc-note').textContent = 'None of the ingredients have amounts the app knows. Tap Edit recipe and add them one per line, e.g. "240 g jasmine rice".';
+      return;
+    }
+    const p = calc.perServing;
+    Object.assign(recipe, {
+      caloriesPerServing: p.kcal, proteinGramsPerServing: p.protein, carbsGramsPerServing: p.carbs, fatGramsPerServing: p.fat,
+      proteinLevel: p.protein >= 25 ? 'High' : p.protein >= 12 ? 'Medium' : 'Low',
+      fatLevel: p.fat > 20 ? 'High' : p.fat > 12 ? 'Medium' : 'Low',
+      userModified: recipe.source === 'built-in' ? true : !!recipe.userModified,
+      updatedAt: new Date().toISOString()
+    });
+    await dbPut('recipes', recipe);
+    showToast(calc.missing.length ? `Worked out. Not counted: ${calc.missing.join(', ')}` : 'Calories and macros worked out');
+    openRecipeDetail(id);
+    renderRoute();
+  });
   document.getElementById('plan-recipe-btn').addEventListener('click', () => openAddRecipeToPlan(recipe));
   document.getElementById('cooked-recipe-btn').addEventListener('click', () => openCookedThis(recipe, { serves }));
   const changeServes = (d) => {
@@ -3493,6 +3541,8 @@ function openRecipeForm(recipe) {
                 ${PRIMARY_PROTEINS.map((p) => `<option value="${p}" ${r.primaryProtein === p ? 'selected' : ''}>${p}</option>`).join('')}
               </select>
             </div>
+            <button type="button" class="btn-secondary" id="r-calc" style="margin:0 0 6px;">🧮 Work out from ingredients</button>
+            <p class="recipe-muted" id="r-calc-note" style="margin:0 0 10px;">Uses typical values for each ingredient and its amount, divided by the serves. Left empty, they're worked out when you save.</p>
             <div class="field-row">
               <div class="field"><label>Calories / serve</label><input type="number" id="r-calories" min="0" value="${r.caloriesPerServing ?? ''}" placeholder="approx."></div>
               <div class="field"><label>Protein g / serve</label><input type="number" id="r-proteinGrams" min="0" value="${r.proteinGramsPerServing ?? ''}" placeholder="approx."></div>
@@ -3534,15 +3584,51 @@ function openRecipeForm(recipe) {
     });
   });
 
+  document.getElementById('r-calc').addEventListener('click', async () => {
+    const calc = await calcRecipeFormNutrition(recipe);
+    const note = document.getElementById('r-calc-note');
+    if (!calc.counted.length) {
+      note.textContent = 'No ingredients with amounts the app knows. Add them one per line, e.g. "240 g jasmine rice".';
+      return;
+    }
+    const p = calc.perServing;
+    document.getElementById('r-calories').value = p.kcal;
+    document.getElementById('r-proteinGrams').value = p.protein;
+    document.getElementById('r-carbsGrams').value = p.carbs;
+    document.getElementById('r-fatGrams').value = p.fat;
+    note.textContent = `Per serve: ${p.kcal} kcal · P ${p.protein} g · C ${p.carbs} g · F ${p.fat} g (approximate).${calc.missing.length ? ` Not counted: ${calc.missing.join(', ')}.` : ''}`;
+  });
+
   document.getElementById('recipe-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     await saveRecipeFromForm(recipe);
   });
 }
 
+// Nutrition per serve from what's typed in the recipe form right now
+async function calcRecipeFormNutrition(existing) {
+  const previousIngredients = existing ? existing.ingredients : [];
+  const knownLookup = buildKnownIngredientLookup(existing ? existing.id : null);
+  const ingredients = document.getElementById('r-ingredients').value.split('\n')
+    .map((line) => parseIngredientLine(line, previousIngredients, knownLookup))
+    .filter(Boolean);
+  const servings = parseFloat(document.getElementById('r-servings').value) || 1;
+  return nutritionFromIngredients(ingredients, servings, await dbGetAll('inventoryItems'));
+}
+
 async function saveRecipeFromForm(existing) {
   const name = document.getElementById('r-name').value.trim();
   if (!name) return;
+
+  // Nothing typed for nutrition: work it out from the ingredients
+  const nutritionIds = ['r-calories', 'r-proteinGrams', 'r-carbsGrams', 'r-fatGrams'];
+  if (nutritionIds.every((id) => document.getElementById(id).value === '')) {
+    const calc = await calcRecipeFormNutrition(existing);
+    if (calc.counted.length) {
+      const p = calc.perServing;
+      [p.kcal, p.protein, p.carbs, p.fat].forEach((v, i) => { document.getElementById(nutritionIds[i]).value = v; });
+    }
+  }
 
   const selectedVal = (id) => {
     const el = document.querySelector(`#${id} button.selected`);
@@ -3702,7 +3788,7 @@ function recipeDiet(recipe) {
   const lowCarb = carbs != null ? carbs <= 20 && mainStarch === 0 : mainStarch === 0;
   const keto = carbs != null ? carbs <= 10 && mainStarch === 0 : (mainStarch === 0 && !sides.length && recipe.fatLevel !== 'Low');
   const lowFat = fat != null ? fat <= 12 : recipe.fatLevel === 'Low';
-  const highProtein = recipe.proteinLevel === 'High' || (recipe.proteinGramsPerServing || 0) >= 30;
+  const highProtein = recipe.proteinGramsPerServing != null ? recipe.proteinGramsPerServing >= 25 : recipe.proteinLevel === 'High';
   return { lowCarb, keto, lowFat, highProtein, skip: lowCarb ? sides.map((i) => i.name) : [] };
 }
 
@@ -4342,7 +4428,208 @@ function macrosFrom(source) {
   return { proteinPer100: macroOrNull(source.proteinPer100), carbsPer100: macroOrNull(source.carbsPer100), fatPer100: macroOrNull(source.fatPer100) };
 }
 
-const CALORIE_SOURCE_LABELS = { label: 'from label', database: 'from barcode database', estimated: 'estimated', manual: 'entered' };
+/* ============================================================
+   TYPICAL NUTRITION (built in, works offline)
+   Approximate values per 100 g (per 100 ml for liquids), raw or as
+   bought, for common ingredients. Used to work out a recipe's
+   calories and macros from its ingredients, and to fill in a kitchen
+   item's values from its name. `each`, `can`, `bunch`, `cup`, `tsp`
+   and `tbsp` give grams for that food where they differ from the defaults;
+   `edible` is the part that's eaten for food bought on the bone.
+   ============================================================ */
+const FOOD_NUTRITION = [
+  // Rice, grains, flour, bread
+  { names: ['rice', 'basmati rice', 'jasmine rice', 'white rice', 'long grain rice', 'sushi rice'], kcal: 360, p: 7, c: 79, f: 0.6, cup: 185 },
+  { names: ['brown rice'], kcal: 362, p: 7.5, c: 76, f: 2.7, cup: 185 },
+  { names: ['cooked rice', 'steamed rice', 'microwave rice'], kcal: 130, p: 2.7, c: 28, f: 0.3, cup: 160 },
+  { names: ['pasta', 'spaghetti', 'penne', 'fettuccine', 'macaroni', 'small pasta', 'lasagne sheets'], kcal: 357, p: 12.5, c: 72, f: 1.5 },
+  { names: ['egg noodles', 'noodles'], kcal: 380, p: 14, c: 71, f: 4 },
+  { names: ['rice noodles', 'vermicelli'], kcal: 360, p: 6, c: 80, f: 0.6 },
+  { names: ['plain flour', 'flour', 'self raising flour', 'atta flour', 'wholemeal flour'], kcal: 350, p: 10, c: 73, f: 1.2, cup: 125, tbsp: 9 },
+  { names: ['besan', 'chickpea flour'], kcal: 387, p: 22, c: 58, f: 6.7, cup: 110 },
+  { names: ['cornflour', 'cornstarch'], kcal: 381, p: 0.3, c: 91, f: 0.1, tsp: 3, tbsp: 9 },
+  { names: ['oats', 'rolled oats'], kcal: 380, p: 13, c: 60, f: 7, cup: 90 },
+  { names: ['bread', 'toast', 'wholemeal bread'], kcal: 250, p: 9, c: 46, f: 3, each: 35 },
+  { names: ['naan'], kcal: 290, p: 9, c: 50, f: 6, each: 90 },
+  { names: ['roti', 'chapati', 'tortilla', 'wrap'], kcal: 300, p: 9, c: 50, f: 7, each: 40 },
+  { names: ['couscous'], kcal: 376, p: 13, c: 77, f: 0.6, cup: 175 },
+  { names: ['quinoa'], kcal: 368, p: 14, c: 64, f: 6, cup: 170 },
+  { names: ['breadcrumbs'], kcal: 395, p: 13, c: 72, f: 5, cup: 110 },
+  // Starchy veg and legumes
+  { names: ['potato', 'potatoes', 'baby potatoes'], kcal: 77, p: 2, c: 17, f: 0.1, each: 170 },
+  { names: ['sweet potato'], kcal: 86, p: 1.6, c: 20, f: 0.1, each: 250 },
+  { names: ['pumpkin', 'butternut', 'butternut pumpkin'], kcal: 40, p: 1, c: 8, f: 0.1 },
+  { names: ['lentils', 'red lentils', 'masoor dal', 'dal', 'toor dal', 'moong dal', 'chana dal', 'split peas', 'brown lentils'], kcal: 350, p: 24, c: 60, f: 1.5, cup: 190 },
+  { names: ['chickpeas'], kcal: 120, p: 7, c: 16, f: 2.5, can: 240 },
+  { names: ['beans', 'kidney beans', 'black beans', 'cannellini beans', 'baked beans'], kcal: 105, p: 7, c: 15, f: 0.6, can: 240 },
+  { names: ['corn', 'sweetcorn', 'corn kernels'], kcal: 86, p: 3.3, c: 19, f: 1.4, each: 200, can: 300 },
+  // Meat, fish, eggs, tofu
+  { names: ['whole chicken', 'chicken whole'], kcal: 150, p: 19, c: 0, f: 8, edible: 0.65 },
+  { names: ['chicken'], kcal: 150, p: 19, c: 0, f: 8 },
+  { names: ['chicken thigh', 'chicken thighs', 'chicken thigh fillets'], kcal: 135, p: 19, c: 0, f: 6.5 },
+  { names: ['chicken breast', 'chicken breasts', 'chicken breast fillets'], kcal: 110, p: 23, c: 0, f: 1.5 },
+  { names: ['chicken drumsticks', 'chicken wings', 'chicken marylands', 'drumsticks'], kcal: 165, p: 18, c: 0, f: 10, edible: 0.7 },
+  { names: ['lamb chops', 'lamb shanks', 'pork chops', 'cutlets'], kcal: 230, p: 19, c: 0, f: 17, edible: 0.75 },
+  { names: ['beef mince', 'mince', 'pork mince', 'lamb mince'], kcal: 200, p: 19, c: 0, f: 14 },
+  { names: ['lean beef mince', 'lean mince', 'extra lean mince', 'chicken mince', 'turkey mince'], kcal: 140, p: 21, c: 0, f: 6 },
+  { names: ['beef', 'steak', 'rump steak', 'chuck steak', 'gravy beef', 'stewing beef', 'diced beef', 'sirloin', 'blade steak'], kcal: 140, p: 21, c: 0, f: 6 },
+  { names: ['lamb', 'lamb shoulder', 'lamb leg', 'diced lamb'], kcal: 200, p: 19, c: 0, f: 14 },
+  { names: ['pork', 'pork shoulder', 'pork loin', 'pork belly', 'diced pork'], kcal: 180, p: 20, c: 0, f: 11 },
+  { names: ['bacon', 'ham'], kcal: 200, p: 18, c: 1, f: 14 },
+  { names: ['sausages', 'sausage'], kcal: 260, p: 13, c: 5, f: 21, each: 70 },
+  { names: ['fish', 'white fish', 'fish fillets', 'barramundi', 'barramundi fillets', 'snapper', 'basa', 'cod', 'haddock', 'flathead', 'hake', 'whiting'], kcal: 95, p: 20, c: 0, f: 1.5, each: 150 },
+  { names: ['smoked fish', 'smoked haddock'], kcal: 100, p: 23, c: 0, f: 1 },
+  { names: ['salmon', 'salmon fillets', 'trout'], kcal: 200, p: 20, c: 0, f: 13, each: 150 },
+  { names: ['prawns', 'shrimp'], kcal: 85, p: 19, c: 0, f: 1 },
+  { names: ['tuna', 'canned tuna'], kcal: 110, p: 25, c: 0, f: 1, can: 185 },
+  { names: ['egg', 'eggs'], kcal: 140, p: 12.5, c: 0.5, f: 10, each: 50 },
+  { names: ['tofu', 'firm tofu'], kcal: 120, p: 13, c: 2, f: 7 },
+  { names: ['paneer'], kcal: 300, p: 18, c: 4, f: 24 },
+  // Dairy and fats
+  { names: ['milk', 'full cream milk'], kcal: 64, p: 3.4, c: 4.8, f: 3.6, cup: 250 },
+  { names: ['skim milk', 'light milk', 'low fat milk'], kcal: 38, p: 3.6, c: 5, f: 0.3, cup: 250 },
+  { names: ['yoghurt', 'greek yoghurt', 'plain yoghurt', 'natural yoghurt', 'yogurt', 'greek yogurt'], kcal: 100, p: 9, c: 4, f: 5, cup: 250 },
+  { names: ['cheese', 'cheddar', 'tasty cheese'], kcal: 400, p: 25, c: 0.5, f: 33 },
+  { names: ['parmesan'], kcal: 430, p: 38, c: 0, f: 30 },
+  { names: ['mozzarella', 'feta'], kcal: 280, p: 20, c: 2, f: 21 },
+  { names: ['butter'], kcal: 720, p: 0.6, c: 0, f: 80, tbsp: 14 },
+  { names: ['ghee'], kcal: 880, p: 0, c: 0, f: 99.5, tbsp: 13, tsp: 4.5 },
+  { names: ['cream', 'thickened cream', 'pouring cream'], kcal: 340, p: 2, c: 3, f: 35 },
+  { names: ['light cream', 'light cooking cream', 'cooking cream'], kcal: 190, p: 3, c: 5, f: 18 },
+  { names: ['sour cream'], kcal: 200, p: 3, c: 4, f: 19 },
+  { names: ['coconut milk'], kcal: 200, p: 2, c: 3, f: 20, can: 400 },
+  { names: ['light coconut milk', 'lite coconut milk'], kcal: 95, p: 1, c: 2, f: 9, can: 400 },
+  { names: ['coconut cream'], kcal: 230, p: 2, c: 3, f: 24, can: 400 },
+  { names: ['oil', 'olive oil', 'vegetable oil', 'canola oil', 'sunflower oil', 'coconut oil', 'sesame oil', 'mustard oil', 'peanut oil', 'rice bran oil'], kcal: 884, p: 0, c: 0, f: 100, tsp: 4.5, tbsp: 13 },
+  // Vegetables and herbs
+  { names: ['onion', 'brown onion', 'red onion', 'white onion', 'shallots'], kcal: 40, p: 1.1, c: 9, f: 0.1, each: 150 },
+  { names: ['spring onion', 'spring onions', 'green onion', 'scallions'], kcal: 32, p: 1.8, c: 7, f: 0.2, each: 15, bunch: 100 },
+  { names: ['garlic'], kcal: 149, p: 6.4, c: 33, f: 0.5, each: 40, clove: 5 },
+  { names: ['ginger'], kcal: 80, p: 1.8, c: 18, f: 0.8 },
+  { names: ['tomato', 'tomatoes', 'cherry tomatoes'], kcal: 18, p: 0.9, c: 3.9, f: 0.2, each: 120 },
+  { names: ['crushed tomatoes', 'diced tomatoes', 'canned tomatoes', 'tinned tomatoes', 'chopped tomatoes', 'whole peeled tomatoes'], kcal: 25, p: 1.2, c: 4, f: 0.2, can: 400 },
+  { names: ['tomato paste', 'tomato puree'], kcal: 82, p: 4.3, c: 19, f: 0.5, tbsp: 16 },
+  { names: ['passata'], kcal: 30, p: 1.5, c: 6, f: 0.2 },
+  { names: ['capsicum', 'green capsicum', 'red capsicum', 'bell pepper'], kcal: 26, p: 1, c: 6, f: 0.3, each: 160 },
+  { names: ['carrot', 'carrots'], kcal: 41, p: 0.9, c: 10, f: 0.2, each: 120 },
+  { names: ['celery'], kcal: 16, p: 0.7, c: 3, f: 0.2, each: 40 },
+  { names: ['peas', 'green peas', 'frozen peas'], kcal: 80, p: 5.4, c: 14, f: 0.4, cup: 150 },
+  { names: ['spinach', 'baby spinach', 'english spinach'], kcal: 23, p: 2.9, c: 3.6, f: 0.4, bunch: 250, cup: 30 },
+  { names: ['broccoli', 'broccolini'], kcal: 34, p: 2.8, c: 7, f: 0.4, each: 300, bunch: 200 },
+  { names: ['chinese broccoli', 'gai lan'], kcal: 22, p: 1.1, c: 3.8, f: 0.7, bunch: 300 },
+  { names: ['bok choy', 'pak choy', 'baby bok choy'], kcal: 13, p: 1.5, c: 2.2, f: 0.2, each: 150, bunch: 300 },
+  { names: ['cabbage'], kcal: 25, p: 1.3, c: 6, f: 0.1, each: 900 },
+  { names: ['cauliflower'], kcal: 25, p: 1.9, c: 5, f: 0.3, each: 600 },
+  { names: ['zucchini'], kcal: 17, p: 1.2, c: 3.1, f: 0.3, each: 200 },
+  { names: ['eggplant'], kcal: 25, p: 1, c: 6, f: 0.2, each: 300 },
+  { names: ['mushrooms', 'mushroom'], kcal: 22, p: 3.1, c: 3.3, f: 0.3 },
+  { names: ['green beans', 'beans green', 'snake beans'], kcal: 31, p: 1.8, c: 7, f: 0.1 },
+  { names: ['mixed vegetables', 'vegetables', 'frozen vegetables', 'stir fry vegetables'], kcal: 45, p: 2, c: 8, f: 0.3 },
+  { names: ['lettuce', 'salad leaves', 'rocket'], kcal: 15, p: 1.4, c: 2.9, f: 0.2, each: 500 },
+  { names: ['cucumber'], kcal: 15, p: 0.7, c: 3.6, f: 0.1, each: 300 },
+  { names: ['avocado'], kcal: 160, p: 2, c: 9, f: 15, each: 170 },
+  { names: ['chilli', 'chillies', 'green chilli', 'red chilli', 'bird eye chilli'], kcal: 40, p: 1.9, c: 9, f: 0.4, each: 10 },
+  { names: ['coriander', 'parsley', 'mint', 'basil', 'dill', 'curry leaves', 'thai basil'], kcal: 23, p: 2, c: 4, f: 0.5, bunch: 50, sprig: 1 },
+  { names: ['lemon', 'lime', 'lemon juice', 'lime juice'], kcal: 29, p: 1.1, c: 9, f: 0.3, each: 60 },
+  { names: ['bean sprouts'], kcal: 30, p: 3, c: 6, f: 0.2 },
+  // Fruit
+  { names: ['banana', 'bananas'], kcal: 89, p: 1.1, c: 23, f: 0.3, each: 120 },
+  { names: ['apple', 'apples'], kcal: 52, p: 0.3, c: 14, f: 0.2, each: 180 },
+  { names: ['orange', 'oranges'], kcal: 47, p: 0.9, c: 12, f: 0.1, each: 150 },
+  { names: ['berries', 'blueberries', 'strawberries'], kcal: 50, p: 0.8, c: 12, f: 0.3, cup: 150 },
+  { names: ['raisins', 'sultanas'], kcal: 299, p: 3, c: 79, f: 0.5, tbsp: 10 },
+  // Sauces, sweeteners, nuts, stock
+  { names: ['sugar', 'brown sugar', 'jaggery', 'caster sugar'], kcal: 400, p: 0, c: 100, f: 0, tsp: 4, tbsp: 12 },
+  { names: ['honey', 'maple syrup'], kcal: 304, p: 0.3, c: 82, f: 0, tbsp: 21 },
+  { names: ['soy sauce', 'light soy sauce', 'dark soy sauce', 'kecap manis'], kcal: 53, p: 8, c: 5, f: 0.6, tbsp: 18 },
+  { names: ['oyster sauce', 'hoisin sauce'], kcal: 100, p: 1.5, c: 22, f: 0.5, tbsp: 18 },
+  { names: ['fish sauce'], kcal: 35, p: 5, c: 4, f: 0, tbsp: 18 },
+  { names: ['tomato sauce', 'ketchup', 'bbq sauce', 'sweet chilli sauce'], kcal: 110, p: 1, c: 26, f: 0.1, tbsp: 18 },
+  { names: ['tamarind', 'tamarind paste'], kcal: 240, p: 3, c: 57, f: 0.6 },
+  { names: ['vinegar', 'white vinegar', 'malt vinegar', 'rice vinegar'], kcal: 20, p: 0, c: 1, f: 0 },
+  { names: ['curry paste', 'red curry paste', 'green curry paste', 'tikka paste'], kcal: 150, p: 2, c: 10, f: 11, tbsp: 16 },
+  { names: ['peanut butter'], kcal: 590, p: 25, c: 20, f: 50, tbsp: 16 },
+  { names: ['nuts', 'almonds', 'cashews', 'peanuts', 'walnuts'], kcal: 600, p: 20, c: 20, f: 52, cup: 140 },
+  { names: ['stock', 'chicken stock', 'beef stock', 'vegetable stock', 'broth'], kcal: 5, p: 0.5, c: 0.5, f: 0.1, cup: 250 },
+  { names: ['protein powder', 'whey protein', 'whey'], kcal: 380, p: 75, c: 8, f: 5, each: 30 },
+  { names: ['water', 'salt', 'sea salt', 'ice'], kcal: 0, p: 0, c: 0, f: 0 },
+  // Dried spices: a teaspoon is about 2.5 g
+  { names: ['spices', 'turmeric', 'cumin', 'cumin seeds', 'ground cumin', 'coriander seeds', 'ground coriander', 'garam masala', 'curry powder', 'chilli powder', 'kashmiri chilli powder', 'paprika', 'smoked paprika', 'cinnamon', 'cardamom', 'cloves', 'black pepper', 'pepper', 'peppercorns', 'black peppercorns', 'mustard seeds', 'fenugreek', 'bay leaves', 'asafoetida', 'fennel seeds', 'star anise', 'nutmeg', 'oregano', 'thyme', 'mixed herbs', 'dried herbs', 'chilli flakes', 'sambar powder', 'rasam powder'], kcal: 330, p: 12, c: 50, f: 12, tsp: 2.5, tbsp: 7 }
+];
+
+// Grams for one of each unit when the food doesn't say
+const UNIT_GRAMS = { g: 1, kg: 1000, ml: 1, L: 1000, tsp: 5, tbsp: 15, cup: 200, clove: 5, bunch: 100, sprig: 1, pinch: 0.4, can: 400 };
+
+const FOOD_NUTRITION_INDEX = FOOD_NUTRITION.flatMap((food) => food.names.map((n) => ({ words: matchWords(n), food })));
+
+// The most specific food whose name appears as whole words in the text: "lean beef mince" beats "mince"
+function findFood(text) {
+  const words = ` ${matchWords(text)} `;
+  let best = null;
+  for (const entry of FOOD_NUTRITION_INDEX) {
+    if (entry.words && words.includes(` ${entry.words} `) && (!best || entry.words.length > best.words.length)) best = entry;
+  }
+  return best ? best.food : null;
+}
+
+function gramsOf(quantity, unit, food) {
+  if (quantity == null || !Number.isFinite(quantity)) return null;
+  const u = unit || 'each';
+  if (u === 'each') return food.each ? quantity * food.each : null;
+  const per = food[u] || UNIT_GRAMS[u];
+  return per ? quantity * per : null;
+}
+
+// The calorie fields for a new kitchen item, from typical values when the app knows the food
+function typicalItemFields(name) {
+  const t = typicalNutritionFor(name);
+  return t ? { ...t, caloriesSource: 'typical' } : {};
+}
+
+// Typical per-100 g values for a kitchen item's name, or null if it isn't a food the app knows
+function typicalNutritionFor(name) {
+  const food = findFood(name);
+  if (!food || !food.kcal) return null;
+  const liquid = /\b(milk|stock|broth|juice|oil|sauce|cream|water)\b/i.test(name);
+  return { caloriesPer100: food.kcal, caloriesUnit: liquid ? 'ml' : 'g', proteinPer100: food.p, carbsPer100: food.c, fatPer100: food.f };
+}
+
+/* Works out calories and macros per serving from a list of ingredients.
+   A kitchen item with its own saved values (e.g. from its label) is used before the typical values.
+   Returns the per-serving numbers and which ingredients were and weren't counted. */
+function nutritionFromIngredients(ingredients, servings, kitchenItems = []) {
+  const index = buildInventoryIndex(kitchenItems.filter((i) => i.caloriesPer100));
+  const total = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+  const counted = [];
+  const missing = [];
+  for (const ing of ingredients || []) {
+    if (ing.optional) continue;
+    const kitchen = index.length ? findInventoryMatch(ing, index) : null;
+    const typical = findFood([ing.name, ...(ing.matchTerms || [])].join(' | '));
+    // Kitchen item values win; the typical entry still supplies weights like "1 each = 150 g"
+    const food = kitchen
+      ? { ...(typical || {}), kcal: kitchen.item.caloriesPer100, p: kitchen.item.proteinPer100 ?? (typical ? typical.p : 0), c: kitchen.item.carbsPer100 ?? (typical ? typical.c : 0), f: kitchen.item.fatPer100 ?? (typical ? typical.f : 0) }
+      : typical;
+    if (!food) { if (!ing.assumedStaple) missing.push(ing.name); continue; }
+    if (ing.quantity == null) { if (food.kcal && !ing.assumedStaple && !/salt|pepper|water/i.test(ing.name)) missing.push(`${ing.name} (no amount)`); continue; }
+    const grams = gramsOf(ing.quantity, ing.unit, food);
+    if (grams == null) { missing.push(`${ing.name} (${ing.unit || 'each'})`); continue; }
+    const k = (grams * (food.edible || 1)) / 100;
+    total.kcal += food.kcal * k;
+    total.protein += (food.p || 0) * k;
+    total.carbs += (food.c || 0) * k;
+    total.fat += (food.f || 0) * k;
+    counted.push(ing.name);
+  }
+  const s = servings && servings > 0 ? servings : 1;
+  return {
+    perServing: { kcal: Math.round(total.kcal / s), protein: Math.round(total.protein / s), carbs: Math.round(total.carbs / s), fat: Math.round(total.fat / s) },
+    counted,
+    missing
+  };
+}
+
+const CALORIE_SOURCE_LABELS = { label: 'from label', database: 'from barcode database', estimated: 'estimated', manual: 'entered', typical: 'typical values' };
 
 function itemCaloriesText(item) {
   if (!item.caloriesPer100) return '';
@@ -5899,7 +6186,18 @@ function openQuickAdd(date, meal, prefill = {}) {
     const text = document.getElementById('qa-name').value.trim();
     const note = document.getElementById('qa-note');
     if (!text) { showToast('Describe what you had first'); return; }
-    if (!getAiKey()) { note.textContent = 'Estimates use Claude: add your API key in Settings → AI suggestions. Or type the numbers in.'; return; }
+    if (!getAiKey()) {
+      // Without Claude: work it out from typical values when it's "amount + food", e.g. "240 g jasmine rice"
+      const ing = parseIngredientLine(text, [], new Map());
+      const calc = ing && ing.quantity ? nutritionFromIngredients([ing], 1) : null;
+      if (calc && calc.counted.length) {
+        setNutrientFields('qa', calc.perServing);
+        note.textContent = `Typical values for ${formatIngredientQuantity(ing)} ${ing.name}. Check and adjust before logging.`;
+      } else {
+        note.textContent = 'Type an amount and a food (e.g. "240 g jasmine rice") to use typical values, or add your API key in Settings → AI suggestions for estimates of anything (like "12 oz coffee with skim milk").';
+      }
+      return;
+    }
     btn.disabled = true;
     btn.textContent = 'Estimating…';
     const r = await estimateFoodMacros(text);
@@ -5946,6 +6244,11 @@ async function openLogFromKitchen(date, meal, preselectId) {
 
 function openLogKitchenItem(date, meal, item) {
   if (item.recipeId && item.portionCount) return openLogLeftover(date, meal, item);
+  // No calories saved for this item: use typical values for the food if the app knows it
+  if (!item.caloriesPer100) {
+    const t = typicalNutritionFor(item.name);
+    if (t) item = { ...item, ...t, caloriesSource: 'typical' };
+  }
   const per100 = item.caloriesPer100;
   const eatenUnit = item.caloriesUnit === 'ml' ? 'ml' : 'g';
   const hasQty = item.quantity != null && item.quantity > 0;
@@ -7121,7 +7424,7 @@ async function openShoppingToKitchen() {
           states, category: r.entry.category || 'Other', isStaple: false, purchaseDate: localDateString(new Date()),
           expiryDate: suggestion ? localDateString(addDays(new Date(), suggestion.suggestedDaysMax)) : null,
           useByOverrideDays: null, cost: null, notes: '', freezerFriendlyRating: null, linkedPurchaseEventId: null,
-          runningLow: false, createdAt: now, updatedAt: now
+          runningLow: false, ...typicalItemFields(r.entry.name), createdAt: now, updatedAt: now
         });
         await logHistory(newId, 'created', qty, null, location, 'Bought (shopping list)');
       }

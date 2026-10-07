@@ -177,6 +177,14 @@ The **Today** tab (formerly Home) is a food diary, like a fitness tracker:
 - **Calories, protein, carbs and fat** per serving are shown as four tiles on the recipe page, and as a coloured "P · C · F" line on each recipe card.
 - On **Today**, every logged food shows its protein, carbs and fat under its name, and each meal shows its totals. Recipe servings logged before carbs and fat were tracked are filled in from the recipe the next time Today opens.
 
+## Calories and macros without an API key
+
+PantryFit has typical values (per 100 g, raw or as bought) for about 120 common foods built in: rice, pasta, flour, meats, fish, eggs, dairy, oils, vegetables, fruit, sauces, legumes and spices. They're in `FOOD_NUTRITION` in `index.html` and work offline.
+- **Recipes**: leave the nutrition boxes empty and the calories, protein, carbs and fat per serve are worked out from the ingredients when you save (e.g. "240 g jasmine rice", 4 serves → 216 kcal, 47 g carbs). Or tap **🧮 Work out from ingredients** in Edit recipe → Nutrition & details. A saved recipe with no calories has a **🧮 Work out from the ingredients** button on its page. Ingredients the app doesn't know, or without an amount, are listed as not counted. Amounts are treated as uncooked; write "cooked rice" for cooked. Kitchen items with their own values (from a label or barcode) are used first. Food bought on the bone (whole chicken, drumsticks, chops) only counts the part you eat.
+- **Kitchen items**: typing a name such as "Jasmine rice" fills in typical calories and macros per 100 g, marked *typical values*; change them if your pack says different. Items added by stocktake or from the shopping list get them too, and logging an item with no calories saved uses them.
+- **Quick add** without an API key: type an amount and a food ("240 g jasmine rice") and tap ✨ Estimate. With an API key, Claude estimates anything ("12 oz coffee with skim milk").
+- The **High protein** tag uses the protein grams per serve when a recipe has them (25 g or more).
+
 ## Fast & easy meals
 
 - Recipes tab: **⚡ 15 min** and **≤ 30 min** filters (prep + cooking time). Recipes 15 minutes or under show ⚡ next to their time.
