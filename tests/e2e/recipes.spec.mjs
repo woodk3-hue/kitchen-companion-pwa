@@ -38,7 +38,7 @@ test('quick and eating-style filters narrow the recipe list', async ({ page }) =
 
   await page.locator('.recipe-card', { hasText: 'Kerala Fish Curry' }).click();
   await expect(page.locator('.modal-scroll-area')).toContainText('skip the rice');
-  await expect(page.locator('.modal-scroll-area')).toContainText('g carbs');
+  await expect(page.locator('.macro-tiles .mt-carbs')).toContainText('10');
   expect(errors).toEqual([]);
 });
 
