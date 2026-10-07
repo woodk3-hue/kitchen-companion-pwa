@@ -658,6 +658,8 @@ h1, h2, h3 {
 .stocktake-btn .st-btn-title { font-size: 15px; font-weight: 800; }
 .stocktake-btn .st-btn-desc { font-size: 12px; color: var(--color-ink-soft); margin-top: 2px; }
 .modal-sheet.tall { height: 92vh; max-height: 92vh; }
+.modal-sheet.fullscreen { height: 100vh; max-height: 100vh; border-radius: 0; padding: 14px 16px 0; }
+.modal-sheet.fullscreen .modal-handle { display: none; }
 .st-intro { font-size: 13px; color: var(--color-ink-soft); margin: 0 0 10px; }
 .st-body { flex: 1; }
 .st-add { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
@@ -1949,8 +1951,9 @@ function showToast(message) {
 }
 
 function openModal(html) {
-  document.getElementById('modal-sheet').classList.remove('tall');
-  document.getElementById('modal-sheet').innerHTML = `<div class="modal-handle"></div>${html}`;
+  const sheet = document.getElementById('modal-sheet');
+  sheet.classList.remove('tall', 'fullscreen');
+  sheet.innerHTML = `<div class="modal-handle"></div>${html}`;
   document.getElementById('modal-overlay').classList.add('open');
 }
 function closeModal() {
@@ -3705,6 +3708,11 @@ function openRecipeForm(recipe, prefill) {
         <div class="field">
           <label>Ingredients <span style="text-transform:none;font-weight:500;">(one per line, e.g. "500 g chicken thigh, diced")</span></label>
           <textarea id="r-ingredients" rows="8" placeholder="500 g chicken thigh, diced&#10;2 onions, sliced&#10;1 tsp turmeric&#10;coriander, to garnish (optional)">${escapeHtml(r.ingredients.map(ingredientToLine).join('\n'))}</textarea>
+          <div class="field-row" style="margin-top:6px;">
+            <button type="button" class="btn-secondary" id="r-scan-barcode" style="margin:0;flex:1;">▦ Scan a jar / sauce</button>
+            <button type="button" class="btn-secondary" id="r-scan-label" style="margin:0;flex:1;">🏷️ Label photo</button>
+          </div>
+          <p class="recipe-muted" style="margin:6px 0 0;">Scans the packet's barcode or nutrition panel, adds it to this recipe with its per-100 g values, and puts the packet in your pantry.</p>
         </div>
 
         <div class="field">
@@ -3748,6 +3756,7 @@ function openRecipeForm(recipe, prefill) {
   `;
 
   openModal(html);
+  document.getElementById('modal-sheet').classList.add('fullscreen');
   document.getElementById('modal-close').addEventListener('click', closeModal);
 
   document.querySelectorAll('#r-difficulty button, #r-proteinLevel button, #r-fatLevel button').forEach((btn) => {
@@ -3782,8 +3791,13 @@ function openRecipeForm(recipe, prefill) {
     note.textContent = `Per serve: ${p.kcal} kcal · P ${p.protein} g · C ${p.carbs} g · F ${p.fat} g (approximate).${calc.missing.length ? ` Not counted: ${calc.missing.join(', ')}.` : ''}`;
   });
 
+  document.getElementById('r-scan-barcode').addEventListener('click', () => startRecipePacketScan('barcode', isEdit, recipe));
+  document.getElementById('r-scan-label').addEventListener('click', () => startRecipePacketScan('label', isEdit, recipe));
+
   document.getElementById('recipe-form').addEventListener('submit', async (e) => {
     e.preventDefault();
+    // Clear the packet-scan context once the recipe is saved
+    PacketScanContext.target = 'myway'; PacketScanContext.recipeDraft = null; PacketScanContext.isEdit = false;
     await saveRecipeFromForm(recipe);
   });
 }
@@ -4378,7 +4392,104 @@ function packetBackButton() {
   return '<button type="button" class="btn-secondary" id="pk-back">Back to the recipe</button>';
 }
 function attachPacketBack() {
-  document.getElementById('pk-back').addEventListener('click', () => { stopBarcodeCamera(); openMakeItMyWay(MyWay.recipe, true); });
+  document.getElementById('pk-back').addEventListener('click', () => { stopBarcodeCamera(); backToRecipeContext(); });
+}
+
+// Scanning from either Make it my way or the recipe-add/edit form. Set before openPacketBarcode / openPacketLabel.
+const PacketScanContext = { target: 'myway', recipeDraft: null, isEdit: false };
+function backToRecipeContext() {
+  if (PacketScanContext.target === 'recipeForm' && PacketScanContext.recipeDraft) {
+    const draft = PacketScanContext.recipeDraft;
+    openRecipeForm(PacketScanContext.isEdit ? draft : null, PacketScanContext.isEdit ? null : draft);
+  } else {
+    openMakeItMyWay(MyWay.recipe, true);
+  }
+}
+
+// Snapshot every field in the recipe-add/edit form so we can reopen it after a packet scan
+function captureRecipeFormDraft() {
+  const val = (id) => (document.getElementById(id) ? document.getElementById(id).value : '');
+  const toggleOn = (id) => { const el = document.getElementById(id); return el && el.dataset.on === 'true'; };
+  const segVal = (id) => { const el = document.querySelector(`#${id} button.selected`); return el ? el.dataset.val : null; };
+  const prevIngredients = PacketScanContext.recipeDraft ? PacketScanContext.recipeDraft.ingredients : [];
+  const lookup = buildKnownIngredientLookup(PacketScanContext.isEdit && PacketScanContext.recipeDraft ? PacketScanContext.recipeDraft.id : null);
+  const ingredients = val('r-ingredients').split('\n').filter((l) => l.trim())
+    .map((line) => parseIngredientLine(line, prevIngredients, lookup))
+    .filter(Boolean);
+  return normalizeRecipe({
+    ...(PacketScanContext.recipeDraft || {}),
+    name: val('r-name'),
+    cuisine: val('r-cuisine'),
+    mealTypes: Array.from(document.querySelectorAll('#r-mealTypes button.selected')).map((b) => b.dataset.val),
+    servings: val('r-servings'),
+    prepMinutes: val('r-prep'),
+    cookMinutes: val('r-cook'),
+    difficulty: segVal('r-difficulty'),
+    proteinLevel: segVal('r-proteinLevel'),
+    fatLevel: segVal('r-fatLevel'),
+    primaryProtein: val('r-primaryProtein'),
+    caloriesPerServing: val('r-calories'),
+    proteinGramsPerServing: val('r-proteinGrams'),
+    carbsGramsPerServing: val('r-carbsGrams'),
+    fatGramsPerServing: val('r-fatGrams'),
+    freezerFriendly: toggleOn('r-freezer'),
+    leftoverFriendly: toggleOn('r-leftover'),
+    ingredients,
+    method: val('r-method').split('\n').map((s) => s.trim()).filter(Boolean),
+    notes: val('r-notes')
+  });
+}
+
+function startRecipePacketScan(mode, isEdit, existingRecipe) {
+  const draft = captureRecipeFormDraft();
+  if (isEdit && existingRecipe) {
+    // Keep the recipe's own metadata so saving later doesn't wipe id / source / ratings
+    Object.assign(draft, {
+      id: existingRecipe.id, source: existingRecipe.source, seedId: existingRecipe.seedId,
+      userRating: existingRecipe.userRating, partnerRating: existingRecipe.partnerRating,
+      isFavourite: existingRecipe.isFavourite, userModified: existingRecipe.userModified,
+      createdAt: existingRecipe.createdAt
+    });
+  }
+  PacketScanContext.target = 'recipeForm';
+  PacketScanContext.isEdit = !!isEdit;
+  PacketScanContext.recipeDraft = draft;
+  if (mode === 'label') openPacketLabel(); else openPacketBarcode();
+}
+
+// Append a scanned packet to the recipe-form ingredients list and store it in the pantry
+// so the recipe's calculator can read its per-100 g values.
+async function addPacketToRecipeForm(name, quantity, unit, per100, from, pantry) {
+  const now = new Date().toISOString();
+  if (pantry) {
+    const items = await dbGetAll('inventoryItems');
+    const existing = items.find((i) => (pantry.barcode && i.barcode === pantry.barcode) || matchWords(i.name) === matchWords(name));
+    if (existing) {
+      if (existing.quantity != null && pantry.grams && existing.unit === 'g') existing.quantity = Math.round((existing.quantity + pantry.grams) * 10) / 10;
+      Object.assign(existing, { caloriesPer100: per100.kcal, caloriesUnit: 'g', caloriesSource: from === 'label' ? 'label' : 'database', ...macrosFrom({ proteinPer100: per100.p, carbsPer100: per100.c, fatPer100: per100.f }), updatedAt: now });
+      await dbPut('inventoryItems', existing);
+    } else {
+      await dbPut('inventoryItems', {
+        name, quantity: pantry.grams || null, unit: 'g', portionCount: null, portionSize: null, location: 'pantry', subLocation: null,
+        states: ['Raw'], category: 'Spices & Seasonings', isStaple: false, purchaseDate: localDateString(new Date()), expiryDate: null,
+        useByOverrideDays: null, cost: null, notes: '', freezerFriendlyRating: null, linkedPurchaseEventId: null, barcode: pantry.barcode || null,
+        caloriesPer100: per100.kcal, caloriesUnit: 'g', caloriesSource: from === 'label' ? 'label' : 'database',
+        ...macrosFrom({ proteinPer100: per100.p, carbsPer100: per100.c, fatPer100: per100.f }), runningLow: false, createdAt: now, updatedAt: now
+      });
+    }
+  }
+  // Give the ingredient the scanned nutrition so the recipe calculator uses it directly too
+  const kind = packetKind(name);
+  const ing = normalizeRecipeIngredient({
+    name, quantity, unit, category: 'Spices & Seasonings', matchTerms: [name.toLowerCase()],
+    nutrition: { kcal: per100.kcal, p: per100.p, c: per100.c, f: per100.f, from, tsp: kind.tsp || UNIT_GRAMS.tsp, tbsp: kind.tbsp || UNIT_GRAMS.tbsp }
+  });
+  const draft = PacketScanContext.recipeDraft || { ingredients: [] };
+  draft.ingredients = [...(draft.ingredients || []), ing];
+  PacketScanContext.recipeDraft = draft;
+  stopBarcodeCamera();
+  backToRecipeContext();
+  showToast(`Added ${formatIngredientQuantity(ing)} ${name}`);
 }
 
 function openPacketBarcode() {
@@ -4401,7 +4512,9 @@ function openPacketBarcode() {
     const packGrams = row.unit === 'g' ? Math.round(row.quantity) : row.unit === 'kg' ? Math.round(row.quantity * 1000) : null;
     const amt = readPacketAmount(packGrams, row.barcode);
     const name = document.getElementById('pk-name').value.trim() || row.name || 'Packet mix';
-    addPacketToMyWay(name, amt.quantity, amt.unit, { kcal: row.caloriesPer100, p: row.proteinPer100, c: row.carbsPer100, f: row.fatPer100 }, 'barcode', amt.pantry);
+    const per100 = { kcal: row.caloriesPer100, p: row.proteinPer100, c: row.carbsPer100, f: row.fatPer100 };
+    if (PacketScanContext.target === 'recipeForm') addPacketToRecipeForm(name, amt.quantity, amt.unit, per100, 'barcode', amt.pantry);
+    else addPacketToMyWay(name, amt.quantity, amt.unit, per100, 'barcode', amt.pantry);
   });
   attachPacketBack();
   scanNextBarcode();
@@ -4471,7 +4584,9 @@ function openPacketLabel() {
     if (Packet.label) {
       const amt = readPacketAmount(Packet.label.packAmount ? Math.round(Packet.label.packAmount) : null, null);
       const name = document.getElementById('pk-name').value.trim() || Packet.label.name || 'Packet mix';
-      addPacketToMyWay(name, amt.quantity, amt.unit, { kcal: Packet.label.per100.kcal, p: Packet.label.per100.protein, c: Packet.label.per100.carbs, f: Packet.label.per100.fat }, 'label', amt.pantry);
+      const per100 = { kcal: Packet.label.per100.kcal, p: Packet.label.per100.protein, c: Packet.label.per100.carbs, f: Packet.label.per100.fat };
+      if (PacketScanContext.target === 'recipeForm') addPacketToRecipeForm(name, amt.quantity, amt.unit, per100, 'label', amt.pantry);
+      else addPacketToMyWay(name, amt.quantity, amt.unit, per100, 'label', amt.pantry);
       return;
     }
     await readPacketLabel();
@@ -5647,6 +5762,25 @@ function typicalNutritionFor(name) {
 /* Works out calories and macros per serving from a list of ingredients.
    A kitchen item with its own saved values (e.g. from its label) is used before the typical values.
    Returns the per-serving numbers and which ingredients were and weren't counted. */
+// Guards per-100 g values that would otherwise blow a recipe up (a mis-scanned label
+// recorded as 4000 kcal/100 g, a per-serving panel saved as per-100 g, etc.).
+// Nothing eaten is more than ~900 kcal/100 g (pure oil is 884), and no macro exceeds 100 g.
+function plausiblePer100(food, typical) {
+  if (!food) return food;
+  const safe = { ...food };
+  const cap = (v, max) => (Number.isFinite(v) && v >= 0 && v <= max ? v : null);
+  const kcal = cap(safe.kcal, 900);
+  const p = cap(safe.p, 100);
+  const c = cap(safe.c, 100);
+  const f = cap(safe.f, 100);
+  // If any value is implausible, fall back to the built-in typical values when we have them
+  if (kcal == null || p == null || c == null || f == null) {
+    return typical ? { ...safe, kcal: typical.kcal, p: typical.p, c: typical.c, f: typical.f } : null;
+  }
+  safe.kcal = kcal; safe.p = p; safe.c = c; safe.f = f;
+  return safe;
+}
+
 function nutritionFromIngredients(ingredients, servings, kitchenItems = []) {
   const index = buildInventoryIndex(kitchenItems.filter((i) => i.caloriesPer100));
   const total = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
@@ -5657,11 +5791,12 @@ function nutritionFromIngredients(ingredients, servings, kitchenItems = []) {
     const kitchen = index.length ? findInventoryMatch(ing, index) : null;
     const typical = findFood([ing.name, ...(ing.matchTerms || [])].join(' | '));
     // Kitchen item values win; the typical entry still supplies weights like "1 each = 150 g"
-    const food = ing.nutrition
+    const rawFood = ing.nutrition
       ? { ...(typical || {}), kcal: ing.nutrition.kcal, p: ing.nutrition.p || 0, c: ing.nutrition.c || 0, f: ing.nutrition.f || 0, edible: 1, ...(ing.nutrition.tsp ? { tsp: ing.nutrition.tsp } : {}), ...(ing.nutrition.tbsp ? { tbsp: ing.nutrition.tbsp } : {}) }
       : kitchen
       ? { ...(typical || {}), kcal: kitchen.item.caloriesPer100, p: kitchen.item.proteinPer100 ?? (typical ? typical.p : 0), c: kitchen.item.carbsPer100 ?? (typical ? typical.c : 0), f: kitchen.item.fatPer100 ?? (typical ? typical.f : 0) }
       : typical;
+    const food = plausiblePer100(rawFood, typical);
     if (!food) { if (!ing.assumedStaple) missing.push(ing.name); continue; }
     if (ing.quantity == null) { if (food.kcal && !ing.assumedStaple && !/salt|pepper|water/i.test(ing.name)) missing.push(`${ing.name} (no amount)`); continue; }
     const grams = gramsOf(ing.quantity, ing.unit, food);
@@ -5757,7 +5892,13 @@ function photoToBase64Jpeg(file) {
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
       resolve({ data: dataUrl.split(',')[1], preview: dataUrl });
     };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Couldn\'t read that photo')); };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      const isHeic = /\.(hei[cf])$/i.test(file.name || '') || /image\/hei[cf]/i.test(file.type || '');
+      reject(new Error(isHeic
+        ? 'That photo is in HEIC format, which browsers can\'t open. In your phone\'s Camera settings, switch "Picture format" to JPEG and try again.'
+        : 'Couldn\'t read that photo. Try a JPEG or PNG, taken from the camera.'));
+    };
     img.src = url;
   });
 }
@@ -5871,10 +6012,12 @@ function renderPhotoScanBody() {
     <div class="ps-thumb"><img src="${p.preview}" alt="Photo ${i + 1}"><button type="button" class="ps-remove" data-i="${i}" aria-label="Remove photo">×</button></div>`).join('');
 
   if (!PhotoScan.rows.length) {
+    const canAdd = PhotoScan.photos.length < PHOTO_MAX_COUNT;
     body.innerHTML = `
       <p class="st-intro">Photograph a shelf, the fridge door, or a few jars. For calories, include the nutrition panels on the back. Up to ${PHOTO_MAX_COUNT} photos.</p>
       <div class="ps-thumbs">${thumbs}
-        ${PhotoScan.photos.length < PHOTO_MAX_COUNT ? '<label class="ps-add">📷<span>Add photo</span><input type="file" id="ps-file" accept="image/*" multiple hidden></label>' : ''}
+        ${canAdd ? '<label class="ps-add">📷<span>Take photo</span><input type="file" id="ps-camera" accept="image/*" capture="environment" hidden></label>' : ''}
+        ${canAdd ? '<label class="ps-add">🖼️<span>Choose photos</span><input type="file" id="ps-file" accept="image/*" multiple hidden></label>' : ''}
       </div>
       <p class="ai-error" id="ps-error"></p>
     `;
@@ -5904,16 +6047,17 @@ function updatePhotoScanButton() {
 }
 
 function attachPhotoScanListeners() {
+  const addPhotos = async (fileList) => {
+    const files = Array.from(fileList || []).slice(0, PHOTO_MAX_COUNT - PhotoScan.photos.length);
+    for (const f of files) {
+      try { PhotoScan.photos.push(await photoToBase64Jpeg(f)); } catch (err) { showToast(err.message); }
+    }
+    renderPhotoScanBody();
+  };
   const file = document.getElementById('ps-file');
-  if (file) {
-    file.addEventListener('change', async (e) => {
-      const files = Array.from(e.target.files || []).slice(0, PHOTO_MAX_COUNT - PhotoScan.photos.length);
-      for (const f of files) {
-        try { PhotoScan.photos.push(await photoToBase64Jpeg(f)); } catch (err) { showToast(err.message); }
-      }
-      renderPhotoScanBody();
-    });
-  }
+  if (file) file.addEventListener('change', (e) => addPhotos(e.target.files));
+  const cam = document.getElementById('ps-camera');
+  if (cam) cam.addEventListener('change', (e) => addPhotos(e.target.files));
   document.querySelectorAll('.ps-remove').forEach((btn) => btn.addEventListener('click', () => {
     PhotoScan.photos.splice(parseInt(btn.dataset.i, 10), 1);
     renderPhotoScanBody();
