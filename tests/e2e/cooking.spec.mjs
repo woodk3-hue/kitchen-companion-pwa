@@ -62,3 +62,19 @@ test('changing serves scales the ingredient amounts', async ({ page }) => {
   await page.click('#cooked-recipe-btn');
   await expect(page.locator('#ck-made')).toHaveValue('6');
 });
+
+test('recipe amounts can be shown in grams instead of spoons and cups', async ({ page }) => {
+  await open(page, 'recipes', '#recipe-list');
+  await waitForStarterRecipes(page);
+  await reopen(page, 'recipes', '.recipe-card');
+  await page.fill('#recipe-search', 'Tadka Dal');
+  await page.locator('.recipe-card').first().click();
+  const turmeric = page.locator('#ingredients-box li', { hasText: 'Turmeric' }).locator('.ing-qty');
+  await expect(turmeric).toHaveText(/tsp/);
+  await page.click('#measure-pref button[data-val="grams"]');
+  await expect(turmeric).toHaveText(/^[\d.]+ g$/);
+  // Remembered next time
+  await page.click('#modal-close');
+  await page.locator('.recipe-card').first().click();
+  await expect(page.locator('#measure-pref button[data-val="grams"]')).toHaveClass(/selected/);
+});

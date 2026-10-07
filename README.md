@@ -101,6 +101,20 @@ IndexedDB is local to the browser/device. Clearing browser data, switching brows
 
 Each ingredient stores `matchTerms` (inventory names that count as having it, e.g. `chicken thigh`, `chicken`), `assumedStaple` (salt, oil and dried spices are assumed on hand) and `optional`.
 
+## Recipe from a photo
+
+**📸 Recipe from a photo** on the Recipes tab: choose up to 4 pictures from your gallery (or take them), such as a screenshot of a website or post, a cookbook page or a handwritten card, with one photo per page if it runs over. Claude reads the name, serves, times, ingredients and method (converting imperial amounts to metric) and opens it in the **Add recipe** form to check before saving; calories and macros are then worked out from the ingredients. Uses your API key. (**Settings → Import recipes** is still for recipe files, not photos.)
+
+## Make it my way: swap ingredients
+
+**🔁 Make it my way** on any recipe page lists its ingredients with **Swap** and **×** (remove) on each, and **+ Add** at the bottom. Calories, protein, carbs and fat per serve update as you go, with the change shown (e.g. "kcal −109").
+- **💡 Suggested swaps**: chicken on the bone → chicken breast, lamb or fatty mince → chicken breast or lean mince, cream → light cooking cream or Greek yoghurt, coconut milk → light coconut milk, ghee or butter → half the oil, rice → cauliflower rice, pasta → zucchini noodles, potato → cauliflower, cheese → reduced-fat cheese, sugar → leave it out.
+- **🧂 Packet mix**: when a recipe has 3 or more separate spices, one tap swaps them for a packet spice mix.
+- **Swap** lets you type anything, e.g. "800 g chicken breast".
+- **Packets (curry mix, paste, sauce, stock)**: **▦ Scan a packet** looks up its barcode in Open Food Facts, or **🏷️ Label photo** has Claude read the nutrition panel. Choose how much goes in, in g, tsp or tbsp (e.g. **3 tbsp**, the whole packet or one serve), and it's added with the packet's own values per 100 g, replacing a generic "packet spice mix" if you'd added one. **Add the packet to my pantry** (ticked) puts the whole packet in the Pantry with its label values; when you tap **I cooked this**, the amount the recipe uses (3 tbsp ≈ 27 g of a spice mix) comes out of it, so the rest stays in your pantry. Those values stay with the ingredient, so the recipe's calories, I cooked this and the diary all use them.
+- **Save as my version** keeps the original and adds "… (my way)"; **Update this recipe** changes it.
+- The new numbers start from the recipe's own figures and move in proportion to the change, using the built-in typical values.
+
 ## Searching for a dish
 
 **🔎 Search online** on the Recipes tab:
@@ -184,6 +198,7 @@ The **Today** tab (formerly Home) is a food diary, like a fitness tracker:
 ## Recipe page: serves and macros
 
 - **How many portions are you making?** sits above the ingredients on every recipe page: tap − / + or type a number and every ingredient amount changes to match (e.g. 4 → 6 portions: 600 g mince becomes 900 g). The recipe itself isn't changed. The button below then reads **🍳 I cooked this · 6 portions** and starts with that many.
+- **Spoons & cups | Grams**: above the ingredients, switch between amounts as written (tsp, tbsp, cups, cloves, "1 onion") and weights in grams (ml for liquids), using the built-in typical weights, e.g. 1 onion → 150 g, 1 tsp turmeric → 2.5 g. "To taste" stays as it is. The choice is remembered on this phone. In Make it my way, spoon amounts also show their weight ("3 tbsp … ≈ 27 g"), and packet amounts can be entered in g, ml, tsp or tbsp.
 - **Calories, protein, carbs and fat** per serving are shown as four tiles on the recipe page, and as a coloured "P · C · F" line on each recipe card.
 - On **Today**, every logged food shows its protein, carbs and fat under its name, and each meal shows its totals. Recipe servings logged before carbs and fat were tracked are filled in from the recipe the next time Today opens.
 
