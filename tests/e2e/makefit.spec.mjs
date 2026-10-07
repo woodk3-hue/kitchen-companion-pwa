@@ -44,8 +44,8 @@ test('High protein rewrite saves as a new recipe; original is unchanged', async 
   expect(original.ingredients.map((i) => i.name).join(' ').toLowerCase()).toContain('chicken thigh');
   // The new recipe uses the app's own macro calculator — chicken breast + greek yoghurt per serve is well above 25g
   expect(fitted.proteinGramsPerServing).toBeGreaterThanOrEqual(25);
-  // Claude's prompt mentioned the goal
-  expect(seen.prompts.join('\n').toLowerCase()).toContain('high protein');
+  // Claude's prompt described the high-protein goal
+  expect(seen.prompts.join('\n').toLowerCase()).toMatch(/at least 25\s*g protein/);
   expect(errors).toEqual([]);
 });
 
@@ -69,7 +69,8 @@ test('Low carb goal is sent to Claude and the fitted recipe is a separate copy',
   expect(fitted).toBeTruthy();
   // The app recomputed macros from the Claude-returned ingredients (cauliflower rice has way fewer carbs than basmati)
   expect(fitted.carbsGramsPerServing).toBeLessThan(30);
-  expect(seen.prompts.join('\n').toLowerCase()).toContain('low carb');
+  // Claude's prompt described the low-carb goal
+  expect(seen.prompts.join('\n').toLowerCase()).toMatch(/carbs under 20\s*g/);
   expect(errors).toEqual([]);
 });
 
