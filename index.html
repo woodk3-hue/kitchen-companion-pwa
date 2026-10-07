@@ -5757,7 +5757,13 @@ function photoToBase64Jpeg(file) {
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
       resolve({ data: dataUrl.split(',')[1], preview: dataUrl });
     };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Couldn\'t read that photo')); };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      const isHeic = /\.(hei[cf])$/i.test(file.name || '') || /image\/hei[cf]/i.test(file.type || '');
+      reject(new Error(isHeic
+        ? 'That photo is in HEIC format, which browsers can\'t open. In your phone\'s Camera settings, switch "Picture format" to JPEG and try again.'
+        : 'Couldn\'t read that photo. Try a JPEG or PNG, taken from the camera.'));
+    };
     img.src = url;
   });
 }
@@ -5871,10 +5877,12 @@ function renderPhotoScanBody() {
     <div class="ps-thumb"><img src="${p.preview}" alt="Photo ${i + 1}"><button type="button" class="ps-remove" data-i="${i}" aria-label="Remove photo">×</button></div>`).join('');
 
   if (!PhotoScan.rows.length) {
+    const canAdd = PhotoScan.photos.length < PHOTO_MAX_COUNT;
     body.innerHTML = `
       <p class="st-intro">Photograph a shelf, the fridge door, or a few jars. For calories, include the nutrition panels on the back. Up to ${PHOTO_MAX_COUNT} photos.</p>
       <div class="ps-thumbs">${thumbs}
-        ${PhotoScan.photos.length < PHOTO_MAX_COUNT ? '<label class="ps-add">📷<span>Add photo</span><input type="file" id="ps-file" accept="image/*" multiple hidden></label>' : ''}
+        ${canAdd ? '<label class="ps-add">📷<span>Take photo</span><input type="file" id="ps-camera" accept="image/*" capture="environment" hidden></label>' : ''}
+        ${canAdd ? '<label class="ps-add">🖼️<span>Choose photos</span><input type="file" id="ps-file" accept="image/*" multiple hidden></label>' : ''}
       </div>
       <p class="ai-error" id="ps-error"></p>
     `;
@@ -5904,16 +5912,17 @@ function updatePhotoScanButton() {
 }
 
 function attachPhotoScanListeners() {
+  const addPhotos = async (fileList) => {
+    const files = Array.from(fileList || []).slice(0, PHOTO_MAX_COUNT - PhotoScan.photos.length);
+    for (const f of files) {
+      try { PhotoScan.photos.push(await photoToBase64Jpeg(f)); } catch (err) { showToast(err.message); }
+    }
+    renderPhotoScanBody();
+  };
   const file = document.getElementById('ps-file');
-  if (file) {
-    file.addEventListener('change', async (e) => {
-      const files = Array.from(e.target.files || []).slice(0, PHOTO_MAX_COUNT - PhotoScan.photos.length);
-      for (const f of files) {
-        try { PhotoScan.photos.push(await photoToBase64Jpeg(f)); } catch (err) { showToast(err.message); }
-      }
-      renderPhotoScanBody();
-    });
-  }
+  if (file) file.addEventListener('change', (e) => addPhotos(e.target.files));
+  const cam = document.getElementById('ps-camera');
+  if (cam) cam.addEventListener('change', (e) => addPhotos(e.target.files));
   document.querySelectorAll('.ps-remove').forEach((btn) => btn.addEventListener('click', () => {
     PhotoScan.photos.splice(parseInt(btn.dataset.i, 10), 1);
     renderPhotoScanBody();
