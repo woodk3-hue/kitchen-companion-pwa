@@ -141,6 +141,10 @@ Each ingredient stores `matchTerms` (inventory names that count as having it, e.
 
 A modern theme sits as one layer at the end of the stylesheet ("MODERN THEME"): Plus Jakarta Sans, a brighter palette matching the icon (orange accent, green, blue, gold), white cards with soft shadows instead of borders, pill chips and buttons, a segmented control style, soft filled inputs, rounded bottom sheets, a frosted header, a floating bottom bar with line icons, and a rounded floating + button. Removing that block returns to the original look.
 
+## Dark mode
+
+**Settings → Appearance**: **Automatic** (the default) follows your phone's light or dark setting and switches with it, or choose **☀️ Light** or **🌙 Dark** to keep one. The choice is saved on this phone only. Dark mode is a set of colour tokens at the end of the stylesheet ("DARK MODE"), plus a small script in `<head>` that applies it before the page draws, so it never flashes white.
+
 ## Food diary (Today tab)
 
 The **Today** tab (formerly Home) is a food diary, like a fitness tracker:

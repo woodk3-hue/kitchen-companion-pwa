@@ -31,3 +31,26 @@ test('report a problem opens a prefilled bug report without personal data', asyn
   expect(url).toContain('Database version');
   expect(url).not.toContain('sk-ant');
 });
+
+test('dark mode follows the phone and can be switched in Settings', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await open(page, 'settings', '#theme-pref');
+  const theme = () => page.evaluate(() => document.documentElement.dataset.theme);
+  const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  expect(await theme()).toBe('dark');
+  expect(await bg()).toBe('rgb(18, 20, 23)');
+
+  await page.click('#theme-pref button[data-val="light"]');
+  expect(await theme()).toBe('light');
+  await page.reload();
+  await page.waitForSelector('#theme-pref');
+  expect(await theme()).toBe('light');
+  await expect(page.locator('#theme-pref button[data-val="light"]')).toHaveClass(/selected/);
+
+  await page.click('#theme-pref button[data-val="auto"]');
+  expect(await theme()).toBe('dark');
+  await page.emulateMedia({ colorScheme: 'light' });
+  await expect.poll(theme).toBe('light');
+  expect(errors).toEqual([]);
+});

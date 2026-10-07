@@ -15,6 +15,15 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="preload" href="./fonts/plus-jakarta-sans.woff2" as="font" type="font/woff2" crossorigin>
+  <script>
+    // Apply the saved appearance before anything draws, so dark mode doesn't flash white
+    (function () {
+      var pref = 'auto';
+      try { pref = localStorage.getItem('pantryfit.theme') || 'auto'; } catch (e) {}
+      var dark = pref === 'dark' || (pref === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    })();
+  </script>
   <style>
 /* ============================================================
    DESIGN TOKENS
@@ -1262,6 +1271,54 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 .cook-use { padding: 8px 0; border-bottom: 1px solid var(--color-fill); }
 .cook-use-amt { font-size: 13px; padding: 4px 0 0 28px; display: flex; align-items: center; gap: 6px; }
 .cook-use-amt input.lki-use { width: 90px; flex: 0 0 90px; padding: 6px 8px; border: 1px solid var(--color-line); border-radius: 8px; font: inherit; }
+
+/* ============================================================
+   DARK MODE
+   The page's <html> gets data-theme="dark" (set before first paint by the
+   script in <head>, from Settings → Appearance or the phone's setting).
+   Colours come from the tokens; the rest are the few fixed colours above.
+   ============================================================ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #121417;
+  --color-ink: #ECEDEE;
+  --color-ink-soft: #A3A8AF;
+  --color-paper: #1D2024;
+  --color-line: #33373D;
+  --color-fill: #2A2E34;
+  --color-accent: #F07A43;
+  --color-accent-dark: #FFA477;
+  --color-accent-tint: #3A2418;
+  --color-fridge: #3DBB8A;
+  --color-freezer: #5B9CE6;
+  --color-leftovers: #E3AE3A;
+  --color-warn: #F0645A;
+  --color-warn-bg: #3A1F1D;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5), 0 6px 20px rgba(0, 0, 0, 0.25);
+  --shadow-float: 0 8px 30px rgba(0, 0, 0, 0.55);
+  --macro-protein: #4C93E8; --macro-carbs: #F07A43; --macro-fat: #2EC48B;
+}
+:root[data-theme="dark"] .app-header { background: rgba(18, 20, 23, 0.86); }
+:root[data-theme="dark"] .bottom-nav { background: rgba(29, 32, 36, 0.92); }
+:root[data-theme="dark"] .modal-overlay { background: rgba(0, 0, 0, 0.6); }
+:root[data-theme="dark"] .expiry-row.urgent { border-color: #5A2E28; }
+:root[data-theme="dark"] .plan-slot.empty { border-color: #3A3F46; }
+:root[data-theme="dark"] .plan-slot.type-leftover { background: #2E2717; }
+:root[data-theme="dark"] .tag.kcal-ok, :root[data-theme="dark"] .tag.tag-protein,
+:root[data-theme="dark"] .tag.match-pct.high { background: #173328; color: #6FD3A6; }
+:root[data-theme="dark"] .tag.kcal-over, :root[data-theme="dark"] .tag.state-defrosting,
+:root[data-theme="dark"] .tag.state-opened, :root[data-theme="dark"] .btn-danger { color: #FF8A80; }
+:root[data-theme="dark"] .tag.state-frozen { background: #182A40; color: #8DBBF2; }
+:root[data-theme="dark"] .tag.state-leftover, :root[data-theme="dark"] .tag.state-cooked { background: #33280F; color: #F0C35A; }
+:root[data-theme="dark"] .tag.tag-diet { background: #2A2240; color: #B9A2F2; }
+:root[data-theme="dark"] .loc-tab.active, :root[data-theme="dark"] .state-chip.selected { color: var(--color-bg); }
+:root[data-theme="dark"] .segmented button.selected { background: #3A3F46; box-shadow: none; }
+:root[data-theme="dark"] .install-card { background: linear-gradient(135deg, #2A2F36, #3A4048); color: #F2F3F4; }
+:root[data-theme="dark"] .ring-track { stroke: #3A2A20; }
+:root[data-theme="dark"] .m-protein.macro-track { background: #1B2B40; }
+:root[data-theme="dark"] .m-carbs.macro-track { background: #3A2418; }
+:root[data-theme="dark"] .m-fat.macro-track { background: #15332A; }
+:root[data-theme="dark"] .toggle-switch::after { background: #F2F2F2; }
 </style>
  </head>
  <body>
@@ -6987,6 +7044,14 @@ async function renderSettingsScreen() {
     </div>
     <input type="file" id="import-recipes-input" accept=".json,application/json" style="display:none;">
 
+    <div class="section-heading" style="margin-top:22px;"><h2>Appearance</h2></div>
+    <div class="settings-card">
+      <div class="segmented" id="theme-pref">
+        ${[['auto', 'Automatic'], ['light', '☀️ Light'], ['dark', '🌙 Dark']].map(([v, l]) => `<button type="button" data-val="${v}" class="${getThemePref() === v ? 'selected' : ''}">${l}</button>`).join('')}
+      </div>
+      <p class="recipe-muted" style="margin:8px 0 0;">Automatic follows your phone's light or dark setting.</p>
+    </div>
+
     <div class="section-heading" style="margin-top:22px;"><h2>Health goals</h2></div>
     <div class="settings-card">
       <div class="field-row">
@@ -7134,6 +7199,10 @@ function attachSettingsListeners() {
   });
   document.getElementById('start-fresh-btn').addEventListener('click', startFresh);
   document.getElementById('report-row').addEventListener('click', reportProblem);
+  document.querySelectorAll('#theme-pref button').forEach((btn) => btn.addEventListener('click', () => {
+    btn.parentElement.querySelectorAll('button').forEach((b) => b.classList.toggle('selected', b === btn));
+    setThemePref(btn.dataset.val);
+  }));
   const starterRemove = document.getElementById('starter-remove');
   if (starterRemove) starterRemove.addEventListener('click', async () => {
     if (!confirm('Remove the starter recipes from your recipe book? Any you have edited are kept. Your own and saved recipes aren\'t affected.')) return;
@@ -7173,6 +7242,34 @@ function attachSettingsListeners() {
     renderRoute();
   });
 }
+
+/* ---- Appearance: automatic (follows the phone), light or dark ----
+   Saved on this phone only (like the API key), so it applies before the app has loaded its data. */
+const THEME_STORAGE = 'pantryfit.theme';
+const darkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+function getThemePref() {
+  try { return localStorage.getItem(THEME_STORAGE) || 'auto'; } catch (err) { return 'auto'; }
+}
+
+function applyTheme() {
+  const pref = getThemePref();
+  const dark = pref === 'dark' || (pref === 'auto' && !!darkQuery && darkQuery.matches);
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', dark ? '#121417' : '#F5F4F1');
+}
+
+function setThemePref(pref) {
+  try {
+    if (pref === 'auto') localStorage.removeItem(THEME_STORAGE);
+    else localStorage.setItem(THEME_STORAGE, pref);
+  } catch (err) { /* private browsing: still switch for this visit */ }
+  applyTheme();
+}
+
+if (darkQuery && darkQuery.addEventListener) darkQuery.addEventListener('change', applyTheme);
+applyTheme();
 
 /* ---- Report a problem ----
    Opens a new GitHub issue with device details filled in. Nothing from the kitchen,
