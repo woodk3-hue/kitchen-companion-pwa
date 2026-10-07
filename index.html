@@ -680,6 +680,24 @@ h1, h2, h3 {
 :root[data-theme="dark"] .r-live-tag.warn { background: #4a2d10; color: #ffcf8a; }
 :root[data-theme="dark"] .r-live-tag.ok { background: #1f3822; color: #8fe59b; }
 :root[data-theme="dark"] .r-live { background: rgba(255,255,255,0.03); }
+
+/* Make it fit sheet */
+.mf-goals { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0 4px; }
+.mf-goal { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 12px; padding: 12px; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+.mf-goal strong { font-size: 14px; }
+.mf-goal small { font-size: 11px; color: var(--color-ink-soft); }
+.mf-goal:active { background: var(--color-bg-soft, rgba(0,0,0,0.03)); }
+.mf-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mf-tile { background: var(--color-bg-soft, #f6f6f8); border: 1px solid var(--color-border); border-radius: 10px; padding: 8px 12px; }
+.mf-tile small { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-ink-soft); margin-bottom: 2px; }
+.mf-tile strong { font-weight: 700; }
+.mf-tile s { color: var(--color-ink-soft); font-variant-numeric: tabular-nums; }
+.mf-changes { list-style: none; margin: 0; padding: 0; }
+.mf-changes li { padding: 8px 0; border-top: 1px solid var(--color-border); font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
+.mf-changes li:first-child { border-top: none; }
+.mf-changes small { color: var(--color-ink-soft); }
+.mf-pre { white-space: pre-wrap; font-family: inherit; font-size: 13px; background: var(--color-bg-soft, #f6f6f8); border: 1px solid var(--color-border); border-radius: 10px; padding: 10px 12px; margin: 0; }
+:root[data-theme="dark"] .mf-tile, :root[data-theme="dark"] .mf-pre { background: rgba(255,255,255,0.03); }
 .st-intro { font-size: 13px; color: var(--color-ink-soft); margin: 0 0 10px; }
 .st-body { flex: 1; }
 .st-add { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
@@ -3491,7 +3509,10 @@ async function openRecipeDetail(id) {
       ${recipe.notes ? `<div class="section-heading" style="margin-top:18px;"><h2>Notes</h2></div><p class="recipe-notes">${escapeHtml(recipe.notes)}</p>` : ''}
     </div>
     <div class="modal-action-bar">
-      <button type="button" class="btn-secondary" id="myway-recipe-btn">🔁 Make it my way: swap ingredients</button>
+      <div class="field-row" style="gap:8px;">
+        <button type="button" class="btn-secondary" id="myway-recipe-btn" style="margin:0;flex:1;">🔁 Make it my way</button>
+        <button type="button" class="btn-secondary" id="makefit-recipe-btn" style="margin:0;flex:1;">🎯 Make it fit</button>
+      </div>
       <button type="button" class="btn-primary" id="cooked-recipe-btn">🍳 I cooked this${baseServes ? ` · ${baseServes} portions` : ''}</button>
       <div class="field-row" style="gap:8px;">
         <button type="button" class="btn-secondary" id="log-recipe-btn">🍽️ Log a serving</button>
@@ -3531,6 +3552,7 @@ async function openRecipeDetail(id) {
 
   document.getElementById('edit-recipe-btn').addEventListener('click', () => openRecipeForm(recipe));
   document.getElementById('myway-recipe-btn').addEventListener('click', () => openMakeItMyWay(recipe));
+  document.getElementById('makefit-recipe-btn').addEventListener('click', () => openMakeItFit(recipe));
   const calcBtn = document.getElementById('recipe-calc-btn');
   if (calcBtn) calcBtn.addEventListener('click', async () => {
     let calc = nutritionFromIngredients(recipe.ingredients, recipe.servings || 1, kitchenItems);
@@ -3830,6 +3852,7 @@ function openRecipeForm(recipe, prefill) {
             <div class="r-live-bars" id="r-live-bars"></div>
             <ul class="r-live-list" id="r-live-list"></ul>
           </div>
+          ${isEdit ? '<button type="button" class="btn-secondary" id="r-make-fit" style="margin-top:8px;">🎯 Make it fit (adjust ingredients to a macro goal)</button>' : ''}
         </div>
 
         <div class="field">
@@ -3910,6 +3933,8 @@ function openRecipeForm(recipe, prefill) {
 
   document.getElementById('r-scan-barcode').addEventListener('click', () => startRecipePacketScan('barcode', isEdit, recipe));
   document.getElementById('r-scan-label').addEventListener('click', () => startRecipePacketScan('label', isEdit, recipe));
+  const makeFitBtn = document.getElementById('r-make-fit');
+  if (makeFitBtn) makeFitBtn.addEventListener('click', () => openMakeItFit(recipe));
 
   // Live macro breakdown: redraws as you edit ingredients or change serves
   let liveTimer = null;
@@ -4283,6 +4308,231 @@ function trimForCalories(rows, added, baseKcal, nowKcal, servings, targetKcal) {
     if (nowKcal <= targetKcal) break;
   }
   return steps;
+}
+
+/* ============================================================
+   MAKE IT FIT
+   Pick a macro goal, Claude rewrites the ingredients + method,
+   the app recomputes the nutrition itself (never trusts Claude's
+   numbers), the result is reviewed and optionally saved as a new
+   recipe (the original is never overwritten).
+   ============================================================ */
+const MakeItFit = { recipe: null, goal: null, targets: null };
+const MAKE_FIT_GOAL_LABEL = { 'high-protein': 'High protein', 'low-carb': 'Low carb', 'low-fat': 'Low fat', 'my-macros': 'My macros' };
+
+function makeItFitSchema() {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['ingredients', 'method', 'changes'],
+    properties: {
+      ingredients: { type: 'array', items: { type: 'string' } },
+      method: { type: 'array', items: { type: 'string' } },
+      changes: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['from', 'to', 'why'],
+          properties: { from: { type: 'string' }, to: { type: 'string' }, why: { type: 'string' } }
+        }
+      }
+    }
+  };
+}
+
+async function openMakeItFit(recipe) {
+  MakeItFit.recipe = recipe;
+  MakeItFit.goal = null;
+  MakeItFit.targets = null;
+  openModal(`
+    <div class="modal-title-row"><h2>🎯 Make it fit</h2><button class="close-btn" id="modal-close">×</button></div>
+    <div class="modal-scroll-area">
+      <p class="st-intro">Pick a goal. Claude rewrites the recipe to hit it while keeping the dish recognisable.</p>
+      <div class="mf-goals">
+        <button type="button" class="mf-goal" data-goal="high-protein"><strong>💪 High protein</strong><small>Aim for ≥ 25 g protein per serve</small></button>
+        <button type="button" class="mf-goal" data-goal="low-carb"><strong>🥦 Low carb</strong><small>Keep carbs under 20 g per serve</small></button>
+        <button type="button" class="mf-goal" data-goal="low-fat"><strong>🫒 Low fat</strong><small>Keep fat under 12 g per serve</small></button>
+        <button type="button" class="mf-goal" data-goal="my-macros"><strong>🎯 Fit my macros</strong><small>Use your per-serve kcal / protein / carbs / fat targets</small></button>
+      </div>
+      <p class="ai-error" id="mf-error"></p>
+    </div>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.querySelectorAll('.mf-goal').forEach((b) => b.addEventListener('click', () => pickMakeItFitGoal(b.dataset.goal)));
+}
+
+async function pickMakeItFitGoal(goal) {
+  if (!getAiKey()) {
+    const err = document.getElementById('mf-error');
+    err.innerHTML = 'Add your Anthropic API key in Settings → AI suggestions first. <button type="button" class="btn-secondary" id="mf-to-settings" style="margin-top:8px;">Go to Settings</button>';
+    document.getElementById('mf-to-settings').addEventListener('click', () => { closeModal(); navigateTo('settings'); });
+    return;
+  }
+  let targets = null;
+  if (goal === 'my-macros') {
+    targets = await ensurePerServeTargets();
+    if (!targets) return;
+  }
+  MakeItFit.goal = goal;
+  MakeItFit.targets = targets;
+  await runMakeItFit();
+}
+
+// Returns per-serve macro targets, prompting (and saving) once if none are set.
+async function ensurePerServeTargets() {
+  const goals = await getHealthGoals();
+  const haveDaily = goals.dailyCalories && goals.dailyProtein && goals.dailyCarbs && goals.dailyFat;
+  if (haveDaily) {
+    const kcal = goals.caloriesMax || Math.round(goals.dailyCalories / 3);
+    return { kcal, protein: Math.round(goals.dailyProtein / 3), carbs: Math.round(goals.dailyCarbs / 3), fat: Math.round(goals.dailyFat / 3) };
+  }
+  const asked = prompt('Per-serve macro targets aren\'t set yet. Enter four numbers (kcal, protein g, carbs g, fat g):\ne.g. 500, 30, 40, 15');
+  if (!asked) return null;
+  const nums = asked.split(/[\s,]+/).map((v) => parseInt(v, 10));
+  if (nums.length < 4 || nums.some((n) => !Number.isFinite(n) || n < 0)) { showToast('Enter four numbers (e.g. 500,30,40,15)'); return null; }
+  const t = { kcal: nums[0], protein: nums[1], carbs: nums[2], fat: nums[3] };
+  await dbPut('settings', { ...goals, dailyCalories: t.kcal * 3, dailyProtein: t.protein * 3, dailyCarbs: t.carbs * 3, dailyFat: t.fat * 3 });
+  return t;
+}
+
+async function runMakeItFit() {
+  openModal(`
+    <div class="modal-title-row"><h2>🎯 Make it fit</h2><button class="close-btn" id="modal-close">×</button></div>
+    <div class="modal-scroll-area">
+      <p class="st-intro" id="mf-status">Rewriting the recipe with Claude… (up to about 20 seconds)</p>
+      <p class="ai-error" id="mf-error"></p>
+    </div>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  let outcome = await requestMakeItFit();
+  if (outcome.syntaxError) outcome = await requestMakeItFit(); // one retry on bad JSON
+  if (!document.getElementById('mf-status')) return; // modal closed while we were waiting
+  if (outcome.error || !outcome.data) {
+    document.getElementById('mf-error').textContent = outcome.error || 'Claude didn\'t return a usable rewrite. Please try again.';
+    return;
+  }
+  await renderMakeItFitResult(outcome.data);
+}
+
+async function requestMakeItFit() {
+  const { recipe, goal, targets } = MakeItFit;
+  const kitchenItems = await dbGetAll('inventoryItems');
+  const kitchenNames = kitchenItems.map((i) => i.name).filter(Boolean);
+  const goalDesc = {
+    'high-protein': 'Aim for at least 25 g protein per serve. Boost lean proteins (chicken breast, cottage cheese, egg whites, Greek yoghurt, lean mince). Reduce starchy or fatty ingredients only if needed to stay in a sensible kcal range.',
+    'low-carb': 'Keep carbs under 20 g per serve. Swap or remove rice, pasta, bread, potatoes and flour; use cauliflower rice, zoodles or extra vegetables.',
+    'low-fat': 'Keep fat under 12 g per serve. Cut oil, cream, butter and cheese; use leaner cuts and grill or bake rather than fry.',
+    'my-macros': targets ? `Hit these per-serve targets closely: ${targets.kcal} kcal, ${targets.protein} g protein, ${targets.carbs} g carbs, ${targets.fat} g fat.` : 'Fit the user\'s per-serve targets.'
+  }[goal];
+  const ingredientsList = (recipe.ingredients || []).map(ingredientToLine).join('\n');
+  const methodList = (recipe.method || []).join('\n');
+  const prompt = `Recipe: ${recipe.name}
+Servings: ${recipe.servings || 4}
+
+Current ingredients:
+${ingredientsList}
+
+Current method:
+${methodList}
+
+Kitchen items I already have (prefer these when swapping):
+${kitchenNames.join(', ') || '(none)'}
+
+Goal: ${goalDesc}
+
+Rewrite the recipe so it hits the goal while staying recognisable as "${recipe.name}". Keep the same servings count. Minimise changes — adjust amounts first, swap ingredients only when needed. Keep the method short and consistent with the new ingredients.
+
+Return JSON with:
+- ingredients: array of lines formatted as "<amount> <unit> <name>" (e.g. "500 g chicken breast", "1 cup basmati rice", "1 tsp garlic")
+- method: array of method step strings
+- changes: array of {from, to, why} describing each swap or adjustment and why it helps the goal`;
+
+  let Anthropic = null;
+  try {
+    const loaded = await getAnthropicClient();
+    Anthropic = loaded.Anthropic;
+    const resp = await loaded.client.beta.messages.create({
+      model: AI_MODEL,
+      max_tokens: 4000,
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+      output_config: { effort: 'medium', format: { type: 'json_schema', schema: makeItFitSchema() } },
+      messages: [{ role: 'user', content: prompt }]
+    });
+    if (resp.stop_reason === 'refusal') return { error: 'Claude couldn\'t rewrite this recipe. Try a different goal.' };
+    const text = resp.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+    const parsed = JSON.parse(text);
+    return { data: parsed };
+  } catch (err) {
+    if (err instanceof SyntaxError) return { syntaxError: true };
+    return { error: describeAiError(err, Anthropic) };
+  }
+}
+
+async function renderMakeItFitResult(data) {
+  const { recipe } = MakeItFit;
+  const kitchenItems = await dbGetAll('inventoryItems');
+  // Parse Claude's string ingredients with the app's own parser (bullets / and-split / aliases),
+  // then let the app compute the macros — never trust Claude's own numbers.
+  const parsedIngredients = (data.ingredients || [])
+    .flatMap((line) => splitAndIngredientLine(line))
+    .map((l) => parseIngredientLine(l, [], new Map()))
+    .filter(Boolean);
+  const after = nutritionFromIngredients(parsedIngredients, recipe.servings || 1, kitchenItems);
+  const before = nutritionFromIngredients(recipe.ingredients, recipe.servings || 1, kitchenItems);
+  const b = before.perServing; const a = after.perServing;
+  const tile = (label, bv, av, unit) => `<div class="mf-tile"><small>${label}</small><div><s>${bv}${unit}</s> → <strong>${av}${unit}</strong></div></div>`;
+  const changesHtml = (data.changes || []).map((c) => `<li><strong>${escapeHtml(c.from)}</strong> → ${escapeHtml(c.to)}<small>${escapeHtml(c.why)}</small></li>`).join('');
+  openModal(`
+    <div class="modal-title-row"><h2>🎯 Make it fit — review</h2><button class="close-btn" id="modal-close">×</button></div>
+    <div class="modal-scroll-area">
+      <p class="st-intro">Per serve, before → after. The numbers are the app's own calculation, not Claude's.</p>
+      <div class="mf-tiles">
+        ${tile('kcal', b.kcal, a.kcal, '')}
+        ${tile('Protein', b.protein, a.protein, ' g')}
+        ${tile('Carbs', b.carbs, a.carbs, ' g')}
+        ${tile('Fat', b.fat, a.fat, ' g')}
+      </div>
+      <div class="section-heading" style="margin-top:14px;"><h2>Changes</h2></div>
+      <ul class="mf-changes">${changesHtml || '<li>No changes needed.</li>'}</ul>
+      <div class="section-heading" style="margin-top:14px;"><h2>New ingredients</h2></div>
+      <pre class="mf-pre">${escapeHtml((data.ingredients || []).join('\n'))}</pre>
+    </div>
+    <div class="modal-action-bar">
+      <div class="field-row" style="gap:8px;">
+        <button type="button" class="btn-secondary" id="mf-again" style="margin:0;flex:1;">Try again</button>
+        <button type="button" class="btn-secondary" id="mf-cancel" style="margin:0;flex:1;">Cancel</button>
+      </div>
+      <button type="button" class="btn-primary" id="mf-save">Save as new recipe</button>
+    </div>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('mf-cancel').addEventListener('click', closeModal);
+  document.getElementById('mf-again').addEventListener('click', runMakeItFit);
+  document.getElementById('mf-save').addEventListener('click', async () => {
+    const goalLabel = MAKE_FIT_GOAL_LABEL[MakeItFit.goal] || 'Fit';
+    const now = new Date().toISOString();
+    const { id: _id, seedId: _seedId, ...rest } = recipe;
+    const newRecord = normalizeRecipe({
+      ...rest,
+      name: `${recipe.name} – ${goalLabel}`,
+      ingredients: parsedIngredients,
+      method: (data.method && data.method.length) ? data.method : recipe.method,
+      caloriesPerServing: a.kcal,
+      proteinGramsPerServing: a.protein,
+      carbsGramsPerServing: a.carbs,
+      fatGramsPerServing: a.fat
+    });
+    const newId = await dbPut('recipes', {
+      ...newRecord,
+      seedId: null, source: 'user', userModified: false, userRating: null, partnerRating: null, isFavourite: false,
+      createdAt: now, updatedAt: now
+    });
+    showToast('Saved as a new recipe — the original is unchanged.');
+    closeModal();
+    openRecipeDetail(newId);
+  });
 }
 
 async function openMakeItMyWay(recipe, resume = false) {
@@ -6250,6 +6500,10 @@ const INGREDIENT_FAMILIES = [
 // Words that mean a kitchen item is a packaged product in a different category — a
 // "butter chicken sauce" is not a swap for butter, "chicken curry pasta" is not a swap for chicken.
 const SWAP_PACKET_WORDS = /\b(sauce|paste|mix|pasta|soup|seasoning|marinade|dressing|stock|broth|flavouring|flavoring|spread|dip|gravy)\b/;
+// Words that mean a kitchen item is a prepared meal, not a single raw ingredient —
+// e.g. "high protein chicken biryani" is not a swap for chicken, even though both
+// mention chicken. These are never valid single-ingredient swaps.
+const SWAP_PREPARED_WORDS = /\b(biryani|curry|lasagne|lasagna|risotto|paella|bolognese|casserole|stew|meal|bowl|pie|wrap|burger|burrito|taco|pizza|sushi|dumpling|dumplings|sandwich|salad|soup|frittata|omelette|omelet|quiche|stir\s?fry|stir-fry|roast|roasted|slice|slices|lentil\s+soup|minestrone|chow\s+mein|fried\s+rice|pad\s+thai|ramen|pho|congee|porridge|oatmeal)\b/;
 // Match a family term against a kitchen name only on whole-word boundaries
 function familyWordMatch(familyTerm, kitchenName) {
   const re = new RegExp(`\\b${familyTerm.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\b`, 'i');
@@ -6269,7 +6523,15 @@ function suggestSwapFor(ing, kitchenNames) {
       if (!familyWordMatch(term, k)) return false;
       // Reject packaged-product kitchen items for a non-packet recipe ingredient
       if (!recipeIsPacket && SWAP_PACKET_WORDS.test(k)) return false;
-      // Don't suggest the same thing the recipe already asks for
+      // Reject prepared meals / dishes — "high protein chicken biryani" isn't a swap for chicken
+      if (SWAP_PREPARED_WORDS.test(k)) return false;
+      // The kitchen item must resolve to a known single ingredient, in the same family as the recipe item.
+      // Sharing a word like "chicken" with a prepared meal is not enough.
+      const kitchenFood = findFood(k);
+      if (!kitchenFood) return false;
+      const kitchenInFamily = family.some((m) => kitchenFood.names.some((n) => familyWordMatch(m, n)));
+      if (!kitchenInFamily) return false;
+      // Don't suggest the same text the recipe already asks for
       if (terms.some((t) => t === k)) return false;
       return true;
     });
