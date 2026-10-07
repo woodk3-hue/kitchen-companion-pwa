@@ -72,5 +72,12 @@
         }
       ]
     }
-  ]
+  ],
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "prefer_related_applications": false,
+  "dir": "ltr",
+  "lang": "en-AU"
 }
