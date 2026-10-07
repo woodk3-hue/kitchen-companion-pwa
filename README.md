@@ -198,6 +198,7 @@ The **Today** tab (formerly Home) is a food diary, like a fitness tracker:
 ## Recipe page: serves and macros
 
 - **How many portions are you making?** sits above the ingredients on every recipe page: tap − / + or type a number and every ingredient amount changes to match (e.g. 4 → 6 portions: 600 g mince becomes 900 g). The recipe itself isn't changed. The button below then reads **🍳 I cooked this · 6 portions** and starts with that many.
+- **Spoons & cups | Grams**: above the ingredients, switch between amounts as written (tsp, tbsp, cups, cloves, "1 onion") and weights in grams (ml for liquids), using the built-in typical weights, e.g. 1 onion → 150 g, 1 tsp turmeric → 2.5 g. "To taste" stays as it is. The choice is remembered on this phone. In Make it my way, spoon amounts also show their weight ("3 tbsp … ≈ 27 g"), and packet amounts can be entered in g, ml, tsp or tbsp.
 - **Calories, protein, carbs and fat** per serving are shown as four tiles on the recipe page, and as a coloured "P · C · F" line on each recipe card.
 - On **Today**, every logged food shows its protein, carbs and fat under its name, and each meal shows its totals. Recipe servings logged before carbs and fat were tracked are filled in from the recipe the next time Today opens.
 

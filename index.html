@@ -1277,6 +1277,8 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 .mt-carbs .mt-v { color: var(--macro-carbs); }
 .mt-fat .mt-v { color: var(--macro-fat); }
 .portion-bar { margin-top: 4px; }
+.measure-toggle { margin: 0 0 8px; }
+.mw-g { font-weight: 500; font-size: 12px; color: var(--color-ink-soft); }
 .stepper { display: flex; align-items: center; gap: 6px; }
 .stepper input { text-align: center; min-width: 0; }
 .step-btn { flex: 0 0 40px; height: 40px; border: none; border-radius: 12px; background: var(--color-fill); color: var(--color-ink); font-size: 20px; font-weight: 700; cursor: pointer; }
@@ -3243,6 +3245,40 @@ function formatIngredientQuantity(ing) {
   return `${qty} ${unit}`;
 }
 
+/* ---- Spoons & cups, or grams ----
+   Recipe pages can show amounts as written (tsp, tbsp, cups, cloves) or as weights in grams
+   (millilitres for liquids), using the built-in typical weights. Saved on this phone. */
+const MEASURE_STORAGE = 'pantryfit.measure';
+function getMeasurePref() {
+  try { return localStorage.getItem(MEASURE_STORAGE) === 'grams' ? 'grams' : 'spoons'; } catch (err) { return 'spoons'; }
+}
+function setMeasurePref(v) {
+  try { localStorage.setItem(MEASURE_STORAGE, v); } catch (err) { /* private browsing: just for this visit */ }
+}
+const LIQUID_RE = /\b(milk|stock|broth|water|juice|cream|oil|sauce|vinegar|coconut milk|wine|yoghurt|yogurt)\b/i;
+
+// An ingredient amount in grams (or ml for liquids), when it's a measure the app can weigh
+function metricAmount(ing) {
+  if (ing.quantity == null || ['g', 'kg', 'ml', 'L', ''].includes(ing.unit || '')) return null;
+  const food = { ...(findFood([ing.name, ...(ing.matchTerms || [])].join(' | ')) || {}), ...(ing.nutrition && ing.nutrition.tbsp ? { tsp: ing.nutrition.tsp, tbsp: ing.nutrition.tbsp } : {}) };
+  const grams = gramsOf(ing.quantity, ing.unit || 'each', food);
+  if (grams == null) return null;
+  const n = grams >= 100 ? Math.round(grams / 5) * 5 : grams >= 10 ? Math.round(grams) : Math.round(grams * 10) / 10;
+  return { quantity: n, unit: LIQUID_RE.test(ing.name) ? 'ml' : 'g' };
+}
+
+function gramsHint(ing) {
+  const m = metricAmount(ing);
+  return m ? ` <span class="mw-g">≈ ${m.quantity} ${m.unit}</span>` : '';
+}
+
+function amountText(ing) {
+  const written = formatIngredientQuantity(ing);
+  if (getMeasurePref() !== 'grams') return written;
+  const m = metricAmount(ing);
+  return m ? `${m.quantity} ${m.unit}` : written;
+}
+
 function starRowHtml(field, value) {
   return [1, 2, 3, 4, 5].map((n) => `
     <button type="button" class="star-btn ${value && n <= value ? 'on' : ''}" data-field="${field}" data-value="${n}" aria-label="${n} star${n === 1 ? '' : 's'}">★</button>
@@ -3268,7 +3304,7 @@ async function openRecipeDetail(id) {
     ? '<p class="recipe-muted">No ingredients listed.</p>'
     : `<ul class="ingredient-list">${recipe.ingredients.map((ing) => `
         <li>
-          <span class="ing-qty">${escapeHtml(formatIngredientQuantity(scaled(ing)))}</span>
+          <span class="ing-qty">${escapeHtml(amountText(scaled(ing)))}</span>
           <span class="ing-name">${escapeHtml(ing.name)}${ing.prepNote ? `<span class="ing-note">, ${escapeHtml(ing.prepNote)}</span>` : ''}
             ${index.length && findInventoryMatch(ing, index) ? '<span class="ing-have">✓ in kitchen</span>' : ''}
             ${ing.optional ? '<span class="ing-flag">optional</span>' : ''}
@@ -3339,6 +3375,10 @@ async function openRecipeDetail(id) {
           <span class="cd-label"><strong>How many portions are you making?</strong><span class="cook-hint" id="serves-note">Amounts for ${baseServes} (as written)</span></span>
           <div class="stepper"><button type="button" class="step-btn" id="serves-down" aria-label="Fewer portions">−</button><input type="number" id="serves-val" min="1" step="1" inputmode="numeric" value="${baseServes}"><button type="button" class="step-btn" id="serves-up" aria-label="More portions">+</button></div>
         </div>` : ''}
+      <div class="segmented measure-toggle" id="measure-pref">
+        <button type="button" data-val="spoons" class="${getMeasurePref() === 'spoons' ? 'selected' : ''}">Spoons & cups</button>
+        <button type="button" data-val="grams" class="${getMeasurePref() === 'grams' ? 'selected' : ''}">Grams</button>
+      </div>
       <div id="ingredients-box">${ingredientsListHtml()}</div>
 
       <div class="section-heading" style="margin-top:18px;"><h2>Method</h2></div>
@@ -3422,6 +3462,11 @@ async function openRecipeDetail(id) {
     document.getElementById('serves-note').textContent = serves === baseServes ? `Amounts for ${baseServes} (as written)` : `Amounts changed for ${serves} portions (recipe makes ${baseServes})`;
     document.getElementById('cooked-recipe-btn').textContent = `🍳 I cooked this · ${serves} portion${serves === 1 ? '' : 's'}`;
   };
+  document.querySelectorAll('#measure-pref button').forEach((b) => b.addEventListener('click', () => {
+    setMeasurePref(b.dataset.val);
+    b.parentElement.querySelectorAll('button').forEach((x) => x.classList.toggle('selected', x === b));
+    document.getElementById('ingredients-box').innerHTML = ingredientsListHtml();
+  }));
   if (baseServes) {
     document.getElementById('serves-down').addEventListener('click', () => setServes(serves - 1));
     document.getElementById('serves-up').addEventListener('click', () => setServes(serves + 1));
@@ -3995,7 +4040,7 @@ async function openMakeItMyWay(recipe, resume = false) {
         return `
         <div class="mw-row ${r.removed ? 'removed' : ''} ${r.cur !== r.orig ? 'swapped' : ''}" data-i="${i}">
           <div class="mw-line">
-            <span class="mw-name">${escapeHtml(ingredientLine(r.cur))}${r.cur !== r.orig && !r.removed ? `<span class="mw-was">was ${escapeHtml(ingredientLine(r.orig))}</span>` : ''}${r.orig.optional ? ' <span class="ing-flag">optional</span>' : ''}</span>
+            <span class="mw-name">${escapeHtml(ingredientLine(r.cur))}${gramsHint(r.cur)}${r.cur !== r.orig && !r.removed ? `<span class="mw-was">was ${escapeHtml(ingredientLine(r.orig))}</span>` : ''}${r.orig.optional ? ' <span class="ing-flag">optional</span>' : ''}</span>
             ${r.removed
               ? '<button type="button" class="link-btn mw-undo">Undo</button>'
               : `<button type="button" class="link-btn mw-swap">${r.cur !== r.orig ? 'Change' : 'Swap'}</button><button type="button" class="mw-del" aria-label="Remove ${escapeHtml(r.cur.name)}">×</button>`}
@@ -4006,7 +4051,7 @@ async function openMakeItMyWay(recipe, resume = false) {
       }).join('')}
       ${added.map((ing, i) => `
         <div class="mw-row swapped added" data-a="${i}">
-          <div class="mw-line"><span class="mw-name">＋ ${escapeHtml(ingredientLine(ing))}${ing.nutrition ? `<span class="mw-was">${ing.nutrition.from === 'label' ? 'from the label' : 'from the barcode'}: ${Math.round(ing.nutrition.kcal)} kcal per 100 g</span>` : ''}</span><button type="button" class="mw-del mw-del-added" aria-label="Remove ${escapeHtml(ing.name)}">×</button></div>
+          <div class="mw-line"><span class="mw-name">＋ ${escapeHtml(ingredientLine(ing))}${gramsHint(ing)}${ing.nutrition ? `<span class="mw-was">${ing.nutrition.from === 'label' ? 'from the label' : 'from the barcode'}: ${Math.round(ing.nutrition.kcal)} kcal per 100 g</span>` : ''}</span><button type="button" class="mw-del mw-del-added" aria-label="Remove ${escapeHtml(ing.name)}">×</button></div>
         </div>`).join('')}
       <div class="st-add" style="margin-top:12px;">
         <input type="text" id="mw-new" placeholder="Add an ingredient, e.g. 1 packet curry spice mix">
@@ -4161,7 +4206,7 @@ function packetAmountHtml(defaultGrams, packGrams, serveGrams) {
     <div class="field" style="margin-top:12px;"><label>How much goes in the whole recipe?</label>
       <div class="ps-fields" style="padding:0;">
         <input type="number" id="pk-grams" min="0" step="any" inputmode="decimal" value="${defaultGrams}">
-        <select id="pk-unit" class="ps-unit"><option value="g">g</option><option value="tsp">tsp</option><option value="tbsp">tbsp</option></select>
+        <select id="pk-unit" class="ps-unit"><option value="g">g</option><option value="tsp">tsp</option><option value="tbsp">tbsp</option><option value="ml">ml</option></select>
       </div></div>
     <div class="state-chip-grid" style="margin-bottom:8px;">${chips}</div>
     <label class="plan-ai-toggle"><input type="checkbox" id="pk-pantry" checked> Add the ${packGrams ? `${packGrams} g ` : ''}packet to my pantry
