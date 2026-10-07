@@ -13,12 +13,15 @@ test('quick and eating-style filters narrow the recipe list', async ({ page }) =
 
   const check = async (selector, expectName) => {
     await page.click(selector);
+    // The list redraws with the chip; wait for it before counting
+    await expect(page.locator(selector)).toHaveClass(/selected/);
     await expect(cards.first()).toBeVisible();
     const n = await cards.count();
     expect(n).toBeGreaterThan(0);
     expect(n).toBeLessThan(total);
     if (expectName) await expect(page.locator('.recipe-card', { hasText: expectName }).first()).toBeVisible();
     await page.click(selector);
+    await expect(page.locator(selector)).not.toHaveClass(/selected/);
     await expect(cards).toHaveCount(total);
   };
   await check('.recipe-time[data-mins="15"]', 'Omelette');
@@ -29,6 +32,7 @@ test('quick and eating-style filters narrow the recipe list', async ({ page }) =
 
   // Keto recipes never list rice, pasta or potatoes as part of the dish
   await page.click('.recipe-filter[data-filter="keto"]');
+  await expect(page.locator('.recipe-filter[data-filter="keto"]')).toHaveClass(/selected/);
   await expect(page.locator('.recipe-card', { hasText: 'Biryani' })).toHaveCount(0);
   await expect(page.locator('.recipe-card', { hasText: 'Bolognese' })).toHaveCount(0);
 
