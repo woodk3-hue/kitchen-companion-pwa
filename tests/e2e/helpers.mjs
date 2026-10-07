@@ -60,7 +60,7 @@ export async function fakeClaude(page, answers) {
     const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
     const body = req.postDataJSON();
-    seen.prompts.push(body.messages[0].content.filter((c) => c && c.type === 'text').map((c) => c.text).join('\n'));
+    const content = body.messages[0].content; seen.prompts.push(typeof content === 'string' ? content : content.filter((c) => c && c.type === 'text').map((c) => c.text).join('\n'));
     const props = body.output_config.format.schema.properties;
     const key = Object.keys(answers).find((k) => props[k] !== undefined);
     const result = key ? answers[key] : {};
