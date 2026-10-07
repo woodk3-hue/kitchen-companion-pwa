@@ -51,3 +51,25 @@ test('choosing an eating style sets the daily macros', async ({ page }) => {
   await page.click('#goal-style button[data-val="low-fat"]');
   await expect(page.locator('#goal-day-fat')).toHaveValue('35');
 });
+
+test('a recipe can have no cuisine, and shows under Basics', async ({ page }) => {
+  const errors = watchErrors(page);
+  await open(page, 'recipes', '#recipe-list');
+  await page.click('#fab-btn');
+  await page.fill('#r-name', 'Jasmine rice');
+  await page.selectOption('#r-cuisine', '');
+  await page.fill('#r-ingredients', '240 g jasmine rice');
+  await page.click('#recipe-form button[type="submit"]');
+  await expect.poll(async () => (await readStore(page, 'recipes')).find((r) => r.name === 'Jasmine rice')?.cuisine).toBe('');
+  // No cuisine tag on its page, and the Edit form keeps "None"
+  await expect(page.locator('.modal-scroll-area .field-row').first()).not.toContainText('Western');
+  await page.click('#edit-recipe-btn');
+  await expect(page.locator('#r-cuisine')).toHaveValue('');
+  await page.click('#modal-close');
+
+  await reopen(page, 'recipes', '.recipe-cuisine-tab[data-cuisine="none"]');
+  await page.click('.recipe-cuisine-tab[data-cuisine="none"]');
+  await expect(page.locator('.recipe-card')).toHaveCount(1);
+  await expect(page.locator('.recipe-card')).toContainText('Jasmine rice');
+  expect(errors).toEqual([]);
+});

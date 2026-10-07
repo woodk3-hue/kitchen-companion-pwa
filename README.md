@@ -101,6 +101,14 @@ IndexedDB is local to the browser/device. Clearing browser data, switching brows
 
 Each ingredient stores `matchTerms` (inventory names that count as having it, e.g. `chicken thigh`, `chicken`), `assumedStaple` (salt, oil and dried spices are assumed on hand) and `optional`.
 
+## Searching for a dish
+
+**🔎 Search online** on the Recipes tab:
+- Type the dish however you like, e.g. "south indian style chicken briyani". Common spellings are fixed (briyani → biryani, dhal → dal, pulao → pilaf), describing words like "style", "south", "homemade" are left out, each main word is searched, and a cuisine word ("Indian") also searches that cuisine. Results are ranked by how many of your words they match.
+- **In your recipes**: matching recipes already in your book are shown first.
+- **✨ Get a recipe for "…" from Claude**: a full recipe for exactly the dish you typed, true to the style and region you name, with calories and macros, ready to save. Uses your API key.
+- TheMealDB (free) has a limited list of dishes, especially regional Indian ones, so Claude is the way to find something specific.
+
 ## Step 2: What can I make?
 
 - **Match %**: each recipe shows how much of it is already in your kitchen ("71% match"), what you'd need to buy, and which food about to go off it uses ("Uses Spinach (2 days left)"). Staples (salt, oil, dried spices) and optional ingredients don't count against the score. With food in the kitchen, the list is sorted by best match, with a boost for recipes that use up expiring food.
@@ -124,7 +132,7 @@ Each ingredient stores `matchTerms` (inventory names that count as having it, e.
 
 ## Step 3: Meal plan
 
-- **Planner tab**: the week from Monday to Sunday, with lunch and dinner for each day (turn on **Plan breakfast too** in Settings). Use ‹ › to move between weeks. Each planned meal shows its kcal (✓ inside your target), food it uses up ("Uses Spinach") and how many ingredients you'd need to buy, with a daily kcal total.
+- **Planner tab**: the week from Monday to Sunday, with lunch, dinner and **snacks** for each day (Settings → Meal plan: **Plan breakfast too** adds breakfast, **Plan snacks** turns the snacks row off). **+ Add** on snacks also offers snack foods from your kitchen (snacks, fruit, yoghurt and other dairy); Fill my week only fills snacks with recipes marked as snacks. Use ‹ › to move between weeks. Each planned meal shows its kcal (✓ inside your target), food it uses up ("Uses Spinach") and how many ingredients you'd need to buy, with a daily kcal total.
 - **What you eat shows in the planner**: anything logged on Today appears in the planner on that day and meal, marked **✓ Eaten** (breakfast and snacks rows appear when something's logged there). A planned meal you log with ✓ Ate this is ticked as eaten rather than added twice. A meal can hold several things, with **+ Add to dinner** under them. Tap a planned meal you didn't eat to remove it ("Didn't eat it: remove" on past days); removing a logged item from the planner keeps it in the diary, and removing it from the diary takes it off the planner. **Clear week** keeps what was eaten.
 - **My portions**: when you add a meal (from **+ Add** or **📅 Add to plan** on a recipe), choose how many portions you'll have, 1 by default. The planner shows "1 portion · 216 kcal", the day total uses it, and tapping a planned meal lets you change it. On Today the planned meal shows its portions, and **✓ Ate this** starts with that many for you (in *I cooked this*, the servings log or the leftovers log). In *I cooked this*, **Portions cooked** is the whole pot; *Me* is your share.
 - **+ Add** on a meal opens a picker: things already made (leftovers, cooked portions, ready meals in your kitchen), your recipes ranked best match first, or "Eating out / skip".
@@ -223,7 +231,7 @@ Once the kitchen has food in it, **🍳 Suggest recipes from my kitchen** appear
 
 ## Cuisines
 
-45 cuisines in 8 regions: South Asian, East Asian, Southeast Asian, Middle Eastern & African, European, Americas, Oceania, and Other. The Recipes tab only shows tabs for cuisines you have recipes in. **Settings → Health goals → Cuisines you like** lists them by region; choosing none means any cuisine, and AI suggestions follow whatever is chosen. Online search results keep their cuisine (e.g. TheMealDB Jamaican → Caribbean).
+46 cuisines in 8 regions: South Asian, East Asian, Southeast Asian, Middle Eastern & African, European, Americas, Oceania, and Other (Western, Fusion, Other). Basics that aren't really a cuisine, like rice, oats or toast, can be saved with **None (basics)** at the top of the cuisine list; they show no cuisine tag and get their own **Basics** tab on the Recipes page. The Recipes tab only shows tabs for cuisines you have recipes in. **Settings → Health goals → Cuisines you like** lists them by region; choosing none means any cuisine, and AI suggestions follow whatever is chosen. Online search results keep their cuisine (e.g. TheMealDB Jamaican → Caribbean).
 
 ## Roadmap
 
