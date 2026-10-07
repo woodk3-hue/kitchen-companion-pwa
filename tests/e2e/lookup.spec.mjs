@@ -61,8 +61,8 @@ test('the live breakdown panel shows a "≈ close match" tag on a typo', async (
   await page.click('#fab-btn');
   await page.fill('#r-name', 'Fuzzy test');
   await page.fill('#r-servings', '2');
-  await page.fill('#r-ingredients', '240 g jasmin rice');
-  // Wait for the live panel debounce
-  await expect(page.locator('#r-live-list .r-live-tag.warn', { hasText: /close match/i })).toBeVisible();
+  // "chikken breast" isn't aliased, so it falls through to the fuzzy matcher
+  await page.fill('#r-ingredients', '400 g chikken breast');
+  await expect(page.locator('#r-live-list .r-live-tag.warn').filter({ hasText: /close match/i })).toBeVisible();
   expect(errors).toEqual([]);
 });
