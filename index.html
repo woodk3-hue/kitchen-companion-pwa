@@ -1284,6 +1284,8 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 .cook-made .cook-num { max-width: 240px; }
 .plan-slot.filled.eaten { opacity: 0.92; }
 .plan-add-more { display: block; width: 100%; margin: 2px 0 6px; padding: 6px 10px; border: none; background: none; color: var(--color-accent); font: inherit; font-size: 13px; font-weight: 700; text-align: left; cursor: pointer; }
+.ask-claude { background: var(--color-fill); border-radius: var(--radius-card); padding: 12px; margin: 10px 0 4px; }
+.ask-claude .ai-meal { margin-top: 10px; }
 .plan-portions { display: flex; align-items: center; gap: 10px; background: var(--color-paper); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 10px 12px; margin: 0 0 12px; }
 .plan-portions .stepper { flex: 0 0 132px; }
 .plan-portions .stepper input { width: 44px; padding: 8px 2px; border: none; background: var(--color-fill); border-radius: 10px; font: inherit; font-weight: 700; color: var(--color-ink); text-align: center; }
@@ -4264,14 +4266,84 @@ async function mealDbFetch(path) {
 }
 
 // Results from an ingredient filter and a name search, without duplicates
+// Common spellings of dish names, so "briyani" finds "biryani"
+const DISH_SPELLINGS = {
+  briyani: 'biryani', biriyani: 'biryani', biriani: 'biryani', buriyani: 'biryani', briani: 'biryani',
+  daal: 'dal', dhal: 'dal', dahl: 'dal', kurma: 'korma', vindalu: 'vindaloo', tika: 'tikka',
+  kebab: 'kebab', kabab: 'kebab', kabob: 'kebab', pilau: 'pilaf', pulao: 'pilaf', samosas: 'samosa', parotta: 'paratha'
+};
+// Words that describe a dish but aren't in TheMealDB names
+const SEARCH_FILLER = new Set(['style', 'south', 'north', 'east', 'west', 'homemade', 'home', 'easy', 'quick', 'simple', 'best', 'authentic',
+  'traditional', 'recipe', 'recipes', 'the', 'with', 'and', 'a', 'an', 'of', 'my', 'mums', 'mum', 'nans', 'healthy', 'spicy', 'mild', 'classic', 'made']);
+const AREA_WORDS = { indian: 'Indian', chinese: 'Chinese', thai: 'Thai', japanese: 'Japanese', italian: 'Italian', mexican: 'Mexican', greek: 'Greek',
+  french: 'French', vietnamese: 'Vietnamese', malaysian: 'Malaysian', filipino: 'Filipino', turkish: 'Turkish', moroccan: 'Moroccan', spanish: 'Spanish',
+  british: 'British', american: 'American', australian: 'Australian', jamaican: 'Jamaican', 'sri': 'Indian', lankan: 'Indian', keralan: 'Indian', kerala: 'Indian' };
+
+function searchWords(query) {
+  return matchWords(query).split(' ').filter(Boolean).map((w) => DISH_SPELLINGS[w] || w);
+}
+
+// Searches TheMealDB several ways (whole phrase, each main word, ingredient, cuisine) and ranks
+// the results by how many of the words in the search they match
 async function searchMealDb(query) {
-  const q = query.trim();
-  const [byIngredient, byName] = await Promise.all([
-    mealDbFetch(`filter.php?i=${encodeURIComponent(q.toLowerCase().replace(/\s+/g, '_'))}`).catch(() => []),
-    mealDbFetch(`search.php?s=${encodeURIComponent(q)}`).catch(() => [])
-  ]);
-  const seen = new Set();
-  return [...byIngredient, ...byName].filter((m) => !seen.has(m.idMeal) && seen.add(m.idMeal));
+  const words = searchWords(query);
+  const area = words.map((w) => AREA_WORDS[w]).find(Boolean);
+  const main = words.filter((w) => !SEARCH_FILLER.has(w) && !AREA_WORDS[w] && w.length >= 3);
+  const phrase = main.join(' ') || words.join(' ');
+  const requests = [
+    mealDbFetch(`search.php?s=${encodeURIComponent(phrase)}`),
+    ...main.slice(0, 4).map((w) => mealDbFetch(`search.php?s=${encodeURIComponent(w)}`)),
+    ...main.slice(0, 2).map((w) => mealDbFetch(`filter.php?i=${encodeURIComponent(w)}`)),
+    ...(area ? [mealDbFetch(`filter.php?a=${encodeURIComponent(area)}`)] : [])
+  ].map((p) => p.catch(() => null));
+  const lists = await Promise.all(requests);
+  if (lists.every((l) => l === null)) throw new Error('TheMealDB unreachable');
+  const areaIds = new Set(area ? (lists[lists.length - 1] || []).map((m) => m.idMeal) : []);
+  const byId = new Map();
+  lists.forEach((l) => (l || []).forEach((m) => { if (!byId.has(m.idMeal)) byId.set(m.idMeal, m); }));
+  const score = (m) => {
+    const name = ` ${matchWords(m.strMeal)} `;
+    const hits = main.filter((w) => name.includes(` ${w} `) || name.includes(` ${w}`)).length;
+    return hits * 10 + (areaIds.has(m.idMeal) || m.strArea === area ? 3 : 0);
+  };
+  const ranked = [...byId.values()].map((m) => ({ m, s: score(m) })).sort((a, b) => b.s - a.s || a.m.strMeal.localeCompare(b.m.strMeal));
+  // With dish words to match, only keep results that match at least one of them
+  const best = ranked.filter((x) => x.s >= 10);
+  return (best.length ? best : ranked).map((x) => x.m);
+}
+
+// One recipe for a dish named by the person, from Claude (same shape as meal suggestions)
+async function requestAiNamedRecipe(dish) {
+  let Anthropic = null;
+  try {
+    const loaded = await getAnthropicClient();
+    Anthropic = loaded.Anthropic;
+    const [items, goals] = await Promise.all([dbGetAll('inventoryItems'), getHealthGoals()]);
+    const style = EATING_STYLES[goals.eatingStyle] || EATING_STYLES[DEFAULT_EATING_STYLE];
+    const response = await loaded.client.beta.messages.create({
+      model: AI_MODEL,
+      max_tokens: 8000,
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+      output_config: { effort: 'medium', format: { type: 'json_schema', schema: aiSuggestionSchema() } },
+      system: 'You are the recipe feature of PantryFit, a personal kitchen app for a home cook in Australia. Write practical home-cooking recipes with clear, concise methods, true to the dish and region asked for.',
+      messages: [{ role: 'user', content: [
+        `Give me exactly 1 recipe for: ${dish}.`,
+        'Keep it true to the style and region named (e.g. South Indian means South Indian techniques and spices). Use the dish as its name, tidied up.',
+        `If it fits the dish, lean towards ${style.label.toLowerCase()} (${style.ai}) and about ${goals.caloriesMin}-${goals.caloriesMax} kcal per serving, but don't change what the dish is.`,
+        'Use metric quantities; quantity 0 with an empty unit for "to taste". Salt, pepper, oil and dried spices are assumedStaple. Set inKitchen for ingredients in my kitchen list. matchTerms are lower-case names a kitchen item could be called.',
+        'Calories, protein, carbs and fat are per serving and approximate. usesExpiring lists kitchen items it uses that are close to their use-by. whyThisMeal is one short sentence about the dish.',
+        '', 'My kitchen (JSON):',
+        JSON.stringify(items.map((i) => ({ name: i.name, daysUntilUseBy: i.expiryDate ? daysUntil(i.expiryDate) : null })))
+      ].join('\n') }]
+    });
+    if (response.stop_reason === 'refusal') return { error: 'Claude couldn\'t write that recipe. Try describing the dish differently.' };
+    const parsed = JSON.parse(response.content.filter((b) => b.type === 'text').map((b) => b.text).join(''));
+    return { meal: (parsed.meals || [])[0] || null };
+  } catch (err) {
+    if (err instanceof SyntaxError) return { error: 'Claude\'s reply couldn\'t be read. Please try again.' };
+    return { error: describeAiError(err, Anthropic) };
+  }
 }
 
 // TheMealDB measures are free text ("1 tbs", "1.2 kg", "5 thinly sliced", "to taste"):
@@ -4355,9 +4427,9 @@ async function openOnlineSearch() {
       <button class="close-btn" id="modal-close">×</button>
     </div>
     <div class="modal-scroll-area" id="online-body">
-      <p class="recipe-muted" style="margin-top:0;">Free recipes from TheMealDB. Search by an ingredient or dish name. These don't include calories.</p>
+      <p class="recipe-muted" style="margin-top:0;">Search your recipes, free recipes from TheMealDB (they don't include calories), or ask Claude for any dish.</p>
       <div class="st-add">
-        <input type="text" id="online-q" placeholder="e.g. chicken, lamb, dal">
+        <input type="text" id="online-q" placeholder="e.g. South Indian chicken biryani">
         <button type="button" class="btn-secondary" id="online-go">Search</button>
       </div>
       ${proteinChips.length ? `<div class="st-group-title">From your kitchen</div>
@@ -4375,7 +4447,7 @@ async function openOnlineSearch() {
     try {
       const meals = await loader();
       if (!document.getElementById('online-results')) return;
-      if (!meals.length) { out.innerHTML = `<p class="recipe-muted">Nothing found for ${escapeHtml(label)}. Try a simpler word, e.g. "chicken".</p>`; return; }
+      if (!meals.length) { out.innerHTML = `<p class="recipe-muted">TheMealDB has nothing for ${escapeHtml(label)}. Try one word, e.g. "biryani", or ask Claude above.</p>`; return; }
       out.innerHTML = meals.slice(0, 40).map((m) => `
         <button type="button" class="online-result" data-id="${escapeHtml(m.idMeal)}">
           ${m.strMealThumb ? `<img src="${escapeHtml(m.strMealThumb)}/preview" alt="" loading="lazy">` : ''}
@@ -4387,9 +4459,52 @@ async function openOnlineSearch() {
     }
   };
 
-  const runSearch = () => {
+  const runSearch = async () => {
     const q = document.getElementById('online-q').value.trim();
-    if (q) show(() => searchMealDb(q), `"${q}"`);
+    if (!q) return;
+    await show(() => searchMealDb(q), `"${q}"`);
+    const out = document.getElementById('online-results');
+    if (!out) return;
+    // Recipes already in the book that match, above the online results
+    const words = searchWords(q).filter((w) => !SEARCH_FILLER.has(w) && !AREA_WORDS[w] && w.length >= 3);
+    const mine = (await dbGetAll('recipes'))
+      .map((r) => ({ r, hits: words.filter((w) => ` ${matchWords(r.name)} `.includes(` ${w}`)).length }))
+      .filter((x) => x.hits).sort((a, b) => b.hits - a.hits).slice(0, 5);
+    const hasKey = !!getAiKey();
+    out.insertAdjacentHTML('afterbegin', `
+      ${mine.length ? `<div class="st-group-title" style="margin-top:0;">In your recipes</div>
+        ${mine.map(({ r }) => `<button type="button" class="pick-row mine-result" data-recipe-id="${r.id}"><span class="pick-name">📖 ${escapeHtml(r.name)}</span></button>`).join('')}` : ''}
+      <div class="ask-claude">
+        <button type="button" class="btn-primary" id="online-ai" style="margin:0;">✨ Get a recipe for “${escapeHtml(q)}” from Claude</button>
+        <p class="recipe-muted" style="margin:6px 0 0;">${hasKey ? 'Any dish, true to the style you name, with calories and macros. Uses your API key.' : 'Add your API key in Settings → AI suggestions to ask Claude for any dish.'}</p>
+        <div id="online-ai-result"></div>
+      </div>
+      <div class="st-group-title">From TheMealDB</div>`);
+    out.querySelectorAll('.mine-result').forEach((b) => b.addEventListener('click', () => openRecipeDetail(parseInt(b.dataset.recipeId, 10))));
+    document.getElementById('online-ai').addEventListener('click', async (e) => {
+      if (!getAiKey()) { closeModal(); navigateTo('settings'); return; }
+      const btn = e.currentTarget;
+      const box = document.getElementById('online-ai-result');
+      btn.disabled = true;
+      btn.textContent = 'Writing the recipe…';
+      const [outcome, goals] = await Promise.all([requestAiNamedRecipe(q), getHealthGoals()]);
+      if (!document.getElementById('online-ai-result')) return;
+      btn.disabled = false;
+      btn.textContent = `✨ Ask again`;
+      if (outcome.error || !outcome.meal) { box.innerHTML = `<p class="ai-error">${escapeHtml(outcome.error || 'No recipe came back. Please try again.')}</p>`; return; }
+      box.innerHTML = aiMealCardHtml(outcome.meal, 0, goals);
+      box.querySelector('details').open = true;
+      box.querySelector('.ai-save-btn').addEventListener('click', async (ev) => {
+        const save = ev.currentTarget;
+        const existing = await dbGetAll('recipes');
+        if (existing.some((r) => r.name.toLowerCase() === outcome.meal.name.toLowerCase())) { save.textContent = 'Already in your recipes'; save.disabled = true; return; }
+        await dbPut('recipes', aiMealToRecipe(outcome.meal));
+        save.textContent = '✓ Saved';
+        save.disabled = true;
+        showToast('Saved to your recipes');
+        if (AppState.route === 'recipes') renderRoute();
+      });
+    });
   };
   document.getElementById('online-go').addEventListener('click', runSearch);
   document.getElementById('online-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
