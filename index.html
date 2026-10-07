@@ -2116,23 +2116,6 @@ async function renderKitchenScreen() {
     </div>
   `;
 
-  const stocktakeHtml = `
-    <div class="recipe-online-row">
-      <button type="button" class="stocktake-btn" id="stocktake-btn">
-        <span class="st-btn-title">📋 Stocktake</span>
-        <span class="st-btn-desc">Tick off a list</span>
-      </button>
-      <button type="button" class="stocktake-btn alt" id="photo-scan-btn">
-        <span class="st-btn-title">📸 Photo</span>
-        <span class="st-btn-desc">Reads labels</span>
-      </button>
-      <button type="button" class="stocktake-btn alt2" id="barcode-scan-btn">
-        <span class="st-btn-title">▦ Barcode</span>
-        <span class="st-btn-desc">Look it up</span>
-      </button>
-    </div>
-  `;
-
   const templates = await dbGetAll('quickAddTemplates');
   const sortedTemplates = templates.sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0));
   const quickAddHtml = sortedTemplates.length === 0 ? '' : `
@@ -2142,7 +2125,7 @@ async function renderKitchenScreen() {
   `;
 
   if (filtered.length === 0) {
-    return tabsHtml + stocktakeHtml + (items.length ? kitchenSuggestButtonHtml('kitchen-suggest-btn') : '') + quickAddHtml + `
+    return tabsHtml + (items.length ? kitchenSuggestButtonHtml('kitchen-suggest-btn') : '') + quickAddHtml + `
       <div class="empty-state">
         <div class="glyph">🧺</div>
         <h3>No items here yet</h3>
@@ -2190,13 +2173,10 @@ async function renderKitchenScreen() {
     `;
   }).join('');
 
-  return tabsHtml + stocktakeHtml + kitchenSuggestButtonHtml('kitchen-suggest-btn') + quickAddHtml + itemsHtml;
+  return tabsHtml + kitchenSuggestButtonHtml('kitchen-suggest-btn') + quickAddHtml + itemsHtml;
 }
 
 function attachKitchenListeners() {
-  document.getElementById('stocktake-btn').addEventListener('click', openStocktake);
-  document.getElementById('photo-scan-btn').addEventListener('click', openPhotoScan);
-  document.getElementById('barcode-scan-btn').addEventListener('click', openBarcodeScan);
   const suggestBtn = document.getElementById('kitchen-suggest-btn');
   if (suggestBtn) suggestBtn.addEventListener('click', openKitchenSuggestions);
 
