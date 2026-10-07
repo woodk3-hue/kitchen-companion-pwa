@@ -171,6 +171,12 @@ The **Today** tab (formerly Home) is a food diary, like a fitness tracker:
 - The 30 starter recipes now carry carbs and fat per serve (for the dish without the rice or bread served with it). Your own recipes can have them too (Edit recipe → Nutrition & details); without them the app estimates from calories, protein and fat level.
 - ✨ Suggest meals and 🪄 Fill my week follow your style.
 
+## Recipe page: serves and macros
+
+- **Serves − / +** on a recipe page scales every ingredient amount (e.g. 4 → 6 serves: 600 g mince becomes 900 g). The recipe itself isn't changed. **I cooked this** then starts with that many portions.
+- **Calories, protein, carbs and fat** per serving are shown as four tiles on the recipe page, and as a coloured "P · C · F" line on each recipe card.
+- On **Today**, every logged food shows its protein, carbs and fat under its name, and each meal shows its totals. Recipe servings logged before carbs and fat were tracked are filled in from the recipe the next time Today opens.
+
 ## Fast & easy meals
 
 - Recipes tab: **⚡ 15 min** and **≤ 30 min** filters (prep + cooking time). Recipes 15 minutes or under show ⚡ next to their time.
@@ -190,7 +196,7 @@ The **Shopping** tab:
 ## Step 5: I cooked this
 
 **🍳 I cooked this** on any recipe page, on a planned meal, from **✓ Ate this** on a planned meal you haven't cooked yet, or from + Add on the Today tab:
-- **Portions made** (the recipe's serves), **Eaten now**, **🧊 Fridge** and **❄️ Freezer**. Change what's eaten and the rest moves to the fridge, with a check that it adds up (e.g. "4 made = 1 eaten + 2 fridge + 1 freezer").
+- **Portions made** (the serves you chose on the recipe page), **Eaten now**, then what's left over, e.g. "3 portions left over", split between **🧊 Fridge** and **❄️ Freezer** with − / + buttons: add one to the freezer and one comes off the fridge. A check shows it adds up ("4 made = 1 eaten + 1 fridge + 2 freezer").
 - **Add my portion to the food diary**: how many portions you had and for which meal (e.g. 1 for today's lunch), with calories, protein, carbs and fat from the recipe.
 - **Take out of my kitchen**: the ingredients you have, with the amount the recipe uses already worked out (800 g chicken thigh → 0.8 of your 1 kg). Untick or change any.
 - The fridge and freezer portions become kitchen items ("Home-Style Chicken Curry, 2 portions" in Leftovers, use within 3 days; 1 portion in the Freezer, about 3 months), linked to the recipe. Logging one later (from my kitchen, or ✓ Ate this on a planned leftover) uses the recipe's nutrition and takes a portion away.

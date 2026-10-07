@@ -39,5 +39,7 @@ test('quick add estimate and label photo use Claude (faked)', async ({ page }) =
   await page.click('#ls-action');
 
   await expect.poll(async () => (await readStore(page, 'foodLog')).map((e) => e.kcal).sort()).toEqual([460, 70]);
+  // Each meal shows its protein, carbs and fat
+  await expect(page.locator('.diary-entry', { hasText: 'Protein shake' }).locator('.macro-line')).toContainText('P 100 g');
   expect(errors).toEqual([]);
 });

@@ -1031,6 +1031,12 @@ h1, h2, h3 {
   font-family: inherit; color: var(--color-ink); cursor: pointer; font-size: 14px;
 }
 .diary-entry .de-name { font-weight: 600; min-width: 0; }
+.diary-entry .de-main { display: flex; flex-direction: column; min-width: 0; }
+.macro-line { display: flex; gap: 10px; font-size: 12px; font-weight: 700; margin-top: 2px; }
+.ml-p { color: var(--macro-protein); }
+.ml-c { color: var(--macro-carbs); }
+.ml-f { color: var(--macro-fat); }
+.recipe-card .macro-line { margin-top: 6px; }
 .diary-entry .de-amt, .diary-planned .de-amt { color: var(--color-ink-soft); font-weight: 500; }
 .diary-entry .de-num { color: var(--color-ink-soft); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .diary-planned { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0 2px; border-top: 1px dashed var(--color-line); font-size: 13px; color: var(--color-ink-soft); }
@@ -1262,6 +1268,22 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 /* I cooked this */
 .cook-split { gap: 10px; }
 .cook-num input { width: 100%; }
+.macro-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.macro-tiles .mt { background: var(--color-paper); border-radius: 14px; box-shadow: var(--shadow-card); padding: 10px 4px; text-align: center; display: flex; flex-direction: column; gap: 2px; }
+.mt-v { font-size: 18px; font-weight: 800; }
+.mt-v small { font-size: 12px; font-weight: 700; margin-left: 1px; }
+.mt-l { font-size: 11px; font-weight: 600; color: var(--color-ink-soft); }
+.mt-protein .mt-v { color: var(--macro-protein); }
+.mt-carbs .mt-v { color: var(--macro-carbs); }
+.mt-fat .mt-v { color: var(--macro-fat); }
+.serves-stat .v { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.serves-btn { width: 24px; height: 24px; border-radius: 50%; border: none; background: var(--color-fill); color: var(--color-ink); font-size: 16px; font-weight: 800; line-height: 1; padding: 0; cursor: pointer; }
+.section-heading #serves-note { font-size: 12px; font-weight: 600; }
+.stepper { display: flex; align-items: center; gap: 6px; }
+.stepper input { text-align: center; min-width: 0; }
+.step-btn { flex: 0 0 40px; height: 40px; border: none; border-radius: 12px; background: var(--color-fill); color: var(--color-ink); font-size: 20px; font-weight: 700; cursor: pointer; }
+.step-btn:active { background: var(--color-accent-tint); }
+.cook-left { font-size: 14px; font-weight: 700; margin: 4px 0 8px; }
 .cook-hint { display: block; font-size: 12px; color: var(--color-ink-soft); margin-top: 3px; }
 .cook-check { font-size: 13px; font-weight: 600; margin: 2px 0 12px; }
 .cook-check.ok { color: var(--color-fridge); }
@@ -3035,6 +3057,7 @@ function renderRecipeList() {
             ${dietTagsHtml(r)}
             ${r.freezerFriendly ? '<span class="tag state-frozen">Freezes well</span>' : ''}
           </div>
+          ${macroLineHtml(recipeMacros(r))}
           ${sc && sc.expiring.length ? `<div class="match-line uses">Uses ${sc.expiring.map((e) => `${escapeHtml(e.name)} (${formatDaysLeft(e.daysLeft)})`).join(', ')}</div>` : ''}
           ${sc && sc.missing.length && sc.pct > 0 ? `<div class="match-line">Need: ${escapeHtml(sc.missing.slice(0, 4).join(', '))}${sc.missing.length > 4 ? ` +${sc.missing.length - 4} more` : ''}</div>` : ''}
         </div>
@@ -3155,11 +3178,15 @@ async function openRecipeDetail(id) {
 
   const [goals, kitchenItems] = await Promise.all([getHealthGoals(), dbGetAll('inventoryItems')]);
   const index = buildInventoryIndex(kitchenItems);
-  const ingredientsHtml = recipe.ingredients.length === 0
+  // Serves can be changed on this page: ingredient amounts scale with it (the recipe itself isn't changed)
+  const baseServes = recipe.servings || null;
+  let serves = baseServes;
+  const scaled = (ing) => (baseServes && ing.quantity != null ? { ...ing, quantity: ing.quantity * serves / baseServes } : ing);
+  const ingredientsListHtml = () => recipe.ingredients.length === 0
     ? '<p class="recipe-muted">No ingredients listed.</p>'
     : `<ul class="ingredient-list">${recipe.ingredients.map((ing) => `
         <li>
-          <span class="ing-qty">${escapeHtml(formatIngredientQuantity(ing))}</span>
+          <span class="ing-qty">${escapeHtml(formatIngredientQuantity(scaled(ing)))}</span>
           <span class="ing-name">${escapeHtml(ing.name)}${ing.prepNote ? `<span class="ing-note">, ${escapeHtml(ing.prepNote)}</span>` : ''}
             ${index.length && findInventoryMatch(ing, index) ? '<span class="ing-have">✓ in kitchen</span>' : ''}
             ${ing.optional ? '<span class="ing-flag">optional</span>' : ''}
@@ -3172,12 +3199,15 @@ async function openRecipeDetail(id) {
     : `<ol class="method-list">${recipe.method.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ol>`;
 
   const macros = recipeMacros(recipe);
-  const nutrition = [
-    recipe.caloriesPerServing ? `~${recipe.caloriesPerServing} kcal` : '',
-    recipe.proteinGramsPerServing ? `~${recipe.proteinGramsPerServing} g protein` : '',
-    macros.carbs != null ? `~${Math.round(macros.carbs)} g carbs` : '',
-    macros.fat != null ? `~${Math.round(macros.fat)} g fat` : `${recipe.fatLevel} fat`
-  ].filter(Boolean).join(' · ');
+  const macroTile = (cls, label, v, unit) => `<div class="mt ${cls}"><span class="mt-v">${v == null ? '–' : Math.round(v)}<small>${unit}</small></span><span class="mt-l">${label}</span></div>`;
+  const macroPanelHtml = `
+    <div class="macro-tiles">
+      ${macroTile('mt-kcal', 'Calories', macros.kcal, '')}
+      ${macroTile('mt-protein', 'Protein', macros.protein, 'g')}
+      ${macroTile('mt-carbs', 'Carbs', macros.carbs, 'g')}
+      ${macroTile('mt-fat', 'Fat', macros.fat, 'g')}
+    </div>
+    <p class="recipe-muted" style="margin:6px 0 14px;">Per serving, approximate${macros.estimated ? '; carbs & fat estimated from calories (add them in Edit recipe)' : ''}${recipeDiet(recipe).skip.length ? `, without the ${escapeHtml(recipeDiet(recipe).skip.map((n) => n.toLowerCase()).join(' & '))}` : ''}.</p>`;
 
   const html = `
     <div class="modal-title-row">
@@ -3197,12 +3227,12 @@ async function openRecipeDetail(id) {
       ${recipe.sourceName ? `<p class="recipe-muted" style="margin:0 0 10px;">From ${escapeHtml(recipe.sourceName)}</p>` : ''}
 
       <div class="recipe-stats">
-        ${stat('Serves', recipe.servings)}
+        ${baseServes ? `<div class="recipe-stat serves-stat"><span class="v"><button type="button" class="serves-btn" id="serves-down" aria-label="Fewer serves">−</button><span id="serves-val">${baseServes}</span><button type="button" class="serves-btn" id="serves-up" aria-label="More serves">+</button></span><span class="l">Serves</span></div>` : ''}
         ${stat('Prep', recipe.prepMinutes ? recipe.prepMinutes + ' min' : '')}
         ${stat('Cook', recipe.cookMinutes ? recipe.cookMinutes + ' min' : '')}
         ${stat('Difficulty', recipe.difficulty)}
       </div>
-      <p class="recipe-muted" style="margin:0 0 14px;">Per serving: ${escapeHtml(nutrition)} (${macros.estimated ? 'carbs & fat estimated' : 'approximate'})</p>
+      ${macroPanelHtml}
 
       <div class="rating-row">
         <span class="rating-label">You</span>
@@ -3216,8 +3246,8 @@ async function openRecipeDetail(id) {
         ${recipe.isFavourite ? '★ Favourite (tap to remove)' : '☆ Add to favourites'}
       </button>
 
-      <div class="section-heading" style="margin-top:18px;"><h2>Ingredients</h2></div>
-      ${ingredientsHtml}
+      <div class="section-heading" style="margin-top:18px;"><h2>Ingredients</h2><span class="recipe-muted" id="serves-note"></span></div>
+      <div id="ingredients-box">${ingredientsListHtml()}</div>
 
       <div class="section-heading" style="margin-top:18px;"><h2>Method</h2></div>
       ${methodHtml}
@@ -3264,7 +3294,17 @@ async function openRecipeDetail(id) {
 
   document.getElementById('edit-recipe-btn').addEventListener('click', () => openRecipeForm(recipe));
   document.getElementById('plan-recipe-btn').addEventListener('click', () => openAddRecipeToPlan(recipe));
-  document.getElementById('cooked-recipe-btn').addEventListener('click', () => openCookedThis(recipe));
+  document.getElementById('cooked-recipe-btn').addEventListener('click', () => openCookedThis(recipe, { serves }));
+  const changeServes = (d) => {
+    serves = Math.max(1, serves + d);
+    document.getElementById('serves-val').textContent = serves;
+    document.getElementById('ingredients-box').innerHTML = ingredientsListHtml();
+    document.getElementById('serves-note').textContent = serves === baseServes ? '' : `for ${serves} serves (recipe makes ${baseServes})`;
+  };
+  if (baseServes) {
+    document.getElementById('serves-down').addEventListener('click', () => changeServes(-1));
+    document.getElementById('serves-up').addEventListener('click', () => changeServes(1));
+  }
   document.getElementById('log-recipe-btn').addEventListener('click', () => openLogRecipeServings(localDateString(new Date()), defaultLogMeal(), recipe));
   document.getElementById('delete-recipe-btn').addEventListener('click', () => deleteRecipe(recipe));
 }
@@ -3655,6 +3695,13 @@ function recipeSuitsStyle(recipe, style) {
 function skipText(names) {
   const short = names.map((n) => n.replace(/^(basmati|jasmine|microwave)\s+/i, '').toLowerCase());
   return short.length ? ` (skip the ${short.slice(0, 2).join(' & ')})` : '';
+}
+
+// "P 34 g · C 17 g · F 24 g" with each macro in its chart colour
+function macroLineHtml(m) {
+  if (!m || (m.protein == null && m.carbs == null && m.fat == null)) return '';
+  const part = (cls, letter, v) => (v == null ? '' : `<span class="ml ${cls}">${letter} ${Math.round(v)} g</span>`);
+  return `<div class="macro-line">${[part('ml-p', 'P', m.protein), part('ml-c', 'C', m.carbs), part('ml-f', 'F', m.fat)].filter(Boolean).join('')}</div>`;
 }
 
 function dietTagsHtml(recipe, { long = false } = {}) {
@@ -5635,10 +5682,26 @@ function macroMeterHtml(m, eaten, goal) {
     </div>`;
 }
 
+// Recipe servings logged before carbs and fat were worked out only have calories and protein:
+// fill the gaps from the recipe (per serving × servings) and save them
+async function fillMissingRecipeMacros(entries) {
+  const gaps = entries.filter((e) => e.recipeId && e.amountUnit === 'serving' && e.amount && (e.carbs == null || e.fat == null || e.protein == null));
+  for (const e of gaps) {
+    const recipe = await dbGet('recipes', e.recipeId);
+    if (!recipe) continue;
+    const m = recipeMacros(recipe);
+    if (e.protein == null && m.protein != null) e.protein = round1(m.protein * e.amount);
+    if (e.carbs == null && m.carbs != null) e.carbs = round1(m.carbs * e.amount);
+    if (e.fat == null && m.fat != null) e.fat = round1(m.fat * e.amount);
+    await dbPut('foodLog', e);
+  }
+}
+
 async function renderTodayDiaryHtml() {
   const date = AppState.diaryDate || localDateString(new Date());
   const today = localDateString(new Date());
   const [entries, goals, plans] = await Promise.all([getLogEntries(date), getHealthGoals(), getPlanEntries([date])]);
+  await fillMissingRecipeMacros(entries);
   const t = dayTotals(entries);
   const left = goals.dailyCalories - Math.round(t.kcal);
   const loggedPlanIds = new Set(entries.filter((e) => e.planEntryId).map((e) => e.planEntryId));
@@ -5646,17 +5709,20 @@ async function renderTodayDiaryHtml() {
   const mealCard = (meal) => {
     const list = entries.filter((e) => e.meal === meal);
     const planned = plans.filter((p) => p.meal === meal && !loggedPlanIds.has(p.id));
-    const kcal = list.reduce((s, e) => s + (e.kcal || 0), 0);
+    const mt = dayTotals(list);
     return `
       <div class="diary-meal">
         <div class="diary-meal-head">
-          <span>${LOG_MEAL_LABELS[meal]}${kcal ? ` <span class="diary-meal-kcal">${Math.round(kcal)} kcal</span>` : ''}</span>
+          <span>${LOG_MEAL_LABELS[meal]}${mt.kcal ? ` <span class="diary-meal-kcal">${Math.round(mt.kcal)} kcal · P ${Math.round(mt.protein)} · C ${Math.round(mt.carbs)} · F ${Math.round(mt.fat)} g</span>` : ''}</span>
           <button type="button" class="link-btn diary-add" data-meal="${meal}">+ Add</button>
         </div>
         ${list.map((e) => `
           <button type="button" class="diary-entry" data-log-id="${e.id}">
-            <span class="de-name">${escapeHtml(e.name)}${e.amount ? `<span class="de-amt"> · ${escapeHtml(formatLogAmount(e))}</span>` : ''}</span>
-            <span class="de-num">${Math.round(e.kcal || 0)} kcal${e.protein != null ? ` · ${Math.round(e.protein)} g P` : ''}</span>
+            <span class="de-main">
+              <span class="de-name">${escapeHtml(e.name)}${e.amount ? `<span class="de-amt"> · ${escapeHtml(formatLogAmount(e))}</span>` : ''}</span>
+              ${macroLineHtml(e)}
+            </span>
+            <span class="de-num">${Math.round(e.kcal || 0)} kcal</span>
           </button>`).join('')}
         ${planned.map((p) => `
           <div class="diary-planned">
@@ -6446,11 +6512,11 @@ function ingredientUseInItemUnit(ing, item, scale) {
   return null;
 }
 
-async function openCookedThis(recipe, { planEntryId = null, date = null, meal = null } = {}) {
+async function openCookedThis(recipe, { planEntryId = null, date = null, meal = null, serves = null } = {}) {
   const [settings, items] = await Promise.all([getPlanSettings(), dbGetAll('inventoryItems')]);
   const logDate = date || localDateString(new Date());
   const logMeal = meal || defaultLogMeal();
-  const made = recipe.servings || 4;
+  const made = serves || recipe.servings || 4;
   const eaten = Math.min(settings.householdSize || 2, made);
   const index = buildInventoryIndex(items);
   const scaleFor = (portions) => (recipe.servings ? portions / recipe.servings : 1);
@@ -6462,7 +6528,9 @@ async function openCookedThis(recipe, { planEntryId = null, date = null, meal = 
   const macros = recipeMacros(recipe);
 
   const numField = (id, label, value, hint) => `
-    <div class="field cook-num"><label>${label}</label><input type="number" id="${id}" min="0" step="1" inputmode="numeric" value="${value}">${hint ? `<span class="cook-hint">${hint}</span>` : ''}</div>`;
+    <div class="field cook-num"><label>${label}</label>
+      <div class="stepper"><button type="button" class="step-btn" data-for="${id}" data-d="-1" aria-label="One less">−</button><input type="number" id="${id}" min="0" step="1" inputmode="numeric" value="${value}"><button type="button" class="step-btn" data-for="${id}" data-d="1" aria-label="One more">+</button></div>
+      ${hint ? `<span class="cook-hint">${hint}</span>` : ''}</div>`;
 
   openModal(`
     <div class="modal-title-row"><h2>🍳 I cooked this</h2><button class="close-btn" id="modal-close">×</button></div>
@@ -6470,8 +6538,9 @@ async function openCookedThis(recipe, { planEntryId = null, date = null, meal = 
       <p class="recipe-muted" style="margin-top:0;">${escapeHtml(recipe.name)}</p>
       <div class="field-row cook-split">
         ${numField('ck-made', 'Portions made', made)}
-        ${numField('ck-eaten', 'Eaten now', eaten, 'everyone')}
+        ${numField('ck-eaten', 'Eaten now', eaten, 'by everyone')}
       </div>
+      <div class="cook-left" id="ck-left"></div>
       <div class="field-row cook-split">
         ${numField('ck-fridge', '🧊 Fridge', made - eaten, `eat within ${LEFTOVER_FRIDGE_DAYS} days`)}
         ${numField('ck-freezer', '❄️ Freezer', 0, 'keeps ~3 months')}
@@ -6529,20 +6598,35 @@ async function openCookedThis(recipe, { planEntryId = null, date = null, meal = 
       ? `≈ ${Math.round(macros.kcal * mine)} kcal${macros.protein != null ? ` · ${Math.round(macros.protein * mine)} g protein` : ''}`
       : 'This recipe has no calories yet; you can edit the diary entry after.';
   };
-  // Changing what's eaten or made moves the difference into the fridge
-  const rebalance = () => {
-    document.getElementById('ck-fridge').value = Math.max(0, val('ck-made') - val('ck-eaten') - val('ck-freezer'));
+  // What's left over is split between fridge and freezer: changing one moves the rest to the other
+  const setVal = (id, n) => { document.getElementById(id).value = Math.max(0, n); };
+  const leftOver = () => Math.max(0, val('ck-made') - val('ck-eaten'));
+  const rebalance = (changed) => {
+    const left = leftOver();
+    if (changed === 'ck-fridge') setVal('ck-freezer', left - Math.min(val('ck-fridge'), left));
+    else if (changed === 'ck-freezer') setVal('ck-fridge', left - Math.min(val('ck-freezer'), left));
+    else { setVal('ck-freezer', Math.min(val('ck-freezer'), left)); setVal('ck-fridge', left - val('ck-freezer')); }
+    if (val('ck-fridge') > left) setVal('ck-fridge', left);
+    if (val('ck-freezer') > left) setVal('ck-freezer', left);
+    document.getElementById('ck-left').textContent = left
+      ? `${left} portion${left === 1 ? '' : 's'} left over: split them between the fridge and freezer`
+      : 'Nothing left over';
     check();
   };
-  document.getElementById('ck-made').addEventListener('input', () => { rebalance(); fillUses(); });
-  document.getElementById('ck-eaten').addEventListener('input', rebalance);
-  document.getElementById('ck-freezer').addEventListener('input', rebalance);
-  document.getElementById('ck-fridge').addEventListener('input', check);
+  ['ck-made', 'ck-eaten', 'ck-fridge', 'ck-freezer'].forEach((id) => document.getElementById(id).addEventListener('input', () => {
+    rebalance(id);
+    if (id === 'ck-made') fillUses();
+  }));
+  document.querySelectorAll('.step-btn').forEach((b) => b.addEventListener('click', () => {
+    const input = document.getElementById(b.dataset.for);
+    input.value = Math.max(0, (parseFloat(input.value) || 0) + parseInt(b.dataset.d, 10));
+    input.dispatchEvent(new Event('input'));
+  }));
   document.getElementById('ck-mine').addEventListener('input', check);
   document.getElementById('ck-log').addEventListener('change', (e) => { document.getElementById('ck-log-fields').style.display = e.target.checked ? '' : 'none'; });
   document.querySelectorAll('.ck-use-qty').forEach((i) => i.addEventListener('input', () => { i.dataset.touched = '1'; }));
   fillUses();
-  check();
+  rebalance('ck-made');
 
   document.getElementById('ck-save').addEventListener('click', async (ev) => {
     const btn = ev.currentTarget;
