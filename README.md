@@ -121,6 +121,9 @@ Each ingredient stores `matchTerms` (inventory names that count as having it, e.
 - Type the dish however you like, e.g. "south indian style chicken briyani". Common spellings are fixed (briyani → biryani, dhal → dal, pulao → pilaf), describing words like "style", "south", "homemade" are left out, each main word is searched, and a cuisine word ("Indian") also searches that cuisine. Results are ranked by how many of your words they match.
 - **In your recipes**: matching recipes already in your book are shown first.
 - **✨ Get a recipe for "…" from Claude**: a full recipe for exactly the dish you typed, true to the style and region you name, with calories and macros, ready to save. Uses your API key.
+  - **🎯 Match my macros**: nudges the recipe towards your eating style and calorie range, swapping lighter options where it still works.
+  - **🧺 Mostly from my pantry**: uses what you have and lists only the few extras you'd still need; where the dish wants something you don't have, it swaps in the closest kitchen ingredient (e.g. gingelly oil → sesame oil → any neutral oil you have).
+- **💡 Use …** chips on any recipe page: when an ingredient isn't in your kitchen and you have something close, a chip offers the swap (e.g. gingelly oil → olive oil, or coconut oil or ghee). Tap it and the ingredient is swapped on that recipe. Food families covered include oils, dairy, cream, yoghurt, coconut milk, cheese, herbs, chillies, chicken cuts, mince, white fish, rice, pasta, noodles, flours, vinegars, soy and umami sauces, lentils and beans.
 - TheMealDB (free) has a limited list of dishes, especially regional Indian ones, so Claude is the way to find something specific.
 
 ## Step 2: What can I make?
