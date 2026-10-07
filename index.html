@@ -3852,7 +3852,10 @@ function openRecipeForm(recipe, prefill) {
           if (l.status === 'unknown') return `<li><span class="r-live-name">${escapeHtml(l.name)}</span><span class="r-live-tag warn">not recognised</span></li>`;
           if (l.status === 'no-amount') return `<li><span class="r-live-name">${escapeHtml(l.name)}</span><span class="r-live-tag warn">no amount</span></li>`;
           if (l.status === 'unknown-unit') return `<li><span class="r-live-name">${escapeHtml(l.name)}</span><span class="r-live-tag warn">unknown unit${l.unit ? ' (' + escapeHtml(l.unit) + ')' : ''}</span></li>`;
-          const sourceTag = l.source === 'packet' ? '<span class="r-live-tag ok">packet</span>' : l.source === 'kitchen' ? '<span class="r-live-tag ok">kitchen</span>' : '';
+          const sourceTag = l.source === 'packet' ? '<span class="r-live-tag ok">packet</span>'
+            : l.source === 'kitchen' ? '<span class="r-live-tag ok">kitchen</span>'
+            : l.approximate ? '<span class="r-live-tag warn">≈ close match</span>'
+            : '';
           return `<li>
             <span class="r-live-name">${escapeHtml(l.name)}</span>
             <span class="r-live-kcal">${l.kcal} kcal · P ${l.protein} C ${l.carbs} F ${l.fat}</span>
@@ -5747,13 +5750,364 @@ const FOOD_NUTRITION = [
   { names: ['protein powder', 'whey protein', 'whey'], kcal: 380, p: 75, c: 8, f: 5, each: 30 },
   { names: ['water', 'salt', 'sea salt', 'ice'], kcal: 0, p: 0, c: 0, f: 0 },
   // Dried spices: a teaspoon is about 2.5 g
-  { names: ['spices', 'turmeric', 'cumin', 'cumin seeds', 'ground cumin', 'coriander seeds', 'ground coriander', 'garam masala', 'curry powder', 'chilli powder', 'kashmiri chilli powder', 'paprika', 'smoked paprika', 'cinnamon', 'cardamom', 'cloves', 'black pepper', 'pepper', 'peppercorns', 'black peppercorns', 'mustard seeds', 'fenugreek', 'bay leaves', 'asafoetida', 'fennel seeds', 'star anise', 'nutmeg', 'oregano', 'thyme', 'mixed herbs', 'dried herbs', 'chilli flakes', 'sambar powder', 'rasam powder'], kcal: 330, p: 12, c: 50, f: 12, tsp: 2.5, tbsp: 7 }
+  { names: ['spices', 'turmeric', 'cumin', 'cumin seeds', 'ground cumin', 'coriander seeds', 'ground coriander', 'garam masala', 'curry powder', 'chilli powder', 'kashmiri chilli powder', 'paprika', 'smoked paprika', 'cinnamon', 'cardamom', 'cloves', 'black pepper', 'pepper', 'peppercorns', 'black peppercorns', 'mustard seeds', 'fenugreek', 'bay leaves', 'asafoetida', 'fennel seeds', 'star anise', 'nutmeg', 'oregano', 'thyme', 'mixed herbs', 'dried herbs', 'chilli flakes', 'sambar powder', 'rasam powder'], kcal: 330, p: 12, c: 50, f: 12, tsp: 2.5, tbsp: 7 },
+
+  // ---- Expanded coverage (stage 1): common Australian supermarket foods ----
+  // Grains, rice, flours, bread
+  { names: ['arborio rice', 'risotto rice'], kcal: 358, p: 7, c: 78, f: 0.6, cup: 185 },
+  { names: ['black rice', 'wild rice'], kcal: 357, p: 14, c: 75, f: 1 },
+  { names: ['brown basmati rice'], kcal: 362, p: 8, c: 76, f: 2.7, cup: 185 },
+  { names: ['bulgur', 'bulgur wheat', 'cracked wheat'], kcal: 342, p: 12, c: 76, f: 1.3, cup: 140 },
+  { names: ['pearl barley', 'barley'], kcal: 352, p: 10, c: 78, f: 1.2, cup: 200 },
+  { names: ['polenta', 'cornmeal'], kcal: 362, p: 9, c: 73, f: 3.5, cup: 160 },
+  { names: ['semolina', 'rava', 'sooji'], kcal: 360, p: 13, c: 73, f: 1 },
+  { names: ['rye flour', 'spelt flour'], kcal: 335, p: 11, c: 69, f: 2, cup: 125 },
+  { names: ['rice flour'], kcal: 366, p: 6, c: 80, f: 1.4, cup: 125 },
+  { names: ['almond meal', 'almond flour'], kcal: 580, p: 21, c: 20, f: 50, cup: 110 },
+  { names: ['coconut flour'], kcal: 400, p: 20, c: 60, f: 10, cup: 110 },
+  { names: ['sourdough', 'sourdough bread', 'rye bread', 'multigrain bread'], kcal: 260, p: 10, c: 48, f: 3, each: 40 },
+  { names: ['pita', 'pita bread', 'flatbread', 'lebanese bread'], kcal: 275, p: 9, c: 55, f: 1.2, each: 60 },
+  { names: ['bagel', 'bagels'], kcal: 260, p: 10, c: 52, f: 1.5, each: 100 },
+  { names: ['english muffin', 'english muffins', 'crumpet', 'crumpets'], kcal: 227, p: 8, c: 44, f: 1.7, each: 60 },
+  { names: ['brioche', 'burger bun', 'burger buns', 'dinner roll', 'dinner rolls'], kcal: 310, p: 9, c: 50, f: 8, each: 55 },
+  { names: ['panko', 'panko breadcrumbs'], kcal: 384, p: 11, c: 73, f: 4 },
+  // Starchy veg
+  { names: ['new potatoes', 'baby chat potatoes', 'chat potatoes', 'kipfler potatoes', 'dutch cream potatoes', 'desiree potatoes', 'coliban potatoes', 'sebago potatoes'], kcal: 77, p: 2, c: 17, f: 0.1, each: 100 },
+  { names: ['parsnip', 'parsnips'], kcal: 75, p: 1.2, c: 18, f: 0.3, each: 150 },
+  { names: ['swede', 'swedes', 'turnip', 'turnips'], kcal: 38, p: 1.1, c: 9, f: 0.1, each: 300 },
+  { names: ['beetroot', 'beets'], kcal: 43, p: 1.6, c: 10, f: 0.2, each: 150 },
+  { names: ['kumara', 'orange sweet potato'], kcal: 86, p: 1.6, c: 20, f: 0.1, each: 250 },
+  { names: ['taro'], kcal: 112, p: 1.5, c: 26, f: 0.2 },
+  // Legumes
+  { names: ['edamame'], kcal: 122, p: 11, c: 10, f: 5, cup: 155 },
+  { names: ['butter beans', 'lima beans'], kcal: 115, p: 7.5, c: 20, f: 0.4, can: 400 },
+  { names: ['pinto beans', 'borlotti beans', 'four bean mix', 'mixed beans'], kcal: 143, p: 9, c: 26, f: 0.6, can: 400 },
+  { names: ['refried beans'], kcal: 90, p: 5, c: 16, f: 0.6, can: 400 },
+  { names: ['black eyed peas', 'black eyed beans'], kcal: 336, p: 24, c: 60, f: 1.3, cup: 190 },
+  { names: ['urad dal', 'black lentils'], kcal: 341, p: 25, c: 59, f: 1.6, cup: 190 },
+  // Meats
+  { names: ['beef sirloin', 'sirloin steak', 'porterhouse', 't bone steak', 'tbone', 'eye fillet', 'fillet steak', 'scotch fillet', 'rib eye', 'ribeye'], kcal: 220, p: 22, c: 0, f: 14 },
+  { names: ['beef cheek', 'oxtail', 'brisket', 'short rib'], kcal: 250, p: 21, c: 0, f: 18, edible: 0.8 },
+  { names: ['corned beef', 'silverside'], kcal: 230, p: 20, c: 0, f: 16 },
+  { names: ['veal'], kcal: 170, p: 24, c: 0, f: 8 },
+  { names: ['lamb cutlets', 'lamb rack', 'lamb loin'], kcal: 235, p: 20, c: 0, f: 17, edible: 0.75 },
+  { names: ['lamb mince lean', 'lean lamb mince'], kcal: 160, p: 21, c: 0, f: 8 },
+  { names: ['pork ribs', 'pork spare ribs'], kcal: 285, p: 19, c: 0, f: 23, edible: 0.75 },
+  { names: ['pork fillet', 'pork tenderloin', 'pork medallions'], kcal: 143, p: 22, c: 0, f: 5 },
+  { names: ['chorizo', 'kabana', 'salami'], kcal: 455, p: 24, c: 2, f: 38 },
+  { names: ['prosciutto', 'parma ham'], kcal: 195, p: 26, c: 0, f: 10 },
+  { names: ['leg ham', 'shaved ham', 'sliced ham'], kcal: 110, p: 18, c: 1, f: 4 },
+  { names: ['smoked salmon'], kcal: 180, p: 22, c: 0, f: 10 },
+  { names: ['salmon canned', 'canned salmon', 'tinned salmon'], kcal: 150, p: 22, c: 0, f: 7, can: 210 },
+  { names: ['sardines', 'canned sardines'], kcal: 208, p: 25, c: 0, f: 12, can: 110 },
+  { names: ['mackerel', 'tinned mackerel'], kcal: 180, p: 22, c: 0, f: 10, can: 110 },
+  { names: ['anchovies', 'anchovy fillets'], kcal: 210, p: 29, c: 0, f: 10 },
+  { names: ['calamari', 'squid'], kcal: 92, p: 15, c: 3, f: 1.4 },
+  { names: ['scallops'], kcal: 88, p: 17, c: 2, f: 0.8 },
+  { names: ['mussels'], kcal: 86, p: 12, c: 4, f: 2.2 },
+  { names: ['tuna in oil'], kcal: 185, p: 25, c: 0, f: 9, can: 185 },
+  { names: ['egg white', 'egg whites'], kcal: 52, p: 11, c: 0.7, f: 0.2, each: 33 },
+  { names: ['tempeh'], kcal: 190, p: 20, c: 8, f: 11 },
+  { names: ['silken tofu'], kcal: 55, p: 6, c: 2, f: 3 },
+  { names: ['halloumi'], kcal: 330, p: 22, c: 2, f: 25 },
+  { names: ['ricotta'], kcal: 150, p: 11, c: 3, f: 11, cup: 240 },
+  { names: ['cottage cheese'], kcal: 98, p: 11, c: 3.4, f: 4.3, cup: 225 },
+  { names: ['cream cheese'], kcal: 342, p: 6, c: 4, f: 34 },
+  { names: ['blue cheese'], kcal: 353, p: 21, c: 2.3, f: 29 },
+  { names: ['brie', 'camembert'], kcal: 334, p: 21, c: 0.5, f: 28 },
+  { names: ['goats cheese', 'chevre'], kcal: 364, p: 22, c: 2.5, f: 30 },
+  // Milk / cream variants
+  { names: ['buttermilk'], kcal: 40, p: 3.3, c: 4.8, f: 0.9, cup: 250 },
+  { names: ['condensed milk', 'sweetened condensed milk'], kcal: 321, p: 8, c: 54, f: 9, tbsp: 20 },
+  { names: ['evaporated milk'], kcal: 134, p: 7, c: 10, f: 7.5, can: 375 },
+  { names: ['soy milk', 'oat milk', 'almond milk unsweetened'], kcal: 44, p: 3, c: 4, f: 1.8, cup: 250 },
+  { names: ['vanilla yoghurt', 'flavoured yoghurt', 'fruit yoghurt'], kcal: 95, p: 4, c: 15, f: 2, cup: 250 },
+  { names: ['high protein yoghurt', 'skyr'], kcal: 60, p: 10, c: 4, f: 0.2, cup: 250 },
+  { names: ['margarine', 'spread'], kcal: 540, p: 0.5, c: 1, f: 60, tbsp: 14 },
+  { names: ['tahini'], kcal: 595, p: 17, c: 21, f: 54, tbsp: 15 },
+  // Vegetables (further)
+  { names: ['fennel', 'fennel bulb'], kcal: 31, p: 1.2, c: 7, f: 0.2, each: 300 },
+  { names: ['leek', 'leeks'], kcal: 61, p: 1.5, c: 14, f: 0.3, each: 150 },
+  { names: ['artichoke', 'artichokes'], kcal: 47, p: 3.3, c: 11, f: 0.2 },
+  { names: ['asparagus'], kcal: 20, p: 2.2, c: 3.9, f: 0.1, bunch: 180 },
+  { names: ['brussels sprouts'], kcal: 43, p: 3.4, c: 9, f: 0.3 },
+  { names: ['snow peas', 'snowpeas', 'sugar snap peas'], kcal: 42, p: 2.8, c: 7.6, f: 0.2 },
+  { names: ['watercress'], kcal: 11, p: 2.3, c: 1.3, f: 0.1 },
+  { names: ['silverbeet', 'swiss chard', 'rainbow chard'], kcal: 19, p: 1.8, c: 3.7, f: 0.2, bunch: 350 },
+  { names: ['kale', 'tuscan kale', 'cavolo nero'], kcal: 35, p: 2.9, c: 4.4, f: 1.5, bunch: 200 },
+  { names: ['radish', 'radishes'], kcal: 16, p: 0.7, c: 3.4, f: 0.1 },
+  { names: ['chinese cabbage', 'napa cabbage', 'wombok'], kcal: 16, p: 1.2, c: 3.2, f: 0.2, each: 1000 },
+  { names: ['okra', 'ladys fingers', 'bhindi'], kcal: 33, p: 1.9, c: 7, f: 0.2 },
+  { names: ['bitter gourd', 'bitter melon', 'karela'], kcal: 17, p: 1, c: 3.7, f: 0.2 },
+  { names: ['bottle gourd', 'lauki'], kcal: 14, p: 0.6, c: 3.4, f: 0.02 },
+  { names: ['drumstick', 'moringa'], kcal: 37, p: 2.1, c: 8, f: 0.2 },
+  { names: ['snake gourd'], kcal: 18, p: 0.5, c: 3.3, f: 0.1 },
+  { names: ['kohlrabi'], kcal: 27, p: 1.7, c: 6, f: 0.1 },
+  { names: ['daikon', 'daikon radish', 'mooli'], kcal: 18, p: 0.6, c: 4, f: 0.1 },
+  { names: ['water chestnuts'], kcal: 97, p: 1, c: 24, f: 0.1, can: 227 },
+  { names: ['bamboo shoots'], kcal: 20, p: 1.5, c: 3.2, f: 0.3, can: 225 },
+  { names: ['sauerkraut', 'kimchi'], kcal: 23, p: 1, c: 5, f: 0.1 },
+  { names: ['sun dried tomatoes'], kcal: 258, p: 14, c: 56, f: 3 },
+  // Pickles, olives
+  { names: ['olives', 'kalamata olives', 'black olives', 'green olives'], kcal: 115, p: 0.8, c: 6, f: 11 },
+  { names: ['gherkins', 'cornichons', 'pickles', 'dill pickles'], kcal: 14, p: 0.5, c: 2.6, f: 0.2 },
+  { names: ['pickled jalapenos', 'jalapenos'], kcal: 29, p: 1.4, c: 6, f: 0.4 },
+  { names: ['capers'], kcal: 23, p: 2.4, c: 4.9, f: 0.9, tbsp: 10 },
+  // Fruit (further)
+  { names: ['pear', 'pears'], kcal: 57, p: 0.4, c: 15, f: 0.1, each: 180 },
+  { names: ['peach', 'peaches', 'nectarine', 'nectarines'], kcal: 39, p: 0.9, c: 10, f: 0.3, each: 150 },
+  { names: ['plum', 'plums'], kcal: 46, p: 0.7, c: 11, f: 0.3, each: 70 },
+  { names: ['apricot', 'apricots'], kcal: 48, p: 1.4, c: 11, f: 0.4, each: 35 },
+  { names: ['cherries', 'cherry'], kcal: 50, p: 1, c: 12, f: 0.3, cup: 155 },
+  { names: ['grapes'], kcal: 69, p: 0.7, c: 18, f: 0.2, cup: 150 },
+  { names: ['mango', 'mangoes'], kcal: 60, p: 0.8, c: 15, f: 0.4, each: 350 },
+  { names: ['pineapple'], kcal: 50, p: 0.5, c: 13, f: 0.1, cup: 165 },
+  { names: ['kiwi fruit', 'kiwi', 'kiwifruit'], kcal: 61, p: 1.1, c: 15, f: 0.5, each: 75 },
+  { names: ['watermelon'], kcal: 30, p: 0.6, c: 7.6, f: 0.2 },
+  { names: ['rockmelon', 'cantaloupe', 'honeydew melon'], kcal: 34, p: 0.8, c: 8, f: 0.2 },
+  { names: ['dragonfruit'], kcal: 60, p: 1.2, c: 13, f: 0.4 },
+  { names: ['passionfruit'], kcal: 97, p: 2.2, c: 23, f: 0.7, each: 20 },
+  { names: ['pomegranate', 'pomegranate seeds'], kcal: 83, p: 1.7, c: 19, f: 1.2 },
+  { names: ['figs', 'dried figs'], kcal: 249, p: 3, c: 64, f: 1 },
+  { names: ['dates', 'medjool dates'], kcal: 282, p: 2.5, c: 75, f: 0.4, each: 20 },
+  { names: ['prunes'], kcal: 240, p: 2.2, c: 64, f: 0.4 },
+  { names: ['dried apricots'], kcal: 241, p: 3.4, c: 63, f: 0.5 },
+  { names: ['dried cranberries'], kcal: 325, p: 0.2, c: 83, f: 1.4 },
+  { names: ['canned peaches', 'canned pears', 'canned fruit salad'], kcal: 54, p: 0.5, c: 14, f: 0.1, can: 410 },
+  // Nuts & seeds
+  { names: ['pecans', 'pecan nuts'], kcal: 691, p: 9, c: 14, f: 72, cup: 100 },
+  { names: ['macadamia nuts', 'macadamias'], kcal: 718, p: 8, c: 14, f: 76 },
+  { names: ['pistachios'], kcal: 560, p: 20, c: 28, f: 45 },
+  { names: ['brazil nuts'], kcal: 659, p: 14, c: 12, f: 67 },
+  { names: ['hazelnuts'], kcal: 628, p: 15, c: 17, f: 61 },
+  { names: ['pine nuts', 'pinenuts'], kcal: 673, p: 14, c: 13, f: 68, tbsp: 10 },
+  { names: ['sunflower seeds'], kcal: 584, p: 21, c: 20, f: 51, tbsp: 10 },
+  { names: ['pumpkin seeds', 'pepitas'], kcal: 559, p: 30, c: 11, f: 49, tbsp: 10 },
+  { names: ['chia seeds'], kcal: 486, p: 17, c: 42, f: 31, tbsp: 12 },
+  { names: ['flax seeds', 'flaxseed', 'linseed', 'linseeds'], kcal: 534, p: 18, c: 29, f: 42, tbsp: 10 },
+  { names: ['sesame seeds'], kcal: 573, p: 18, c: 23, f: 50, tbsp: 9 },
+  { names: ['poppy seeds'], kcal: 525, p: 18, c: 28, f: 42, tsp: 2.8 },
+  { names: ['desiccated coconut', 'shredded coconut', 'coconut flakes'], kcal: 650, p: 7, c: 24, f: 60, cup: 90 },
+  { names: ['nutella', 'chocolate hazelnut spread'], kcal: 539, p: 6, c: 58, f: 31, tbsp: 20 },
+  { names: ['jam', 'strawberry jam', 'apricot jam', 'marmalade'], kcal: 250, p: 0.4, c: 62, f: 0, tbsp: 20 },
+  { names: ['vegemite', 'marmite', 'promite'], kcal: 180, p: 25, c: 20, f: 1, tsp: 5 },
+  // Sauces, condiments
+  { names: ['mayonnaise', 'mayo'], kcal: 680, p: 1, c: 1, f: 75, tbsp: 15 },
+  { names: ['light mayonnaise', 'reduced fat mayo'], kcal: 240, p: 1, c: 11, f: 22, tbsp: 15 },
+  { names: ['aioli'], kcal: 575, p: 1.5, c: 2, f: 62, tbsp: 15 },
+  { names: ['mustard', 'dijon mustard', 'wholegrain mustard'], kcal: 66, p: 4, c: 6, f: 3.3, tsp: 5, tbsp: 15 },
+  { names: ['sriracha', 'hot sauce', 'tabasco'], kcal: 95, p: 2, c: 20, f: 1, tsp: 5 },
+  { names: ['worcestershire sauce'], kcal: 78, p: 0, c: 20, f: 0, tbsp: 17 },
+  { names: ['bbq sauce', 'barbecue sauce'], kcal: 170, p: 0.9, c: 40, f: 0.6, tbsp: 18 },
+  { names: ['sweet chilli sauce'], kcal: 220, p: 0, c: 55, f: 0, tbsp: 20 },
+  { names: ['black bean sauce'], kcal: 130, p: 5, c: 20, f: 3, tbsp: 18 },
+  { names: ['tzatziki'], kcal: 70, p: 2.5, c: 3, f: 5, tbsp: 20 },
+  { names: ['hummus'], kcal: 160, p: 6, c: 14, f: 9, tbsp: 15 },
+  { names: ['pesto', 'basil pesto'], kcal: 450, p: 5, c: 7, f: 45, tbsp: 15 },
+  { names: ['tomato pasta sauce', 'pasta sauce', 'marinara sauce', 'napoletana sauce'], kcal: 60, p: 1.5, c: 10, f: 1.5, cup: 250 },
+  { names: ['balsamic vinegar'], kcal: 90, p: 0.5, c: 17, f: 0, tbsp: 16 },
+  { names: ['red wine vinegar'], kcal: 19, p: 0, c: 0.3, f: 0 },
+  { names: ['coconut aminos'], kcal: 90, p: 0.5, c: 20, f: 0, tbsp: 15 },
+  { names: ['mirin'], kcal: 240, p: 0.3, c: 55, f: 0, tbsp: 18 },
+  { names: ['miso paste', 'miso'], kcal: 199, p: 12, c: 26, f: 6, tbsp: 17 },
+  { names: ['sriracha mayo', 'spicy mayo'], kcal: 650, p: 1, c: 2, f: 70, tbsp: 15 },
+  { names: ['peri peri sauce'], kcal: 100, p: 1, c: 10, f: 6, tbsp: 15 },
+  { names: ['chimichurri'], kcal: 300, p: 1, c: 3, f: 32, tbsp: 15 },
+  // Pasta / noodle variants
+  { names: ['gnocchi'], kcal: 165, p: 4, c: 32, f: 2, cup: 160 },
+  { names: ['ravioli', 'tortellini'], kcal: 240, p: 10, c: 32, f: 7 },
+  { names: ['soba noodles', 'buckwheat noodles'], kcal: 345, p: 14, c: 73, f: 1 },
+  { names: ['udon noodles', 'ramen noodles'], kcal: 128, p: 4.6, c: 27, f: 0.6 },
+  { names: ['glass noodles', 'mung bean noodles', 'cellophane noodles'], kcal: 350, p: 0.5, c: 86, f: 0.1 },
+  { names: ['hokkien noodles'], kcal: 200, p: 7, c: 38, f: 2 },
+  // Breakfast
+  { names: ['porridge', 'cooked oats', 'oatmeal'], kcal: 71, p: 2.5, c: 12, f: 1.5, cup: 240 },
+  { names: ['muesli', 'granola'], kcal: 450, p: 10, c: 60, f: 18, cup: 110 },
+  { names: ['weet bix', 'weetbix', 'weetabix', 'cornflakes', 'rice bubbles'], kcal: 365, p: 11, c: 72, f: 2, each: 15 },
+  { names: ['pancakes', 'pancake'], kcal: 227, p: 6, c: 28, f: 10, each: 60 },
+  { names: ['waffles', 'waffle'], kcal: 300, p: 7, c: 36, f: 15, each: 75 },
+  { names: ['croissant'], kcal: 406, p: 8, c: 46, f: 21, each: 60 },
+  { names: ['danish pastry', 'danish'], kcal: 374, p: 7, c: 43, f: 20, each: 70 },
+  { names: ['muffin', 'muffins'], kcal: 377, p: 6, c: 54, f: 15, each: 100 },
+  { names: ['scone', 'scones'], kcal: 365, p: 8, c: 55, f: 12, each: 60 },
+  // Drinks
+  { names: ['orange juice', 'apple juice', 'juice'], kcal: 46, p: 0.7, c: 11, f: 0.1, cup: 250 },
+  { names: ['coconut water'], kcal: 19, p: 0.7, c: 3.7, f: 0.2, cup: 250 },
+  { names: ['black coffee', 'coffee'], kcal: 2, p: 0.1, c: 0, f: 0, cup: 250 },
+  { names: ['tea', 'black tea', 'green tea'], kcal: 1, p: 0, c: 0, f: 0, cup: 250 },
+  { names: ['beer'], kcal: 43, p: 0.5, c: 3.6, f: 0 },
+  { names: ['wine', 'red wine', 'white wine'], kcal: 83, p: 0.1, c: 2.6, f: 0 },
+  // Snacks / sweets
+  { names: ['dark chocolate'], kcal: 598, p: 7.8, c: 46, f: 43 },
+  { names: ['milk chocolate'], kcal: 535, p: 7.6, c: 59, f: 30 },
+  { names: ['chocolate chips', 'cocoa'], kcal: 480, p: 4.3, c: 63, f: 30 },
+  { names: ['cocoa powder', 'cacao powder'], kcal: 230, p: 20, c: 58, f: 14, tbsp: 7 },
+  { names: ['popcorn'], kcal: 387, p: 13, c: 78, f: 4.5 },
+  { names: ['chips', 'potato chips', 'crisps'], kcal: 536, p: 7, c: 53, f: 34 },
+  { names: ['pretzels'], kcal: 380, p: 10, c: 80, f: 3 },
+  { names: ['rice cakes'], kcal: 387, p: 8, c: 82, f: 2.8, each: 9 },
+  { names: ['protein bar'], kcal: 400, p: 30, c: 40, f: 10, each: 60 },
+  { names: ['muesli bar'], kcal: 420, p: 7, c: 65, f: 15, each: 30 },
+  { names: ['ice cream'], kcal: 207, p: 3.5, c: 24, f: 11, cup: 130 },
+  // Fresh herbs (more)
+  { names: ['chives'], kcal: 30, p: 3.3, c: 4.4, f: 0.7 },
+  { names: ['dill', 'fresh dill'], kcal: 43, p: 3.5, c: 7, f: 1.1 },
+  { names: ['rosemary', 'fresh rosemary'], kcal: 131, p: 3.3, c: 21, f: 5.9, sprig: 1 },
+  { names: ['sage', 'fresh sage'], kcal: 315, p: 11, c: 61, f: 13, sprig: 1 },
+  { names: ['oregano fresh'], kcal: 60, p: 2.5, c: 10, f: 1.5 },
+  { names: ['tarragon'], kcal: 295, p: 23, c: 50, f: 7 },
+  { names: ['lemongrass'], kcal: 99, p: 1.8, c: 25, f: 0.5, each: 20 },
+  { names: ['galangal'], kcal: 80, p: 1.5, c: 18, f: 0.8 },
+  { names: ['pandan leaves'], kcal: 32, p: 0.5, c: 7, f: 0.2 },
+  { names: ['kaffir lime leaves', 'makrut lime leaves'], kcal: 100, p: 2, c: 20, f: 2 },
+  // Baking
+  { names: ['baking powder', 'baking soda', 'bicarb', 'bicarbonate of soda'], kcal: 53, p: 0, c: 28, f: 0, tsp: 5, tbsp: 14 },
+  { names: ['yeast', 'dry yeast', 'instant yeast'], kcal: 325, p: 40, c: 41, f: 7.6, tsp: 3 },
+  { names: ['vanilla extract', 'vanilla essence'], kcal: 288, p: 0.1, c: 13, f: 0.1, tsp: 4 },
+  { names: ['icing sugar'], kcal: 390, p: 0, c: 100, f: 0, cup: 130 },
+  { names: ['brown sugar light', 'brown sugar dark'], kcal: 380, p: 0, c: 98, f: 0, tsp: 4, tbsp: 12 },
+  { names: ['stevia', 'erythritol', 'monk fruit'], kcal: 0, p: 0, c: 0, f: 0, tsp: 4 },
+  { names: ['agave syrup', 'agave nectar'], kcal: 310, p: 0, c: 76, f: 0, tbsp: 21 },
+  { names: ['golden syrup', 'rice malt syrup'], kcal: 318, p: 0.3, c: 79, f: 0, tbsp: 21 },
+  { names: ['treacle', 'molasses'], kcal: 290, p: 0, c: 75, f: 0, tbsp: 20 },
+  { names: ['dark chocolate chips'], kcal: 480, p: 4, c: 63, f: 30 },
+  // Pastes & cooking aids
+  { names: ['tikka masala paste', 'tikka paste', 'rogan josh paste', 'korma paste', 'madras paste', 'vindaloo paste', 'butter chicken paste'], kcal: 180, p: 3, c: 15, f: 12, tbsp: 16 },
+  { names: ['laksa paste', 'rendang paste', 'satay paste', 'tom yum paste'], kcal: 180, p: 3, c: 15, f: 12, tbsp: 16 },
+  { names: ['ginger paste', 'garlic paste', 'ginger garlic paste'], kcal: 90, p: 3, c: 18, f: 0.8, tbsp: 16 },
+  { names: ['tomato paste double concentrate'], kcal: 82, p: 4.3, c: 19, f: 0.5, tbsp: 16 },
+  { names: ['liquid stock', 'chicken stock liquid', 'beef stock liquid', 'vegetable stock liquid'], kcal: 10, p: 0.6, c: 0.7, f: 0.3, cup: 250 },
+  { names: ['stock cube', 'bouillon cube', 'stock concentrate'], kcal: 200, p: 10, c: 20, f: 10, each: 10 },
+  // Veg (cooked)
+  { names: ['roast potatoes', 'roasted potatoes'], kcal: 149, p: 2.4, c: 20, f: 7, cup: 170 },
+  { names: ['steamed vegetables'], kcal: 45, p: 2, c: 8, f: 0.5, cup: 150 },
+  { names: ['chips oven baked', 'oven chips', 'frozen chips'], kcal: 170, p: 2.5, c: 25, f: 6 },
+  // Dairy sweets
+  { names: ['custard'], kcal: 110, p: 3, c: 15, f: 4.5, cup: 250 },
+  // Prepared / takeaway (for the plate photo)
+  { names: ['pizza'], kcal: 266, p: 11, c: 33, f: 10 },
+  { names: ['burger', 'hamburger', 'cheeseburger'], kcal: 295, p: 17, c: 24, f: 14, each: 220 },
+  { names: ['sushi', 'nigiri', 'maki'], kcal: 150, p: 5, c: 29, f: 1.5 },
+  { names: ['dumplings', 'gyoza', 'wontons'], kcal: 190, p: 7, c: 24, f: 7, each: 20 },
+  { names: ['spring rolls'], kcal: 240, p: 5, c: 30, f: 11, each: 30 },
+  { names: ['samosa', 'samosas'], kcal: 310, p: 6, c: 35, f: 16, each: 40 },
+  { names: ['hot chips', 'french fries', 'fries'], kcal: 312, p: 3.4, c: 41, f: 15 },
+  { names: ['pad thai'], kcal: 180, p: 6, c: 26, f: 6, cup: 240 },
+  { names: ['tacos', 'taco'], kcal: 220, p: 10, c: 20, f: 11, each: 90 },
+  { names: ['burrito'], kcal: 240, p: 10, c: 30, f: 9, each: 250 }
 ];
 
 // Grams for one of each unit when the food doesn't say
 const UNIT_GRAMS = { g: 1, kg: 1000, ml: 1, L: 1000, tsp: 5, tbsp: 15, cup: 200, clove: 5, bunch: 100, sprig: 1, pinch: 0.4, can: 400 };
 
 const FOOD_NUTRITION_INDEX = FOOD_NUTRITION.flatMap((food) => food.names.map((n) => ({ words: matchWords(n), food })));
+
+// Words to strip when matching an ingredient to a food — "finely chopped fresh ginger" → "ginger"
+const PREP_WORDS = new Set([
+  'chopped', 'diced', 'sliced', 'minced', 'crushed', 'grated', 'shredded', 'cubed', 'cubes',
+  'finely', 'roughly', 'thinly', 'thickly', 'coarsely', 'fresh', 'freshly', 'frozen',
+  'cooked', 'raw', 'uncooked', 'boiled', 'fried', 'roasted', 'steamed', 'baked', 'grilled',
+  'peeled', 'unpeeled', 'skinless', 'boneless', 'trimmed', 'rinsed', 'drained',
+  'to', 'taste', 'optional', 'approximately', 'about', 'approx', 'extra', 'large', 'small', 'medium',
+  'organic', 'free', 'range', 'skin', 'on', 'off', 'piece', 'pieces', 'whole', 'half', 'quartered',
+  'softened', 'melted', 'warm', 'cold', 'hot', 'ripe', 'leaves', 'leaf', 'stalk', 'stalks',
+  'florets', 'spears', 'wedges', 'rings', 'strips', 'juice', 'zest', 'rind', 'skin'
+]);
+
+// Regional / shop-aisle names → the names we actually use in FOOD_NUTRITION.
+// Applied before matching, so a recipe saying "ground beef" lands on "beef mince".
+const REGIONAL_ALIASES = {
+  'bell pepper': 'capsicum', 'bell peppers': 'capsicum',
+  'cilantro': 'coriander',
+  'arugula': 'rocket',
+  'scallion': 'spring onion', 'scallions': 'spring onion', 'green onions': 'spring onion',
+  'ground beef': 'beef mince', 'ground meat': 'mince',
+  'ground chicken': 'chicken mince', 'ground turkey': 'turkey mince',
+  'ground pork': 'pork mince', 'ground lamb': 'lamb mince',
+  'eggplant': 'eggplant', 'aubergine': 'eggplant',
+  'zucchini': 'zucchini', 'courgette': 'zucchini', 'courgettes': 'zucchini',
+  'garbanzo': 'chickpeas', 'garbanzo beans': 'chickpeas',
+  'confectioners sugar': 'icing sugar', 'powdered sugar': 'icing sugar',
+  'all purpose flour': 'plain flour', 'all-purpose flour': 'plain flour',
+  'self rising flour': 'self raising flour',
+  'bok choi': 'bok choy',
+  'kimchee': 'kimchi',
+  'mangetout': 'snow peas',
+  'swiss chard': 'silverbeet',
+  'molasses': 'treacle',
+  'baking soda': 'bicarb',
+  'bicarbonate of soda': 'bicarb',
+  'heavy cream': 'thickened cream', 'whipping cream': 'thickened cream', 'double cream': 'thickened cream',
+  'half and half': 'light cream', 'half-and-half': 'light cream',
+  'snow pea': 'snow peas',
+  'spring onion whites': 'spring onion', 'green onion': 'spring onion',
+  'passata di pomodoro': 'passata',
+  'passion fruit': 'passionfruit',
+  'cornstarch': 'cornflour',
+  'bicarb soda': 'bicarb',
+  'rock melon': 'rockmelon',
+  'kaffir lime leaf': 'kaffir lime leaves',
+  'cilantro leaves': 'coriander',
+  'coriander leaves': 'coriander',
+  'cilantro root': 'coriander',
+  'nam pla': 'fish sauce',
+  'shoyu': 'soy sauce',
+  'gochujang': 'sriracha',
+  'tomatoe': 'tomato', 'tomatoe paste': 'tomato paste', 'tomatoe sauce': 'tomato sauce',
+  'jasmin': 'jasmine', 'jasmin rice': 'jasmine rice',
+  'yoghurt greek': 'greek yoghurt'
+};
+
+// Normalise an ingredient name for matching: lowercase, drop prep words, apply aliases
+function normaliseIngredientText(text) {
+  const raw = String(text || '').toLowerCase();
+  // Apply multi-word aliases first (longest first so "ground beef" beats "beef")
+  const aliasKeys = Object.keys(REGIONAL_ALIASES).sort((a, b) => b.length - a.length);
+  let aliased = raw;
+  for (const key of aliasKeys) {
+    const re = new RegExp(`\\b${key.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\b`, 'g');
+    aliased = aliased.replace(re, REGIONAL_ALIASES[key]);
+  }
+  // Drop prep words
+  const kept = aliased.replace(/[^a-z]+/g, ' ').trim().split(' ')
+    .filter((w) => w && !PREP_WORDS.has(w));
+  return kept.join(' ');
+}
+
+// Levenshtein distance up to a cap (returns cap+1 if above). Used only as a last-resort match.
+function editDistance(a, b, cap) {
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > cap) return cap + 1;
+  const la = a.length; const lb = b.length;
+  if (!la) return lb; if (!lb) return la;
+  let prev = new Array(lb + 1); for (let j = 0; j <= lb; j++) prev[j] = j;
+  for (let i = 1; i <= la; i++) {
+    const curr = new Array(lb + 1); curr[0] = i; let rowMin = i;
+    for (let j = 1; j <= lb; j++) {
+      const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
+      curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+      if (curr[j] < rowMin) rowMin = curr[j];
+    }
+    if (rowMin > cap) return cap + 1;
+    prev = curr;
+  }
+  return prev[lb];
+}
+
+// Allowed typo budget for a word: 0 for ≤3 letters, 1 for ≤6, 2 beyond.
+function typoBudget(word) { return word.length <= 3 ? 0 : word.length <= 6 ? 1 : 2; }
+
+function wordFuzzyMatch(ingredientWords, entryWords) {
+  const haystack = ingredientWords.split(' ').filter(Boolean);
+  const needles = entryWords.split(' ').filter(Boolean);
+  if (!needles.length || !haystack.length) return false;
+  for (const n of needles) {
+    const budget = typoBudget(n);
+    const hit = haystack.some((h) => editDistance(h, n, budget) <= budget);
+    if (!hit) return false;
+  }
+  return true;
+}
 
 // Ingredients that work in the same way: if the recipe asks for one, any of the others does the job.
 // Order matters: items near the start are preferred when swapping.
@@ -5795,28 +6149,62 @@ const INGREDIENT_FAMILIES = [
 ];
 
 // For an ingredient the kitchen doesn't have, suggest the first in-kitchen alternative from its family
+// Words that mean a kitchen item is a packaged product in a different category — a
+// "butter chicken sauce" is not a swap for butter, "chicken curry pasta" is not a swap for chicken.
+const SWAP_PACKET_WORDS = /\b(sauce|paste|mix|pasta|soup|seasoning|marinade|dressing|stock|broth|flavouring|flavoring|spread|dip|gravy)\b/;
+// Match a family term against a kitchen name only on whole-word boundaries
+function familyWordMatch(familyTerm, kitchenName) {
+  const re = new RegExp(`\\b${familyTerm.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\b`, 'i');
+  return re.test(kitchenName);
+}
 function suggestSwapFor(ing, kitchenNames) {
   const name = (ing.name || '').toLowerCase().trim();
   const terms = [name, ...(ing.matchTerms || []).map((t) => t.toLowerCase())];
-  const family = INGREDIENT_FAMILIES.find((f) => f.some((m) => terms.some((t) => t.includes(m))));
+  const family = INGREDIENT_FAMILIES.find((f) => f.some((m) => terms.some((t) => familyWordMatch(m, t))));
   if (!family) return null;
-  // Something from the kitchen that's in the same family, closest first
-  const pick = family.find((n) => kitchenNames.some((k) => k === n || k.includes(n) || n.includes(k)));
-  if (!pick) return null;
-  const kitchenMatch = kitchenNames.find((k) => k === pick || k.includes(pick) || pick.includes(k)) || pick;
-  // Don't suggest swapping to the same thing
-  if (terms.some((t) => t === kitchenMatch || t.includes(kitchenMatch) || kitchenMatch.includes(t))) return null;
-  return kitchenMatch;
+  // The recipe already asks for a packaged thing (its name mentions sauce/paste/mix…) — in that
+  // case packaged kitchen items are fair swaps. Otherwise reject them.
+  const recipeIsPacket = terms.some((t) => SWAP_PACKET_WORDS.test(t));
+  // Keep the family's order so the first-listed match wins (e.g. olive oil before grapeseed oil)
+  for (const term of family) {
+    const match = kitchenNames.find((k) => {
+      if (!familyWordMatch(term, k)) return false;
+      // Reject packaged-product kitchen items for a non-packet recipe ingredient
+      if (!recipeIsPacket && SWAP_PACKET_WORDS.test(k)) return false;
+      // Don't suggest the same thing the recipe already asks for
+      if (terms.some((t) => t === k)) return false;
+      return true;
+    });
+    if (match) return match;
+  }
+  return null;
 }
 
-// The most specific food whose name appears as whole words in the text: "lean beef mince" beats "mince"
-function findFood(text) {
-  const words = ` ${matchWords(text)} `;
+// The most specific food whose name appears as whole words in the text, after
+// normalisation (prep-word stripping + regional aliases). Falls back to a
+// typo-tolerant fuzzy match when nothing matches exactly.
+// Returns { food, approximate } or null.
+function findFoodMatch(text) {
+  const normalised = matchWords(normaliseIngredientText(text));
+  if (!normalised) return null;
+  const padded = ` ${normalised} `;
+  // Exact (longest wins)
   let best = null;
   for (const entry of FOOD_NUTRITION_INDEX) {
-    if (entry.words && words.includes(` ${entry.words} `) && (!best || entry.words.length > best.words.length)) best = entry;
+    if (entry.words && padded.includes(` ${entry.words} `) && (!best || entry.words.length > best.words.length)) best = entry;
   }
-  return best ? best.food : null;
+  if (best) return { food: best.food, approximate: false };
+  // Last resort: fuzzy — longest entry name wins, so a close "jasmin rice" still prefers "jasmine rice" over "rice"
+  let fuzzyBest = null;
+  for (const entry of FOOD_NUTRITION_INDEX) {
+    if (entry.words && wordFuzzyMatch(normalised, entry.words) && (!fuzzyBest || entry.words.length > fuzzyBest.words.length)) fuzzyBest = entry;
+  }
+  return fuzzyBest ? { food: fuzzyBest.food, approximate: true } : null;
+}
+
+function findFood(text) {
+  const m = findFoodMatch(text);
+  return m ? m.food : null;
 }
 
 function gramsOf(quantity, unit, food) {
@@ -5872,7 +6260,9 @@ function nutritionFromIngredients(ingredients, servings, kitchenItems = []) {
   for (const ing of ingredients || []) {
     if (ing.optional) { lines.push({ name: ing.name, status: 'optional' }); continue; }
     const kitchen = index.length ? findInventoryMatch(ing, index) : null;
-    const typical = findFood([ing.name, ...(ing.matchTerms || [])].join(' | '));
+    const typicalMatch = findFoodMatch([ing.name, ...(ing.matchTerms || [])].join(' | '));
+    const typical = typicalMatch ? typicalMatch.food : null;
+    const typicalApproximate = !!(typicalMatch && typicalMatch.approximate);
     // Kitchen item values win; the typical entry still supplies weights like "1 each = 150 g"
     const rawFood = ing.nutrition
       ? { ...(typical || {}), kcal: ing.nutrition.kcal, p: ing.nutrition.p || 0, c: ing.nutrition.c || 0, f: ing.nutrition.f || 0, edible: 1, ...(ing.nutrition.tsp ? { tsp: ing.nutrition.tsp } : {}), ...(ing.nutrition.tbsp ? { tbsp: ing.nutrition.tbsp } : {}) }
@@ -5880,6 +6270,7 @@ function nutritionFromIngredients(ingredients, servings, kitchenItems = []) {
       ? { ...(typical || {}), kcal: kitchen.item.caloriesPer100, p: kitchen.item.proteinPer100 ?? (typical ? typical.p : 0), c: kitchen.item.carbsPer100 ?? (typical ? typical.c : 0), f: kitchen.item.fatPer100 ?? (typical ? typical.f : 0) }
       : typical;
     const source = ing.nutrition ? 'packet' : kitchen ? 'kitchen' : typical ? 'typical' : null;
+    const approximate = source === 'typical' && typicalApproximate;
     const food = plausiblePer100(rawFood, typical);
     if (!food) {
       if (!ing.assumedStaple) missing.push(ing.name);
@@ -5905,7 +6296,7 @@ function nutritionFromIngredients(ingredients, servings, kitchenItems = []) {
     total.kcal += kcal; total.protein += protein; total.carbs += carbs; total.fat += fat;
     counted.push(ing.name);
     lines.push({
-      name: ing.name, status: 'ok', source,
+      name: ing.name, status: 'ok', source, approximate,
       quantity: ing.quantity, unit: ing.unit,
       grams: Math.round(grams),
       kcal: Math.round(kcal), protein: Math.round(protein), carbs: Math.round(carbs), fat: Math.round(fat)
