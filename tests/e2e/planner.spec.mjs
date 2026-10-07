@@ -1,6 +1,6 @@
 // Planning a meal: choose how many portions you'll have; calories follow.
 import { test, expect } from '@playwright/test';
-import { watchErrors, open, reopen, readStore } from './helpers.mjs';
+import { watchErrors, open, reopen, readStore, addItem } from './helpers.mjs';
 
 test('plan 1 portion of a 4-serve recipe, change it to 2, then eat it', async ({ page }) => {
   const errors = watchErrors(page);
@@ -76,4 +76,28 @@ test('eating a planned meal ticks it off; removing the log un-ticks it', async (
   await page.locator('.diary-entry').first().click();
   await page.click('#le-delete');
   await expect.poll(async () => (await readStore(page, 'mealPlans')).map((p) => `${p.type}:${!!p.eaten}`)).toEqual(['recipe:false']);
+});
+
+test('snacks have their own row in the planner, with kitchen snacks to pick', async ({ page }) => {
+  const errors = watchErrors(page);
+  await open(page, 'planner', '.plan-day.today');
+  const today = page.locator('.plan-day.today');
+  await expect(today.locator('.plan-slot.empty[data-meal="snacks"]')).toHaveCount(1);
+
+  await addItem(page, { name: 'Greek yoghurt', quantity: 500, unit: 'g', location: 'fridge', category: 'Dairy & Refrigerated', caloriesPer100: 100, caloriesUnit: 'g' });
+  await reopen(page, 'planner', '.plan-day.today');
+  await page.locator('.plan-day.today .plan-slot.empty[data-meal="snacks"]').click();
+  await expect(page.locator('.modal-scroll-area')).toContainText('Snacks from your kitchen');
+  await page.locator('.pick-row', { hasText: 'Greek yoghurt' }).click();
+  await expect(page.locator('.plan-day.today .plan-slot.filled')).toContainText('Greek yoghurt');
+
+  await reopen(page, 'home', '.diary-planned');
+  await expect(page.locator('.diary-meal', { hasText: 'Snacks' }).locator('.diary-planned')).toContainText('Greek yoghurt');
+
+  // Can be switched off in Settings
+  await reopen(page, 'settings', '#plan-snacks');
+  await page.click('#plan-snacks');
+  await reopen(page, 'planner', '.plan-day');
+  await expect(page.locator('.plan-slot.empty[data-meal="snacks"]')).toHaveCount(0);
+  expect(errors).toEqual([]);
 });

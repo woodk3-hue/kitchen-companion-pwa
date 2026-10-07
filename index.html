@@ -5444,14 +5444,19 @@ function openBarcodeScan() {
 const PLAN_MEALS = ['breakfast', 'lunch', 'dinner'];
 const PLAN_MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snacks' };
 const PLAN_MEAL_ORDER = ['breakfast', 'lunch', 'dinner', 'snacks'];
-const DEFAULT_PLAN_SETTINGS = { key: 'mealPlanSettings', householdSize: 2, planBreakfast: false };
+const DEFAULT_PLAN_SETTINGS = { key: 'mealPlanSettings', householdSize: 2, planBreakfast: false, planSnacks: true };
 
 async function getPlanSettings() {
   return { ...DEFAULT_PLAN_SETTINGS, ...((await dbGet('settings', 'mealPlanSettings')) || {}) };
 }
 
 function plannedMeals(settings) {
-  return settings.planBreakfast ? PLAN_MEALS : ['lunch', 'dinner'];
+  return [settings.planBreakfast && 'breakfast', 'lunch', 'dinner', settings.planSnacks !== false && 'snacks'].filter(Boolean);
+}
+
+// The recipe meal type that fits a planner meal ("Snack" recipes go in Snacks)
+function planMealType(meal) {
+  return meal === 'snacks' ? 'Snack' : PLAN_MEAL_LABELS[meal];
 }
 
 function parseLocalDate(str) {
@@ -5651,7 +5656,7 @@ async function clearPlanWeek() {
 async function openSlotPicker(date, meal) {
   const [recipes, items, goals, settings] = await Promise.all([dbGetAll('recipes'), dbGetAll('inventoryItems'), getHealthGoals(), getPlanSettings()]);
   const index = buildInventoryIndex(items);
-  const mealType = PLAN_MEAL_LABELS[meal];
+  const mealType = planMealType(meal);
   const ranked = recipes
     .map((r) => ({ r, sc: index.length ? scoreRecipe(r, index) : null }))
     .sort((a, b) => {
@@ -5662,6 +5667,10 @@ async function openSlotPicker(date, meal) {
   // Already-made food: leftovers, cooked or prepared portions, ready meals
   const ready = items.filter((i) => i.location === 'leftovers' || i.category === 'Ready Meals'
     || (i.states || []).some((s) => s === 'Cooked' || s === 'Leftover'));
+  // For snacks, also things in the kitchen you'd snack on
+  const snackItems = meal === 'snacks'
+    ? items.filter((i) => !ready.includes(i) && ['Snacks & Treats', 'Fruit', 'Dairy & Refrigerated'].includes(i.category))
+    : [];
 
   const recipeRow = ({ r, sc }) => `
     <button type="button" class="pick-row" data-recipe-id="${r.id}" data-name="${escapeHtml(r.name.toLowerCase())}">
@@ -5685,6 +5694,11 @@ async function openSlotPicker(date, meal) {
         ${ready.map((i) => `<button type="button" class="pick-row" data-item-id="${i.id}">
           <span class="pick-name">🧊 ${escapeHtml(i.name)}</span>
           <span class="pick-tags"><span class="tag">${LOCATION_LABELS[i.location]}</span><span class="tag">${escapeHtml(formatItemQuantity(i))}</span></span>
+        </button>`).join('')}` : ''}
+      ${snackItems.length ? `<div class="st-group-title">Snacks from your kitchen</div>
+        ${snackItems.map((i) => `<button type="button" class="pick-row" data-item-id="${i.id}">
+          <span class="pick-name">${escapeHtml(i.name)}</span>
+          <span class="pick-tags"><span class="tag">${LOCATION_LABELS[i.location]}</span>${i.caloriesPer100 ? `<span class="tag kcal-tag">${itemCaloriesText(i)}</span>` : ''}</span>
         </button>`).join('')}` : ''}
       <div class="st-group-title">Your recipes</div>
       <div class="field recipe-search" style="margin-bottom:8px;"><input type="search" id="pick-search" placeholder="Search recipes"></div>
@@ -5789,7 +5803,7 @@ async function openAddRecipeToPlan(recipe) {
   const start = new Date();
   const dates = Array.from({ length: 10 }, (_, i) => localDateString(addDays(start, i)));
   const entries = await getPlanEntries(dates);
-  const preferred = meals.find((m) => (recipe.mealTypes || []).includes(PLAN_MEAL_LABELS[m])) || 'dinner';
+  const preferred = meals.find((m) => (recipe.mealTypes || []).includes(planMealType(m))) || 'dinner';
   openModal(`
     <div class="modal-title-row">
       <h2>📅 Add to plan</h2>
@@ -5851,7 +5865,7 @@ async function fillMyWeek() {
   let added = 0;
 
   const scoreFor = (recipe, mealType, date) => {
-    if (!(recipe.mealTypes || []).includes(mealType) && !(mealType !== 'Breakfast' && !(recipe.mealTypes || []).length)) return -Infinity;
+    if (!(recipe.mealTypes || []).includes(mealType) && !(mealType !== 'Breakfast' && mealType !== 'Snack' && !(recipe.mealTypes || []).length)) return -Infinity;
     const weekday = parseLocalDate(date).getDay() % 6 !== 0;
     const mins = recipeTotalMinutes(recipe);
     if (AppState.planQuickWeeknights && weekday && mins > QUICK_RECIPE_MINUTES) return -Infinity;
@@ -5877,7 +5891,7 @@ async function fillMyWeek() {
   for (const date of dates) {
     for (const meal of meals) {
       if (taken.has(`${date}|${meal}`)) continue;
-      const mealType = PLAN_MEAL_LABELS[meal];
+      const mealType = planMealType(meal);
       const best = recipes
         .filter((r) => !usedRecipeIds.has(r.id))
         .map((r) => ({ r, s: scoreFor(r, mealType, date) }))
@@ -7681,8 +7695,12 @@ async function renderSettingsScreen() {
       <div class="field" style="margin:0;"><label>How many people you cook for</label><input type="number" id="plan-household" min="1" max="12" inputmode="numeric" value="${planSettings.householdSize}"></div>
       <div class="field" style="margin:12px 0 0;"><label>Partner's name <span style="text-transform:none;font-weight:500;">(optional, shown in I cooked this and ratings)</span></label><input type="text" id="plan-partner" maxlength="30" placeholder="Partner" value="${escapeHtml(partnerName)}"></div>
       <div class="staple-toggle-row" style="margin:12px 0 0;">
-        <div class="label-group"><span class="label">Plan breakfast too</span><span class="desc">Otherwise the planner shows lunch and dinner</span></div>
+        <div class="label-group"><span class="label">Plan breakfast too</span><span class="desc">A Breakfast row on every day of the planner</span></div>
         <button type="button" id="plan-breakfast" class="toggle-switch ${planSettings.planBreakfast ? 'on' : ''}" data-on="${planSettings.planBreakfast ? 'true' : 'false'}"></button>
+      </div>
+      <div class="staple-toggle-row" style="margin:12px 0 0;">
+        <div class="label-group"><span class="label">Plan snacks</span><span class="desc">A Snacks row on every day of the planner</span></div>
+        <button type="button" id="plan-snacks" class="toggle-switch ${planSettings.planSnacks !== false ? 'on' : ''}" data-on="${planSettings.planSnacks !== false ? 'true' : 'false'}"></button>
       </div>
     </div>
 
@@ -7779,7 +7797,7 @@ function attachSettingsListeners() {
 
   const savePlanSettings = async () => {
     const size = Math.max(1, Math.min(12, parseInt(document.getElementById('plan-household').value, 10) || 2));
-    await dbPut('settings', { ...DEFAULT_PLAN_SETTINGS, householdSize: size, planBreakfast: document.getElementById('plan-breakfast').dataset.on === 'true' });
+    await dbPut('settings', { ...DEFAULT_PLAN_SETTINGS, householdSize: size, planBreakfast: document.getElementById('plan-breakfast').dataset.on === 'true', planSnacks: document.getElementById('plan-snacks').dataset.on === 'true' });
     showToast('Meal plan settings saved');
   };
   document.getElementById('plan-household').addEventListener('change', savePlanSettings);
@@ -7790,6 +7808,13 @@ function attachSettingsListeners() {
     showToast('Saved');
   });
   document.getElementById('plan-breakfast').addEventListener('click', (e) => {
+    const b = e.currentTarget;
+    const on = b.dataset.on !== 'true';
+    b.dataset.on = on ? 'true' : 'false';
+    b.classList.toggle('on', on);
+    savePlanSettings();
+  });
+  document.getElementById('plan-snacks').addEventListener('click', (e) => {
     const b = e.currentTarget;
     const on = b.dataset.on !== 'true';
     b.dataset.on = on ? 'true' : 'false';
