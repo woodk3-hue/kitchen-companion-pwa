@@ -1,7 +1,7 @@
 // PantryFit — Service Worker
 // Caches the app shell so it works fully offline after first load.
 
-const CACHE_NAME = 'pantryfit-v17';
+const CACHE_NAME = 'pantryfit-v18';
 const APP_SHELL = [
   './',
   './index.html',
