@@ -1224,6 +1224,44 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 .ring-track { stroke: #F6E2D7; }
 .diary-summary { padding: 16px; }
 .toast { border-radius: 14px; bottom: calc(var(--nav-height) + var(--safe-bottom) + 24px); }
+
+/* Eating-style tags */
+.tag.tag-diet { background: #EEE8FA; color: #6440B0; }
+
+/* Shopping list */
+.shop-add { margin: 4px 0 12px; }
+.shop-group { background: var(--color-paper); border-radius: var(--radius-card); box-shadow: var(--shadow-card); overflow: hidden; margin-bottom: 8px; }
+.shop-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--color-fill); }
+.shop-row:first-child { border-top: none; }
+.shop-tick { background: none; border: none; padding: 4px; cursor: pointer; display: flex; }
+.shop-tick .st-box { width: 22px; flex: 0 0 22px; color: #fff; }
+.shop-row.done .st-box { background: var(--color-fridge); border-color: var(--color-fridge); color: #fff; }
+.shop-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.shop-name { font-weight: 600; color: var(--color-ink); }
+.shop-row.done .shop-name { text-decoration: line-through; color: var(--color-ink-soft); }
+.shop-qty { font-weight: 500; color: var(--color-ink-soft); font-size: 13px; }
+.shop-note { font-size: 12px; color: var(--color-ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shop-del { background: none; border: none; font-size: 22px; line-height: 1; color: var(--color-ink-soft); padding: 4px 6px; cursor: pointer; }
+.shop-actions { margin-top: 14px; }
+.sp-for { font-size: 12px; color: var(--color-ink-soft); padding: 0 12px 8px 44px; }
+.sk-row { padding: 10px 0; border-bottom: 1px solid var(--color-fill); }
+.sk-name { font-weight: 700; margin-bottom: 6px; }
+.sk-adds { display: block; font-weight: 500; font-size: 12px; color: var(--color-fridge); }
+.sk-fields { display: grid; grid-template-columns: 1fr 80px 100px; gap: 6px; }
+.sk-fields input, .sk-fields select { min-width: 0; }
+
+/* I cooked this */
+.cook-split { gap: 10px; }
+.cook-num input { width: 100%; }
+.cook-hint { display: block; font-size: 12px; color: var(--color-ink-soft); margin-top: 3px; }
+.cook-check { font-size: 13px; font-weight: 600; margin: 2px 0 12px; }
+.cook-check.ok { color: var(--color-fridge); }
+.cook-check.warn { color: var(--color-warn); }
+.cook-box { background: var(--color-fill); border-radius: 14px; padding: 12px; margin-bottom: 12px; }
+.cook-box .segmented { flex-wrap: wrap; }
+.cook-use { padding: 8px 0; border-bottom: 1px solid var(--color-fill); }
+.cook-use-amt { font-size: 13px; padding: 4px 0 0 28px; display: flex; align-items: center; gap: 6px; }
+.cook-use-amt input.lki-use { width: 90px; flex: 0 0 90px; padding: 6px 8px; border: 1px solid var(--color-line); border-radius: 8px; font: inherit; }
 </style>
  </head>
  <body>
@@ -1251,7 +1289,7 @@ h1, h2, h3 { letter-spacing: -0.02em; }
    ============================================================ */
 // The app was called Kitchen Companion; the database keeps that name so existing data stays put.
 const DB_NAME = 'KitchenCompanionDB';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 let db = null;
 
 // Controlled category list (PROJECT_VISION.md)
@@ -1401,6 +1439,11 @@ function openDatabase() {
       if (!_db.objectStoreNames.contains('foodLog')) {
         const store = _db.createObjectStore('foodLog', { keyPath: 'id', autoIncrement: true });
         store.createIndex('date', 'date', { unique: false });
+      }
+
+      // v4: shopping list
+      if (!_db.objectStoreNames.contains('shoppingList')) {
+        _db.createObjectStore('shoppingList', { keyPath: 'id', autoIncrement: true });
       }
     };
 
@@ -1662,7 +1705,8 @@ const AppState = {
   planWeekStart: null,
   diaryDate: null,
   planUseAi: false,
-  recipeFilters: { search: '', cuisine: 'all', favourites: false, quick: false, highProtein: false, freezer: false }
+  planQuickWeeknights: false,
+  recipeFilters: { search: '', cuisine: 'all', favourites: false, time: 0, highProtein: false, lowCarb: false, keto: false, lowFat: false, freezer: false }
 };
 
 /* ============================================================
@@ -1696,7 +1740,7 @@ async function renderRoute() {
     planner: ['Meal Planner', 'Plan the week around what you have'],
     recipes: ['Recipes', 'Your recipe book'],
     kitchen: ['Kitchen', 'Pantry · Fridge · Freezer · Leftovers'],
-    shopping: ['Shopping', 'Coming in Phase 3'],
+    shopping: ['Shopping', 'What to buy, and into the kitchen'],
     settings: ['Settings', 'App data & preferences']
   };
   const [title, subtitle] = titleMap[AppState.route];
@@ -1718,7 +1762,7 @@ async function renderRoute() {
     case 'settings': content.innerHTML = await renderSettingsScreen(); attachSettingsListeners(); break;
     case 'planner': content.innerHTML = await renderPlannerScreen(); attachPlannerListeners(); break;
     case 'recipes': content.innerHTML = await renderRecipesScreen(); attachRecipesListeners(); break;
-    case 'shopping': content.innerHTML = renderPlaceholder('Shopping', 'Budget tracking, purchase events, and shopping lists built from your meal plan.'); break;
+    case 'shopping': content.innerHTML = await renderShoppingScreen(); attachShoppingListeners(); break;
   }
 }
 
@@ -1784,7 +1828,8 @@ function addDays(date, days) {
 
 // "2 cans", "1kg", "6" (each), or "In stock" when no amount was recorded
 function formatItemQuantity(item) {
-  if (item.portionCount) return `${item.portionCount} × ${item.portionSize || ''}`.trim();
+  if (item.portionCount && !item.portionSize) return `${item.portionCount} portion${item.portionCount === 1 ? '' : 's'}`;
+  if (item.portionCount) return `${item.portionCount} × ${item.portionSize}`;
   if (item.quantity === null || item.quantity === undefined || item.quantity === 0) return 'In stock';
   const q = Number.isInteger(item.quantity) ? item.quantity : Math.round(item.quantity * 100) / 100;
   if (!item.unit || item.unit === 'each') return String(q);
@@ -1975,6 +2020,7 @@ async function renderKitchenScreen() {
             ${stateTagsHtml}
             ${item.category ? `<span class="tag">${item.category}</span>` : ''}
             ${stapleBadge}
+            ${item.runningLow ? '<span class="tag kcal-over">Running low</span>' : ''}
             ${item.caloriesPer100 ? `<span class="tag kcal-tag">${itemCaloriesText(item)}</span>` : ''}
           </div>
           ${expiryFlag}
@@ -2325,6 +2371,8 @@ async function saveItemFromForm(existingItem) {
     notes: document.getElementById('f-notes').value.trim(),
     freezerFriendlyRating: null,
     linkedPurchaseEventId: null,
+    runningLow: existingItem ? !!existingItem.runningLow : false,
+    recipeId: existingItem ? existingItem.recipeId || null : null,
     updatedAt: now
   };
 
@@ -2398,6 +2446,7 @@ async function openItemDetail(id) {
     ${item.notes ? `<p style="font-size:13px;color:var(--color-ink-soft);margin:0 0 14px;">${escapeHtml(item.notes)}</p>` : ''}
 
     <button class="btn-primary" id="edit-item-btn">Edit item</button>
+    <button class="btn-secondary" id="low-item-btn">${item.runningLow ? '🛒 Running low (on your shopping list)' : '🛒 Running low: add to shopping list'}</button>
 
     <div class="section-heading" style="margin-top:20px;">
       <h2>History</h2>
@@ -2408,6 +2457,11 @@ async function openItemDetail(id) {
   openModal(html);
   document.getElementById('modal-close').addEventListener('click', closeModal);
   document.getElementById('edit-item-btn').addEventListener('click', () => openItemForm(item));
+  document.getElementById('low-item-btn').addEventListener('click', async () => {
+    await markRunningLow(item);
+    closeModal();
+    renderRoute();
+  });
 }
 
 function formatHistoryAction(h) {
@@ -2417,6 +2471,8 @@ function formatHistoryAction(h) {
     used: `Used${h.quantityChanged ? ' ' + h.quantityChanged : ''}`,
     portioned: 'Created freezer portions',
     discarded: 'Discarded',
+    bought: `Bought${h.quantityChanged ? ' ' + h.quantityChanged : ''}`,
+    cooked: 'Cooked',
     adjusted: 'Edited'
   };
   let label = actionVerbs[h.action] || h.action;
@@ -2797,6 +2853,8 @@ function normalizeRecipe(r) {
     difficulty: pick(r.difficulty, DIFFICULTIES, 'Easy'),
     caloriesPerServing: toNumberOrNull(r.caloriesPerServing),
     proteinGramsPerServing: toNumberOrNull(r.proteinGramsPerServing),
+    carbsGramsPerServing: toNumberOrNull(r.carbsGramsPerServing),
+    fatGramsPerServing: toNumberOrNull(r.fatGramsPerServing),
     proteinLevel: pick(r.proteinLevel, LEVELS, 'Medium'),
     fatLevel: pick(r.fatLevel, LEVELS, 'Medium'),
     primaryProtein: pick(r.primaryProtein, PRIMARY_PROTEINS, 'None'),
@@ -2862,8 +2920,11 @@ async function syncRecipeSeed() {
 function recipeMatchesFilters(r, f) {
   if (f.cuisine !== 'all' && r.cuisine !== f.cuisine) return false;
   if (f.favourites && !r.isFavourite) return false;
-  if (f.quick && !(recipeTotalMinutes(r) > 0 && recipeTotalMinutes(r) <= QUICK_RECIPE_MINUTES)) return false;
-  if (f.highProtein && r.proteinLevel !== 'High') return false;
+  if (f.time && !(recipeTotalMinutes(r) > 0 && recipeTotalMinutes(r) <= f.time)) return false;
+  if (f.highProtein || f.lowCarb || f.keto || f.lowFat) {
+    const d = recipeDiet(r);
+    if ((f.highProtein && !d.highProtein) || (f.lowCarb && !d.lowCarb) || (f.keto && !d.keto) || (f.lowFat && !d.lowFat)) return false;
+  }
   if (f.freezer && !r.freezerFriendly) return false;
   const q = f.search.trim().toLowerCase();
   if (q) {
@@ -2908,13 +2969,13 @@ function renderRecipeList() {
         <div class="body">
           <div class="top-row">
             <span class="name">${r.isFavourite ? '<span class="fav-star">★</span> ' : ''}${escapeHtml(r.name)}</span>
-            <span class="qty">${total ? `${total} min` : ''}</span>
+            <span class="qty">${total ? `${total <= 15 ? '⚡ ' : ''}${total} min` : ''}</span>
           </div>
           <div class="meta-row">
             ${sc ? `<span class="tag match-pct ${sc.pct >= 80 ? 'high' : ''}">${sc.pct}% match</span>` : ''}
             <span class="tag">${escapeHtml(r.cuisine)}</span>
             ${calorieBadgeHtml(r.caloriesPerServing, AppState.healthGoals)}
-            ${r.proteinLevel === 'High' ? '<span class="tag tag-protein">High protein</span>' : ''}
+            ${dietTagsHtml(r)}
             ${r.freezerFriendly ? '<span class="tag state-frozen">Freezes well</span>' : ''}
           </div>
           ${sc && sc.expiring.length ? `<div class="match-line uses">Uses ${sc.expiring.map((e) => `${escapeHtml(e.name)} (${formatDaysLeft(e.daysLeft)})`).join(', ')}</div>` : ''}
@@ -2933,6 +2994,8 @@ async function renderRecipesScreen() {
   const f = AppState.recipeFilters;
   const filterChip = (key, label) =>
     `<button type="button" class="state-chip recipe-filter ${f[key] ? 'selected' : ''}" data-filter="${key}">${label}</button>`;
+  const timeChip = (mins, label) =>
+    `<button type="button" class="state-chip recipe-time ${f.time === mins ? 'selected' : ''}" data-mins="${mins}">${label}</button>`;
 
   return `
     <div class="recipe-online-row">
@@ -2955,8 +3018,12 @@ async function renderRecipesScreen() {
     </div>
     <div class="state-chip-grid recipe-filter-row">
       ${filterChip('favourites', '★ Favourites')}
-      ${filterChip('quick', `≤ ${QUICK_RECIPE_MINUTES} min`)}
+      ${timeChip(15, '⚡ 15 min')}
+      ${timeChip(QUICK_RECIPE_MINUTES, `≤ ${QUICK_RECIPE_MINUTES} min`)}
       ${filterChip('highProtein', 'High protein')}
+      ${filterChip('lowCarb', 'Low carb')}
+      ${filterChip('keto', 'Keto')}
+      ${filterChip('lowFat', 'Low fat')}
       ${filterChip('freezer', 'Freezes well')}
     </div>
     <div id="recipe-list">${renderRecipeList()}</div>
@@ -2991,6 +3058,13 @@ function attachRecipesListeners() {
     chip.addEventListener('click', () => {
       const key = chip.dataset.filter;
       AppState.recipeFilters[key] = !AppState.recipeFilters[key];
+      renderRoute();
+    });
+  });
+  document.querySelectorAll('.recipe-time').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const mins = parseInt(chip.dataset.mins, 10);
+      AppState.recipeFilters.time = AppState.recipeFilters.time === mins ? 0 : mins;
       renderRoute();
     });
   });
@@ -3040,10 +3114,12 @@ async function openRecipeDetail(id) {
     ? '<p class="recipe-muted">No method added.</p>'
     : `<ol class="method-list">${recipe.method.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ol>`;
 
+  const macros = recipeMacros(recipe);
   const nutrition = [
     recipe.caloriesPerServing ? `~${recipe.caloriesPerServing} kcal` : '',
     recipe.proteinGramsPerServing ? `~${recipe.proteinGramsPerServing} g protein` : '',
-    `${recipe.fatLevel} fat`
+    macros.carbs != null ? `~${Math.round(macros.carbs)} g carbs` : '',
+    macros.fat != null ? `~${Math.round(macros.fat)} g fat` : `${recipe.fatLevel} fat`
   ].filter(Boolean).join(' · ');
 
   const html = `
@@ -3056,7 +3132,7 @@ async function openRecipeDetail(id) {
         <span class="tag">${escapeHtml(recipe.cuisine)}</span>
         ${recipe.mealTypes.map((m) => `<span class="tag">${escapeHtml(m)}</span>`).join('')}
         ${calorieBadgeHtml(recipe.caloriesPerServing, goals)}
-        ${recipe.proteinLevel === 'High' ? '<span class="tag tag-protein">High protein</span>' : ''}
+        ${dietTagsHtml(recipe, { long: true })}
         ${recipe.freezerFriendly ? '<span class="tag state-frozen">Freezes well</span>' : ''}
         ${recipe.leftoverFriendly ? '<span class="tag state-leftover">Good leftovers</span>' : ''}
         ${recipe.source === 'built-in' ? '<span class="tag">Built-in</span>' : ''}
@@ -3069,7 +3145,7 @@ async function openRecipeDetail(id) {
         ${stat('Cook', recipe.cookMinutes ? recipe.cookMinutes + ' min' : '')}
         ${stat('Difficulty', recipe.difficulty)}
       </div>
-      <p class="recipe-muted" style="margin:0 0 14px;">Per serving: ${escapeHtml(nutrition)} (approximate)</p>
+      <p class="recipe-muted" style="margin:0 0 14px;">Per serving: ${escapeHtml(nutrition)} (${macros.estimated ? 'carbs & fat estimated' : 'approximate'})</p>
 
       <div class="rating-row">
         <span class="rating-label">You</span>
@@ -3092,9 +3168,10 @@ async function openRecipeDetail(id) {
       ${recipe.notes ? `<div class="section-heading" style="margin-top:18px;"><h2>Notes</h2></div><p class="recipe-notes">${escapeHtml(recipe.notes)}</p>` : ''}
     </div>
     <div class="modal-action-bar">
+      <button type="button" class="btn-primary" id="cooked-recipe-btn">🍳 I cooked this</button>
       <div class="field-row" style="gap:8px;">
-        <button type="button" class="btn-primary" id="log-recipe-btn">🍽️ Log a serving</button>
-        <button type="button" class="btn-primary" id="plan-recipe-btn">📅 Add to plan</button>
+        <button type="button" class="btn-secondary" id="log-recipe-btn">🍽️ Log a serving</button>
+        <button type="button" class="btn-secondary" id="plan-recipe-btn">📅 Add to plan</button>
       </div>
       <div class="field-row" style="gap:8px;">
         <button type="button" class="btn-secondary" id="edit-recipe-btn">Edit recipe</button>
@@ -3130,6 +3207,7 @@ async function openRecipeDetail(id) {
 
   document.getElementById('edit-recipe-btn').addEventListener('click', () => openRecipeForm(recipe));
   document.getElementById('plan-recipe-btn').addEventListener('click', () => openAddRecipeToPlan(recipe));
+  document.getElementById('cooked-recipe-btn').addEventListener('click', () => openCookedThis(recipe));
   document.getElementById('log-recipe-btn').addEventListener('click', () => openLogRecipeServings(localDateString(new Date()), defaultLogMeal(), recipe));
   document.getElementById('delete-recipe-btn').addEventListener('click', () => deleteRecipe(recipe));
 }
@@ -3303,6 +3381,10 @@ function openRecipeForm(recipe) {
               <div class="field"><label>Calories / serve</label><input type="number" id="r-calories" min="0" value="${r.caloriesPerServing ?? ''}" placeholder="approx."></div>
               <div class="field"><label>Protein g / serve</label><input type="number" id="r-proteinGrams" min="0" value="${r.proteinGramsPerServing ?? ''}" placeholder="approx."></div>
             </div>
+            <div class="field-row">
+              <div class="field"><label>Carbs g / serve</label><input type="number" id="r-carbsGrams" min="0" value="${r.carbsGramsPerServing ?? ''}" placeholder="approx."></div>
+              <div class="field"><label>Fat g / serve</label><input type="number" id="r-fatGrams" min="0" value="${r.fatGramsPerServing ?? ''}" placeholder="approx."></div>
+            </div>
             ${toggleRow('r-freezer', 'Freezes well', 'Good for batch cooking and freezer portions', r.freezerFriendly)}
             ${toggleRow('r-leftover', 'Good as leftovers', 'Keeps well in the fridge for another meal', r.leftoverFriendly)}
             <div class="field"><label>Notes</label><textarea id="r-notes">${escapeHtml(r.notes)}</textarea></div>
@@ -3366,6 +3448,8 @@ async function saveRecipeFromForm(existing) {
     difficulty: selectedVal('r-difficulty'),
     caloriesPerServing: document.getElementById('r-calories').value,
     proteinGramsPerServing: document.getElementById('r-proteinGrams').value,
+    carbsGramsPerServing: document.getElementById('r-carbsGrams').value,
+    fatGramsPerServing: document.getElementById('r-fatGrams').value,
     proteinLevel: selectedVal('r-proteinLevel'),
     fatLevel: selectedVal('r-fatLevel'),
     primaryProtein: document.getElementById('r-primaryProtein').value,
@@ -3396,6 +3480,18 @@ async function saveRecipeFromForm(existing) {
    Calories per meal and preferred cuisines. Used to flag recipes
    inside or over the target and to steer AI meal suggestions.
    ============================================================ */
+/* ---- Eating styles ----
+   Each style is a split of daily calories between protein, carbs and fat. Choosing one
+   in Settings fills in the daily macro targets; recipes get Low carb / Keto / Low fat tags. */
+const EATING_STYLES = {
+  'balanced': { label: 'Balanced', split: [20, 50, 30], desc: 'A bit of everything.', ai: 'Keep meals balanced: a good protein, plenty of vegetables, a moderate serve of carbs, not too much fat.' },
+  'high-protein': { label: 'High protein', split: [25, 44, 31], desc: 'Protein first, fat kept lower.', ai: 'Prioritise protein (chicken, fish, lean beef, pork, eggs, legumes, in that order) and keep fat lower where possible.' },
+  'low-carb': { label: 'Low carb', split: [30, 20, 50], desc: 'Around 20 g carbs a meal: skip or swap the rice, bread and potatoes.', ai: 'Keep carbs low: under about 20 g per serving. No rice, pasta, bread or potatoes as part of the dish; suggest swaps like cauliflower rice or salad.' },
+  'keto': { label: 'Keto', split: [25, 6, 69], desc: 'Very low carb (about 25 g a day), higher fat.', ai: 'Make meals keto: under about 10 g carbs per serving, no grains, sugar, potatoes, legumes or starchy vegetables, with fat from meat, fish, eggs, cheese, cream, butter, oil and avocado.' },
+  'low-fat': { label: 'Low fat', split: [25, 55, 20], desc: 'Lean meats, little oil, cream or cheese.', ai: 'Keep fat low: under about 12 g per serving. Lean meats and fish, little oil, no cream, butter or cheese-heavy sauces.' }
+};
+const DEFAULT_EATING_STYLE = 'high-protein';
+
 const DEFAULT_HEALTH_GOALS = {
   key: 'healthGoals',
   caloriesMin: 450,
@@ -3404,6 +3500,7 @@ const DEFAULT_HEALTH_GOALS = {
   dailyProtein: 100,
   dailyCarbs: 175,
   dailyFat: 55,
+  eatingStyle: DEFAULT_EATING_STYLE,
   preferredCuisines: ['Anglo-Indian', 'Indian', 'Australian', 'Western', 'Chinese', 'Indo-Chinese', 'Korean', 'Vietnamese'],
   cuisinesVersion: 2
 };
@@ -3439,6 +3536,80 @@ function calorieBadgeHtml(kcal, goals) {
   return `<span class="tag">${kcal} kcal</span>`;
 }
 
+
+function eatingStyleMacros(style, dailyCalories) {
+  const [p, c, f] = (EATING_STYLES[style] || EATING_STYLES[DEFAULT_EATING_STYLE]).split;
+  const round5 = (n) => Math.round(n / 5) * 5;
+  return {
+    dailyProtein: round5(dailyCalories * p / 100 / 4),
+    dailyCarbs: round5(dailyCalories * c / 100 / 4),
+    dailyFat: round5(dailyCalories * f / 100 / 9)
+  };
+}
+
+// Starchy ingredients that make a dish high in carbs. Small amounts that are staples (a teaspoon
+// of sugar, a spoon of flour to thicken) and optional ones don't count.
+const STARCH_RE = /\b(rice|pasta|spaghetti|penne|fettuccine|macaroni|noodles?|bread|breadcrumbs|naan|roti|chapatis?|parathas?|potato|potatoes|flour|lentils?|dal|chickpeas?|kidney beans|beans|oats|couscous|quinoa|tortillas?|wraps?|sugar|honey|corn|pumpkin|sweet potato|cereal|biscuits?|pastry|buns?)\b/;
+
+function isStarchy(ing) {
+  const name = ing.name.toLowerCase();
+  if (/green beans|bean sprouts|beansprouts/.test(name)) return false;
+  return ing.category === 'Carbs & Grains' || STARCH_RE.test(name);
+}
+
+// Per-serving nutrition, using the recipe's own figures where it has them. Carbs and fat are
+// estimated from calories, protein and fat level when the recipe doesn't say (marked estimated).
+function recipeMacros(recipe) {
+  const kcal = recipe.caloriesPerServing || null;
+  const protein = recipe.proteinGramsPerServing ?? null;
+  let fat = recipe.fatGramsPerServing ?? null;
+  let carbs = recipe.carbsGramsPerServing ?? null;
+  const estimated = kcal != null && (fat == null || carbs == null);
+  if (kcal && fat == null) {
+    fat = { Low: 9, Medium: 17, High: 27 }[recipe.fatLevel] || 17;
+    fat = Math.min(fat, Math.max(0, (kcal - (protein || 0) * 4) / 9));
+  }
+  if (kcal && carbs == null) carbs = Math.max(0, (kcal - (protein || 0) * 4 - (fat || 0) * 9) / 4);
+  return { kcal, protein, carbs: carbs == null ? null : round1(carbs), fat: fat == null ? null : round1(fat), estimated };
+}
+
+// Which eating styles a recipe suits. Rice, bread or potatoes listed "to serve" can be skipped,
+// so a curry served with rice still counts as low carb, with a note to skip the rice.
+function recipeDiet(recipe) {
+  const required = (recipe.ingredients || []).filter((i) => !i.optional && !i.assumedStaple);
+  const starchy = required.filter(isStarchy);
+  const sides = starchy.filter((i) => /to serve|on the side|for serving/i.test(i.prepNote || ''));
+  const mainStarch = starchy.length - sides.length;
+  const carbs = recipe.carbsGramsPerServing;
+  const fat = recipe.fatGramsPerServing;
+  // Per-serving figures are for the dish itself, without the rice or bread served with it
+  const lowCarb = carbs != null ? carbs <= 20 && mainStarch === 0 : mainStarch === 0;
+  const keto = carbs != null ? carbs <= 10 && mainStarch === 0 : (mainStarch === 0 && !sides.length && recipe.fatLevel !== 'Low');
+  const lowFat = fat != null ? fat <= 12 : recipe.fatLevel === 'Low';
+  const highProtein = recipe.proteinLevel === 'High' || (recipe.proteinGramsPerServing || 0) >= 30;
+  return { lowCarb, keto, lowFat, highProtein, skip: lowCarb ? sides.map((i) => i.name) : [] };
+}
+
+function recipeSuitsStyle(recipe, style) {
+  const d = recipeDiet(recipe);
+  return style === 'low-carb' ? d.lowCarb : style === 'keto' ? d.keto : style === 'low-fat' ? d.lowFat : style === 'high-protein' ? d.highProtein : true;
+}
+
+function skipText(names) {
+  const short = names.map((n) => n.replace(/^(basmati|jasmine|microwave)\s+/i, '').toLowerCase());
+  return short.length ? ` (skip the ${short.slice(0, 2).join(' & ')})` : '';
+}
+
+function dietTagsHtml(recipe, { long = false } = {}) {
+  const d = recipeDiet(recipe);
+  const tags = [];
+  if (d.highProtein) tags.push('<span class="tag tag-protein">High protein</span>');
+  if (d.keto) tags.push(`<span class="tag tag-diet">Keto${long ? skipText(d.skip) : ''}</span>`);
+  else if (d.lowCarb) tags.push(`<span class="tag tag-diet">Low carb${long ? skipText(d.skip) : ''}</span>`);
+  if (d.lowFat) tags.push('<span class="tag tag-diet">Low fat</span>');
+  return tags.join('');
+}
+
 /* ============================================================
    RECIPE MATCHING
    How much of each recipe is already in the kitchen, and whether it
@@ -3463,9 +3634,10 @@ function termMatchesItem(term, itemWords) {
   return ` ${itemWords} `.includes(` ${term} `) || ` ${term} `.includes(` ${itemWords} `);
 }
 
+// Cooked portions (leftovers from "I cooked this") are meals, not ingredients
 function buildInventoryIndex(items) {
   return items
-    .filter((i) => i.expiryDate == null || daysUntil(i.expiryDate) >= 0)
+    .filter((i) => !i.recipeId && (i.expiryDate == null || daysUntil(i.expiryDate) >= 0))
     .map((i) => ({ item: i, words: matchWords(i.name), daysLeft: i.expiryDate ? daysUntil(i.expiryDate) : null }));
 }
 
@@ -3585,7 +3757,7 @@ function aiSuggestionSchema() {
     type: 'object',
     additionalProperties: false,
     required: ['name', 'cuisine', 'mealTypes', 'whyThisMeal', 'usesExpiring', 'servings', 'prepMinutes', 'cookMinutes',
-      'difficulty', 'caloriesPerServing', 'proteinGramsPerServing', 'fatLevel', 'primaryProtein',
+      'difficulty', 'caloriesPerServing', 'proteinGramsPerServing', 'carbsGramsPerServing', 'fatGramsPerServing', 'fatLevel', 'primaryProtein',
       'freezerFriendly', 'leftoverFriendly', 'ingredients', 'method'],
     properties: {
       name: str,
@@ -3599,6 +3771,8 @@ function aiSuggestionSchema() {
       difficulty: { type: 'string', enum: DIFFICULTIES },
       caloriesPerServing: int,
       proteinGramsPerServing: int,
+      carbsGramsPerServing: int,
+      fatGramsPerServing: int,
       fatLevel: { type: 'string', enum: LEVELS },
       primaryProtein: { type: 'string', enum: PRIMARY_PROTEINS },
       freezerFriendly: { type: 'boolean' },
@@ -3615,7 +3789,8 @@ function aiSuggestionSchema() {
   };
 }
 
-function buildAiPrompt(items, goals, mealType, request) {
+function buildAiPrompt(items, goals, mealType, request, maxMinutes) {
+  const style = EATING_STYLES[goals.eatingStyle] || EATING_STYLES[DEFAULT_EATING_STYLE];
   const kitchen = items.map((i) => ({
     name: i.name,
     location: i.location,
@@ -3628,12 +3803,13 @@ function buildAiPrompt(items, goals, mealType, request) {
     'Suggest 3 different meals I can cook, using what is in my kitchen.',
     '',
     `Meal: ${mealType}.`,
-    `Calorie target: ${goals.caloriesMin}-${goals.caloriesMax} kcal per serving. Prioritise protein (chicken, fish, lean beef, pork, eggs, legumes, in that order) and keep fat lower where possible.`,
+    `Calorie target: ${goals.caloriesMin}-${goals.caloriesMax} kcal per serving. Eating style: ${style.label}. ${style.ai}`,
+    maxMinutes ? `Fast and easy: each meal must take ${maxMinutes} minutes or less in total (prep plus cooking), with few steps and little washing up.` : null,
     goals.preferredCuisines.length ? `Cuisines I like: ${goals.preferredCuisines.join(', ')}. Mostly suggest these.` : 'Any cuisine is fine; vary them.',
     'Use food with the fewest days until its use-by date first, and say which of those items each meal uses in usesExpiring (exact kitchen item names). Skip anything already past its use-by date (negative days).',
     'Salt, pepper, oil and dried spices count as staples; mark them assumedStaple. Prefer meals that need few or no extra purchases; set inKitchen for each ingredient that is in my kitchen list.',
     'Use metric quantities. Use quantity 0 with an empty unit for "to taste". matchTerms are lower-case names a kitchen item could be called, most specific first (e.g. "chicken thigh", "chicken").',
-    'Calories and protein are per serving and approximate. whyThisMeal is one short sentence.',
+    'Calories, protein, carbs and fat are per serving and approximate. whyThisMeal is one short sentence.',
     request ? `Also: ${request}` : '',
     '',
     'My kitchen (JSON):',
@@ -3641,7 +3817,7 @@ function buildAiPrompt(items, goals, mealType, request) {
   ].filter((line) => line !== null).join('\n');
 }
 
-async function requestAiSuggestions(mealType, request) {
+async function requestAiSuggestions(mealType, request, maxMinutes) {
   let Anthropic = null;
   try {
     const loaded = await getAnthropicClient();
@@ -3654,7 +3830,7 @@ async function requestAiSuggestions(mealType, request) {
       fallbacks: 'default',
       output_config: { effort: 'medium', format: { type: 'json_schema', schema: aiSuggestionSchema() } },
       system: 'You are the meal-suggestion feature of PantryFit, a personal kitchen app for a home cook in Australia. Suggest practical, healthy home-cooked meals with clear, concise methods, in the cuisines they say they like.',
-      messages: [{ role: 'user', content: buildAiPrompt(items, goals, mealType, request) }]
+      messages: [{ role: 'user', content: buildAiPrompt(items, goals, mealType, request, maxMinutes) }]
     });
     if (response.stop_reason === 'refusal') {
       return { error: 'Claude couldn\'t suggest meals for this request. Try rewording the extra request, or leave it blank.' };
@@ -3705,6 +3881,8 @@ function aiMealCardHtml(meal, idx, goals) {
         <span class="tag">${escapeHtml(meal.cuisine)}</span>
         ${calorieBadgeHtml(meal.caloriesPerServing, goals)}
         <span class="tag tag-protein">~${escapeHtml(meal.proteinGramsPerServing)} g protein</span>
+        ${meal.carbsGramsPerServing != null ? `<span class="tag">~${escapeHtml(meal.carbsGramsPerServing)} g carbs</span>` : ''}
+        ${meal.fatGramsPerServing != null ? `<span class="tag">~${escapeHtml(meal.fatGramsPerServing)} g fat</span>` : ''}
       </div>
       <p class="ai-why">${escapeHtml(meal.whyThisMeal)}</p>
       ${meal.usesExpiring && meal.usesExpiring.length ? `<p class="match-line uses">Uses up: ${escapeHtml(meal.usesExpiring.join(', '))}</p>` : ''}
@@ -3739,8 +3917,14 @@ function openAiSuggest() {
           </div>
         </div>
         <div class="field">
+          <label>Time</label>
+          <div class="segmented" id="ai-time">
+            ${[['0', 'Any'], ['30', '≤ 30 min'], ['15', '⚡ 15 min']].map(([v, l]) => `<button type="button" data-val="${v}" class="${v === '0' ? 'selected' : ''}">${l}</button>`).join('')}
+          </div>
+        </div>
+        <div class="field">
           <label>Anything in particular? <span style="text-transform:none;font-weight:500;">(optional)</span></label>
-          <input type="text" id="ai-request" placeholder="e.g. quick, use the barramundi, no beef">
+          <input type="text" id="ai-request" placeholder="e.g. use the barramundi, no beef">
         </div>
         <button type="button" class="btn-primary" id="ai-go">Suggest 3 meals</button>
         <div id="ai-results"></div>
@@ -3759,7 +3943,7 @@ function openAiSuggest() {
     document.getElementById('ai-to-settings').addEventListener('click', () => { closeModal(); navigateTo('settings'); });
     return;
   }
-  document.querySelectorAll('#ai-mealType button').forEach((btn) => {
+  document.querySelectorAll('#ai-mealType button, #ai-time button').forEach((btn) => {
     btn.addEventListener('click', () => {
       btn.parentElement.querySelectorAll('button').forEach((b) => b.classList.remove('selected'));
       btn.classList.add('selected');
@@ -3773,11 +3957,12 @@ async function runAiSuggest() {
   const results = document.getElementById('ai-results');
   const mealType = document.querySelector('#ai-mealType button.selected')?.dataset.val || 'Dinner';
   const request = document.getElementById('ai-request').value.trim();
+  const maxMinutes = parseInt(document.querySelector('#ai-time button.selected')?.dataset.val || '0', 10);
   goBtn.disabled = true;
   goBtn.textContent = 'Thinking…';
   results.innerHTML = '<p class="recipe-muted ai-wait">Looking through your kitchen…</p>';
 
-  const [outcome, goals] = await Promise.all([requestAiSuggestions(mealType, request), getHealthGoals()]);
+  const [outcome, goals] = await Promise.all([requestAiSuggestions(mealType, request, maxMinutes), getHealthGoals()]);
   if (!document.getElementById('ai-results')) return; // sheet was closed while waiting
   goBtn.disabled = false;
   goBtn.textContent = 'Suggest 3 more';
@@ -4897,9 +5082,10 @@ async function renderPlannerScreen() {
       <span class="plan-meal">${PLAN_MEAL_LABELS[meal]}</span>
       <span class="plan-title">${icon}${escapeHtml(entry.title)}</span>
       <span class="plan-tags">
+        ${entry.cooked ? '<span class="tag kcal-ok">✓ Cooked</span>' : ''}
         ${kcal ? calorieBadgeHtml(kcal, goals) : ''}
-        ${sc && sc.expiring.length ? `<span class="tag kcal-over">Uses ${escapeHtml(sc.expiring[0].name)}</span>` : ''}
-        ${sc && sc.missing.length ? `<span class="tag">Need ${sc.missing.length}</span>` : ''}
+        ${sc && !entry.cooked && sc.expiring.length ? `<span class="tag kcal-over">Uses ${escapeHtml(sc.expiring[0].name)}</span>` : ''}
+        ${sc && !entry.cooked && sc.missing.length ? `<span class="tag">Need ${sc.missing.length}</span>` : ''}
       </span>
     </button>`;
   };
@@ -4933,6 +5119,7 @@ async function renderPlannerScreen() {
         <span class="st-btn-desc">${plannedCount} planned</span>
       </button>
     </div>
+    <label class="plan-ai-toggle"><input type="checkbox" id="plan-quick" ${AppState.planQuickWeeknights ? 'checked' : ''}> ⏱️ Quick weeknights <span class="recipe-muted">(30 min or less, Mon–Fri)</span></label>
     <label class="plan-ai-toggle"><input type="checkbox" id="plan-ai" ${AppState.planUseAi ? 'checked' : ''}> ✨ Include new ideas from Claude <span class="recipe-muted">(uses your API key)</span></label>
     ${plannedCount === 0 ? '<p class="recipe-muted" style="margin:8px 0 0;">Nothing planned yet. Tap <strong>+ Add</strong> on any meal, or let <strong>Fill my week</strong> do it.</p>' : ''}
     ${daysHtml}
@@ -4949,6 +5136,7 @@ function attachPlannerListeners() {
   const todayBtn = document.getElementById('plan-today');
   if (todayBtn) todayBtn.addEventListener('click', () => { AppState.planWeekStart = null; renderRoute(); });
   document.getElementById('plan-ai').addEventListener('change', (e) => { AppState.planUseAi = e.target.checked; });
+  document.getElementById('plan-quick').addEventListener('change', (e) => { AppState.planQuickWeeknights = e.target.checked; });
   document.getElementById('plan-fill').addEventListener('click', fillMyWeek);
   document.getElementById('plan-clear').addEventListener('click', clearPlanWeek);
   document.querySelectorAll('.plan-slot.empty').forEach((btn) => {
@@ -5064,13 +5252,19 @@ async function openPlanEntry(id) {
       <button class="close-btn" id="modal-close">×</button>
     </div>
     <p class="recipe-muted" style="margin-top:0;">${PLAN_MEAL_LABELS[entry.meal]} · ${formatDayLabel(entry.date)}${entry.type === 'leftover' ? ' · leftovers' : ''}</p>
-    ${entry.recipeId ? '<button type="button" class="btn-primary" id="pe-view">View recipe</button>' : ''}
+    ${entry.type === 'recipe' && entry.recipeId ? `<button type="button" class="btn-primary" id="pe-cooked">${entry.cooked ? '✓ Cooked (cook it again?)' : '🍳 I cooked this'}</button>` : ''}
+    ${entry.recipeId ? '<button type="button" class="btn-secondary" id="pe-view">View recipe</button>' : ''}
     <button type="button" class="btn-secondary" id="pe-swap">Swap for something else</button>
     <button type="button" class="btn-danger" id="pe-remove">Remove from plan</button>
   `);
   document.getElementById('modal-close').addEventListener('click', closeModal);
   const view = document.getElementById('pe-view');
   if (view) view.addEventListener('click', () => openRecipeDetail(entry.recipeId));
+  const cooked = document.getElementById('pe-cooked');
+  if (cooked) cooked.addEventListener('click', async () => {
+    const recipe = await dbGet('recipes', entry.recipeId);
+    if (recipe) openCookedThis(recipe, { planEntryId: entry.id, date: localDateString(new Date()), meal: entry.meal });
+  });
   document.getElementById('pe-swap').addEventListener('click', async () => {
     await removePlanEntry(entry.id);
     renderRoute();
@@ -5131,7 +5325,7 @@ async function fillMyWeek() {
     if (!getAiKey()) { showToast('Add your API key in Settings to include new ideas'); return; }
     btn.disabled = true;
     btn.querySelector('.st-btn-title').textContent = '✨ Getting new ideas…';
-    const outcome = await requestAiSuggestions('Dinner', 'These are for a weekly meal plan; make them different from each other.');
+    const outcome = await requestAiSuggestions('Dinner', 'These are for a weekly meal plan; make them different from each other.', AppState.planQuickWeeknights ? QUICK_RECIPE_MINUTES : 0);
     if (outcome.error) { showToast(outcome.error); }
     else {
       const existing = new Set((await dbGetAll('recipes')).map((r) => r.name.toLowerCase()));
@@ -5150,9 +5344,14 @@ async function fillMyWeek() {
   let lastCuisine = null;
   let added = 0;
 
-  const scoreFor = (recipe, mealType) => {
+  const scoreFor = (recipe, mealType, date) => {
     if (!(recipe.mealTypes || []).includes(mealType) && !(mealType !== 'Breakfast' && !(recipe.mealTypes || []).length)) return -Infinity;
+    const weekday = parseLocalDate(date).getDay() % 6 !== 0;
+    const mins = recipeTotalMinutes(recipe);
+    if (AppState.planQuickWeeknights && weekday && mins > QUICK_RECIPE_MINUTES) return -Infinity;
     let score = 0;
+    // Follow the eating style: a strong nudge, not a hard rule, so a week still fills up
+    if (goals.eatingStyle && goals.eatingStyle !== 'balanced') score += recipeSuitsStyle(recipe, goals.eatingStyle) ? 25 : -25;
     if (index.length) {
       const sc = scoreRecipe(recipe, index);
       score += sc.pct;
@@ -5175,7 +5374,7 @@ async function fillMyWeek() {
       const mealType = PLAN_MEAL_LABELS[meal];
       const best = recipes
         .filter((r) => !usedRecipeIds.has(r.id))
-        .map((r) => ({ r, s: scoreFor(r, mealType) }))
+        .map((r) => ({ r, s: scoreFor(r, mealType, date) }))
         .filter((x) => x.s > -Infinity)
         .sort((a, b) => b.s - a.s)[0];
       if (!best) continue;
@@ -5226,15 +5425,15 @@ async function addStarterRecipes() {
    like new. Keeps built-in reference data and the API key (stored separately).
    ============================================================ */
 async function startFresh() {
-  if (!confirm('Start fresh?\n\nThis deletes everything: your kitchen and its history, meal plans, all recipes (including the 30 starter recipes), ratings, favourites and settings.\n\nYou can add the starter recipes back from Settings. Your API key stays.')) return;
+  if (!confirm('Start fresh?\n\nThis deletes everything: your kitchen and its history, meal plans, food diary, shopping list, all recipes (including the 30 starter recipes), ratings, favourites and settings.\n\nYou can add the starter recipes back from Settings. Your API key stays.')) return;
   if (confirm('Download a backup of your current data first? (Recommended)')) await exportKitchenData();
   if (!confirm('Last check: delete everything now?')) return;
 
-  for (const store of ['inventoryItems', 'inventoryHistory', 'mealPlans', 'foodLog', 'batchCookEvents', 'purchaseEvents', 'recipes', 'quickAddTemplates', 'settings']) {
+  for (const store of ['inventoryItems', 'inventoryHistory', 'mealPlans', 'foodLog', 'shoppingList', 'batchCookEvents', 'purchaseEvents', 'recipes', 'quickAddTemplates', 'settings']) {
     await dbClearAndBulkPut(store, []);
   }
   AppState.planWeekStart = null;
-  AppState.recipeFilters = { search: '', cuisine: 'all', favourites: false, quick: false, highProtein: false, freezer: false };
+  AppState.recipeFilters = { search: '', cuisine: 'all', favourites: false, time: 0, highProtein: false, lowCarb: false, keto: false, lowFat: false, freezer: false };
   AppState.activeLocationFilter = 'all';
   await seedIfEmpty();
   await dbPut('settings', { key: 'recipeSeed', version: 0, deletedSeedIds: [], builtInsOff: true });
@@ -5508,11 +5707,16 @@ function openAddFood(date, meal) {
       <button type="button" class="add-food-opt" data-how="recipe"><span>📖</span>A recipe</button>
       <button type="button" class="add-food-opt" data-how="barcode"><span>▦</span>Scan barcode</button>
       <button type="button" class="add-food-opt" data-how="photo"><span>📸</span>Photo of my plate</button>
-      <button type="button" class="add-food-opt wide" data-how="quick"><span>⚡</span>Quick add calories</button>
+      <button type="button" class="add-food-opt" data-how="label"><span>🏷️</span>Packaged meal, drink or shake</button>
+      <button type="button" class="add-food-opt" data-how="cooked"><span>🍳</span>I cooked a recipe</button>
+      <button type="button" class="add-food-opt wide" data-how="quick"><span>⚡</span>Quick add (✨ estimate from a description)</button>
     </div>
   `);
   document.getElementById('modal-close').addEventListener('click', closeModal);
-  const flows = { kitchen: openLogFromKitchen, recipe: openLogRecipe, barcode: openDiaryBarcode, photo: openPlatePhoto, quick: openQuickAdd };
+  const flows = {
+    kitchen: openLogFromKitchen, recipe: openLogRecipe, barcode: openDiaryBarcode, photo: openPlatePhoto, quick: openQuickAdd, label: openLabelScan,
+    cooked: (d, m) => openLogRecipe(d, m, null, null, (recipe) => openCookedThis(recipe, { date: d, meal: m }))
+  };
   document.querySelectorAll('.add-food-opt').forEach((b) => b.addEventListener('click', () => flows[b.dataset.how](date, meal)));
 }
 
@@ -5540,12 +5744,30 @@ function openQuickAdd(date, meal, prefill = {}) {
   openModal(`
     <div class="modal-title-row"><h2>⚡ Quick add</h2><button class="close-btn" id="modal-close">×</button></div>
     ${mealSelectHtml(meal)}
-    <div class="field" style="margin-top:12px;"><label>What was it?</label><input type="text" id="qa-name" placeholder="e.g. Coffee with milk" value="${escapeHtml(prefill.name || '')}"></div>
+    <div class="field" style="margin-top:12px;"><label>What was it? <span style="text-transform:none;font-weight:500;">(say how much)</span></label><input type="text" id="qa-name" placeholder="e.g. 12 oz coffee with skim milk" value="${escapeHtml(prefill.name || '')}"></div>
+    <button type="button" class="btn-secondary" id="qa-estimate" style="margin-top:0;">✨ Estimate calories & macros</button>
+    <p class="recipe-muted" id="qa-note" style="margin:6px 0 8px;"></p>
     ${nutrientFieldsHtml('qa', {})}
     <button type="button" class="btn-primary" id="qa-save">Log it</button>
   `);
   document.getElementById('modal-close').addEventListener('click', closeModal);
   attachMealSelect();
+  document.getElementById('qa-estimate').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const text = document.getElementById('qa-name').value.trim();
+    const note = document.getElementById('qa-note');
+    if (!text) { showToast('Describe what you had first'); return; }
+    if (!getAiKey()) { note.textContent = 'Estimates use Claude: add your API key in Settings → AI suggestions. Or type the numbers in.'; return; }
+    btn.disabled = true;
+    btn.textContent = 'Estimating…';
+    const r = await estimateFoodMacros(text);
+    if (!document.getElementById('qa-estimate')) return;
+    btn.disabled = false;
+    btn.textContent = '✨ Estimate again';
+    if (r.error) { note.textContent = r.error; return; }
+    setNutrientFields('qa', r);
+    note.textContent = `Estimate for ${r.portion}: ${r.assumptions} Check and adjust before logging.`;
+  });
   document.getElementById('qa-save').addEventListener('click', async () => {
     const name = document.getElementById('qa-name').value.trim() || 'Quick add';
     const n = readNutrientFields('qa');
@@ -5581,6 +5803,7 @@ async function openLogFromKitchen(date, meal, preselectId) {
 }
 
 function openLogKitchenItem(date, meal, item) {
+  if (item.recipeId && item.portionCount) return openLogLeftover(date, meal, item);
   const per100 = item.caloriesPer100;
   const eatenUnit = item.caloriesUnit === 'ml' ? 'ml' : 'g';
   const hasQty = item.quantity != null && item.quantity > 0;
@@ -5660,11 +5883,11 @@ function openLogKitchenItem(date, meal, item) {
 }
 
 /* ---- A recipe ---- */
-async function openLogRecipe(date, meal, preselectId, planEntryId) {
+async function openLogRecipe(date, meal, preselectId, planEntryId, onPick) {
   const recipes = (await dbGetAll('recipes')).sort((a, b) => a.name.localeCompare(b.name));
   if (preselectId) { const r = recipes.find((x) => x.id === preselectId); if (r) return openLogRecipeServings(date, meal, r, planEntryId); }
   openModal(`
-    <div class="modal-title-row"><h2>📖 A recipe</h2><button class="close-btn" id="modal-close">×</button></div>
+    <div class="modal-title-row"><h2>${onPick ? '🍳 What did you cook?' : '📖 A recipe'}</h2><button class="close-btn" id="modal-close">×</button></div>
     <div class="field recipe-search" style="margin-bottom:8px;"><input type="search" id="lr-search" placeholder="Search recipes"></div>
     <div class="modal-scroll-area" id="lr-list">
       ${recipes.length ? recipes.map((r) => `
@@ -5680,7 +5903,8 @@ async function openLogRecipe(date, meal, preselectId, planEntryId) {
     document.querySelectorAll('#lr-list .pick-row').forEach((r) => { r.style.display = !q || r.dataset.name.includes(q) ? '' : 'none'; });
   });
   document.querySelectorAll('#lr-list .pick-row').forEach((b) => b.addEventListener('click', () => {
-    openLogRecipeServings(date, meal, recipes.find((r) => r.id === parseInt(b.dataset.recipeId, 10)));
+    const recipe = recipes.find((r) => r.id === parseInt(b.dataset.recipeId, 10));
+    if (onPick) onPick(recipe); else openLogRecipeServings(date, meal, recipe);
   }));
 }
 
@@ -5697,10 +5921,12 @@ function openLogRecipeServings(date, meal, recipe, planEntryId) {
   attachMealSelect();
   const recalc = () => {
     const s = numOrNull(document.getElementById('lrs-servings').value) || 0;
+    const m = recipeMacros(recipe);
     setNutrientFields('lrs', {
-      kcal: recipe.caloriesPerServing ? recipe.caloriesPerServing * s : null,
-      protein: recipe.proteinGramsPerServing ? recipe.proteinGramsPerServing * s : null,
-      carbs: null, fat: null
+      kcal: m.kcal ? m.kcal * s : null,
+      protein: m.protein != null ? m.protein * s : null,
+      carbs: m.carbs != null ? m.carbs * s : null,
+      fat: m.fat != null ? m.fat * s : null
     });
   };
   document.getElementById('lrs-servings').addEventListener('input', recalc);
@@ -5717,6 +5943,15 @@ async function ateThis(planId) {
   const p = await dbGet('mealPlans', planId);
   if (!p) return;
   const meal = p.meal;
+  if (p.type === 'leftover' && p.recipeId) {
+    const portions = (await dbGetAll('inventoryItems')).filter((i) => i.recipeId === p.recipeId && i.portionCount > 0)
+      .sort((a, b) => (a.location === 'leftovers' ? 0 : 1) - (b.location === 'leftovers' ? 0 : 1));
+    if (portions.length) return openLogLeftover(p.date, meal, portions[0], p.id);
+  }
+  if (p.type === 'recipe' && p.recipeId && !p.cooked) {
+    const recipe = await dbGet('recipes', p.recipeId);
+    if (recipe) return openCookedThis(recipe, { planEntryId: p.id, date: p.date, meal });
+  }
   if (p.recipeId) return openLogRecipe(p.date, meal, p.recipeId, p.id);
   if (p.type === 'kitchen' && p.itemId) return openLogFromKitchen(p.date, meal, p.itemId);
   return openQuickAdd(p.date, meal, { name: p.title, source: 'plan', planEntryId: p.id });
@@ -5756,6 +5991,7 @@ async function renderDiaryBarcodeConfirm() {
         ${row.packSize ? `<div class="recipe-muted" style="margin:4px 0 0;">Pack: ${escapeHtml(row.packSize)}</div>` : ''}
       </div>
     </div>
+    ${row.found ? '' : '<button type="button" class="btn-secondary" id="bd-label" style="margin:0 0 10px;">🏷️ Read the label with a photo instead</button>'}
     ${mealSelectHtml(meal)}
     <div class="field" style="margin-top:12px;"><label>Name</label><input type="text" id="bd-name" value="${escapeHtml(row.name)}" placeholder="e.g. Chobani Greek yoghurt"></div>
     <div class="field"><label>How much did you have? (${unit})</label><input type="number" id="bd-amount" min="0" step="any" inputmode="decimal" value="${row.servingSize || 100}"></div>
@@ -5776,6 +6012,8 @@ async function renderDiaryBarcodeConfirm() {
   };
   document.getElementById('bd-amount').addEventListener('input', recalc);
   recalc();
+  const labelBtn = document.getElementById('bd-label');
+  if (labelBtn) labelBtn.addEventListener('click', () => { stopBarcodeCamera(); openLabelScan(BarcodeScan.diary.date, selectedMeal(meal)); });
   const action = document.getElementById('bc-action');
   action.textContent = 'Log it';
   action.disabled = false;
@@ -5805,6 +6043,205 @@ async function saveDiaryBarcode() {
         await logHistory(item.id, 'used', 1, item.location, null, 'Eaten (food diary): used up');
       }
     }
+  }
+  finishLog(name);
+}
+
+/* ---- ✨ Estimate macros from a description (Quick add) ---- */
+function foodEstimateSchema() {
+  return {
+    type: 'object', additionalProperties: false,
+    required: ['name', 'portion', 'kcal', 'protein', 'carbs', 'fat', 'assumptions'],
+    properties: {
+      name: { type: 'string' }, portion: { type: 'string' },
+      kcal: { type: 'number' }, protein: { type: 'number' }, carbs: { type: 'number' }, fat: { type: 'number' },
+      assumptions: { type: 'string' }
+    }
+  };
+}
+
+async function estimateFoodMacros(description) {
+  let Anthropic = null;
+  try {
+    const loaded = await getAnthropicClient();
+    Anthropic = loaded.Anthropic;
+    const response = await loaded.client.beta.messages.create({
+      model: AI_MODEL,
+      max_tokens: 2000,
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+      output_config: { effort: 'low', format: { type: 'json_schema', schema: foodEstimateSchema() } },
+      messages: [{ role: 'user', content: `Estimate the nutrition for what someone in Australia ate or drank: "${description}".
+Use the amount they give (convert oz, cups and sizes such as small/regular/large to metric). If no amount is given, assume one typical serve.
+Return kcal, protein, carbs and fat in grams for the whole amount. name is a short tidy name, portion is the amount in metric (e.g. "355 ml"), assumptions is one short sentence on what you assumed.` }]
+    });
+    if (response.stop_reason === 'refusal') return { error: 'Claude couldn\'t estimate this one. Enter the numbers yourself.' };
+    return JSON.parse(response.content.filter((b) => b.type === 'text').map((b) => b.text).join(''));
+  } catch (err) {
+    if (err instanceof SyntaxError) return { error: 'Claude\'s reply couldn\'t be read. Please try again.' };
+    return { error: describeAiError(err, Anthropic) };
+  }
+}
+
+/* ---- 🏷️ Packaged food & drinks: read the label from a photo ----
+   For ready meals, frozen meals, drinks, protein shakes and protein powder.
+   Barcode scanning is quicker when the product is in Open Food Facts; this
+   covers everything else, and reads serving sizes like "1 scoop (30 g)". */
+const LabelScan = { photos: [], result: null };
+const LABEL_KINDS = ['ready meal', 'frozen meal', 'drink', 'protein shake', 'protein powder', 'snack', 'other'];
+
+function labelSchema() {
+  const nums = {
+    type: 'object', additionalProperties: false, required: ['kcal', 'protein', 'carbs', 'fat'],
+    properties: { kcal: { type: 'number' }, protein: { type: 'number' }, carbs: { type: 'number' }, fat: { type: 'number' } }
+  };
+  return {
+    type: 'object', additionalProperties: false,
+    required: ['found', 'name', 'kind', 'servingDescription', 'servingAmount', 'servingUnit', 'perServing', 'per100', 'fromLabel'],
+    properties: {
+      found: { type: 'boolean' },
+      name: { type: 'string' },
+      kind: { type: 'string', enum: LABEL_KINDS },
+      servingDescription: { type: 'string' },
+      servingAmount: { type: 'number' },
+      servingUnit: { type: 'string', enum: ['g', 'ml'] },
+      perServing: nums,
+      per100: nums,
+      fromLabel: { type: 'boolean' }
+    }
+  };
+}
+
+function openLabelScan(date, meal) {
+  if (!getAiKey()) { showToast('Add your API key in Settings → AI suggestions to read labels'); return; }
+  LabelScan.photos = [];
+  LabelScan.result = null;
+  openModal(`
+    <div class="modal-title-row"><h2>🏷️ Packaged food or drink</h2><button class="close-btn" id="modal-close">×</button></div>
+    ${mealSelectHtml(meal)}
+    <div class="modal-scroll-area" id="ls-body" style="margin-top:12px;">
+      <p class="st-intro">For ready meals, frozen meals, drinks, protein shakes and protein powder. Take a photo of the front, and one of the nutrition panel if you can. Claude reads the label and the serving size.</p>
+      <div class="ps-thumbs" id="ls-thumbs"></div>
+      <p class="ai-error" id="ls-error"></p>
+    </div>
+    <div class="modal-action-bar"><button type="button" class="btn-primary" id="ls-action" disabled>Take a photo first</button></div>
+  `);
+  document.getElementById('modal-sheet').classList.add('tall');
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  attachMealSelect();
+  const drawThumbs = () => {
+    document.getElementById('ls-thumbs').innerHTML = LabelScan.photos.map((p) => `<div class="ps-thumb"><img src="${p.preview}" alt="Label photo"></div>`).join('')
+      + (LabelScan.photos.length < 3 ? `<label class="ps-add">📷<span>${LabelScan.photos.length ? 'Add the nutrition panel' : 'Take photo'}</span><input type="file" id="ls-file" accept="image/*" capture="environment" hidden></label>` : '');
+    const input = document.getElementById('ls-file');
+    if (input) input.addEventListener('change', async (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      try { LabelScan.photos.push(await photoToBase64Jpeg(f)); } catch (err) { showToast(err.message); return; }
+      drawThumbs();
+      const btn = document.getElementById('ls-action');
+      btn.disabled = false;
+      btn.textContent = 'Read the label';
+    });
+  };
+  drawThumbs();
+  document.getElementById('ls-action').addEventListener('click', () => (LabelScan.result ? saveLabelScan(date, meal) : readLabel(date, meal)));
+}
+
+async function readLabel(date, meal) {
+  const btn = document.getElementById('ls-action');
+  btn.disabled = true;
+  btn.textContent = 'Reading the label…';
+  let Anthropic = null;
+  let error = null;
+  try {
+    const loaded = await getAnthropicClient();
+    Anthropic = loaded.Anthropic;
+    const response = await loaded.client.beta.messages.create({
+      model: AI_MODEL,
+      max_tokens: 4000,
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+      output_config: { effort: 'medium', format: { type: 'json_schema', schema: labelSchema() } },
+      messages: [{ role: 'user', content: [
+        ...LabelScan.photos.map((p) => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: p.data } })),
+        { type: 'text', text: `These photos show one packaged food or drink (front of pack and/or nutrition information panel), probably Australian.
+Set found to false if there is no food or drink product in the photos.
+name: brand and product, short. servingDescription: the serving size as printed, e.g. "1 scoop (30 g)", "1 bottle (500 ml)", "1 meal (350 g)". servingAmount and servingUnit: that serving in g or ml.
+perServing and per100: kcal, protein, carbs (total carbohydrate) and fat in grams. Australian panels give energy in kJ: divide by 4.184 for kcal.
+For protein powder, the serving is the powder alone (made with water) unless the label says otherwise.
+If there is no readable nutrition panel, estimate typical values for this product, set fromLabel to false, and fill per100 from your estimate.` }
+      ] }]
+    });
+    if (response.stop_reason === 'refusal') error = 'Claude couldn\'t read this photo. Try another, or use Quick add.';
+    else {
+      const r = JSON.parse(response.content.filter((b) => b.type === 'text').map((b) => b.text).join(''));
+      if (!r.found) error = 'No food or drink label was recognised. Try a closer, sharper photo of the label.';
+      else LabelScan.result = r;
+    }
+  } catch (err) {
+    error = err instanceof SyntaxError ? 'Claude\'s reply couldn\'t be read. Please try again.' : describeAiError(err, Anthropic);
+  }
+  if (!document.getElementById('ls-body')) return;
+  if (error) {
+    document.getElementById('ls-error').textContent = error;
+    btn.disabled = false;
+    btn.textContent = 'Try again';
+    return;
+  }
+  renderLabelConfirm();
+}
+
+function renderLabelConfirm() {
+  const r = LabelScan.result;
+  const kitchenLoc = /frozen/.test(r.kind) ? 'freezer' : /ready meal|drink|shake/.test(r.kind) ? 'fridge' : 'pantry';
+  document.getElementById('ls-body').innerHTML = `
+    <div class="ps-thumbs" style="margin-bottom:10px;">${LabelScan.photos.map((p) => `<div class="ps-thumb"><img src="${p.preview}" alt=""></div>`).join('')}</div>
+    <div class="field-row" style="flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+      <span class="tag">${escapeHtml(r.kind)}</span>
+      ${r.fromLabel ? '<span class="tag kcal-ok">Read from the label</span>' : '<span class="tag kcal-over">No panel found: estimated</span>'}
+    </div>
+    <div class="field"><label>Name</label><input type="text" id="ls-name" value="${escapeHtml(r.name)}"></div>
+    <div class="field"><label>How many serves? <span style="text-transform:none;font-weight:500;">(1 serve = ${escapeHtml(r.servingDescription)})</span></label>
+      <input type="number" id="ls-serves" min="0" step="0.25" inputmode="decimal" value="1"></div>
+    ${nutrientFieldsHtml('ls', {})}
+    <label class="plan-ai-toggle"><input type="checkbox" id="ls-kitchen"> Also add to my kitchen
+      <select id="ls-loc" class="ps-unit" style="margin-left:6px;">${['pantry', 'fridge', 'freezer'].map((l) => `<option value="${l}" ${l === kitchenLoc ? 'selected' : ''}>${LOCATION_LABELS[l]}</option>`).join('')}</select></label>
+  `;
+  const recalc = () => {
+    const n = numOrNull(document.getElementById('ls-serves').value) || 0;
+    const p = r.perServing;
+    setNutrientFields('ls', { kcal: p.kcal * n, protein: p.protein * n, carbs: p.carbs * n, fat: p.fat * n });
+  };
+  document.getElementById('ls-serves').addEventListener('input', recalc);
+  recalc();
+  const btn = document.getElementById('ls-action');
+  btn.disabled = false;
+  btn.textContent = 'Log it';
+}
+
+async function saveLabelScan(date, meal) {
+  const r = LabelScan.result;
+  const name = document.getElementById('ls-name').value.trim() || r.name;
+  const n = readNutrientFields('ls');
+  if (!n.kcal) { showToast('Enter the calories'); return; }
+  const serves = numOrNull(document.getElementById('ls-serves').value);
+  await addLogEntry({ date, meal: selectedMeal(meal), name, amount: serves, amountUnit: 'serving', ...n, source: 'label' });
+  if (document.getElementById('ls-kitchen').checked) {
+    const location = document.getElementById('ls-loc').value;
+    const now = new Date().toISOString();
+    const hasPer100 = r.per100 && r.per100.kcal > 0;
+    const id = await dbPut('inventoryItems', {
+      name, quantity: null, unit: 'each', portionCount: null, portionSize: null, location, subLocation: null,
+      states: location === 'freezer' ? ['Frozen'] : ['Fresh'], category: /powder|snack/.test(r.kind) ? 'Snacks & Treats' : /drink|shake/.test(r.kind) ? 'Other' : 'Ready Meals',
+      isStaple: false, purchaseDate: null, expiryDate: null, useByOverrideDays: null, cost: null,
+      notes: `Serve: ${r.servingDescription}`, freezerFriendlyRating: null, linkedPurchaseEventId: null,
+      caloriesPer100: hasPer100 ? Math.round(r.per100.kcal) : null,
+      caloriesUnit: hasPer100 ? r.servingUnit : null,
+      caloriesSource: hasPer100 ? (r.fromLabel ? 'label' : 'estimated') : null,
+      ...(hasPer100 ? macrosFrom({ proteinPer100: r.per100.protein, carbsPer100: r.per100.carbs, fatPer100: r.per100.fat }) : {}),
+      runningLow: false, createdAt: now, updatedAt: now
+    });
+    await logHistory(id, 'created', null, null, location, 'Added from a label photo');
   }
   finishLog(name);
 }
@@ -5933,6 +6370,590 @@ async function savePlate(date, meal) {
 }
 
 /* ============================================================
+   I COOKED THIS
+   Say how many portions you made, how many were eaten, and how many
+   went into the fridge or freezer. Ingredients come out of the kitchen,
+   your portion goes in the food diary, and the rest become leftover
+   portions that can be planned or logged later.
+   ============================================================ */
+const LEFTOVER_FRIDGE_DAYS = 3;
+const LEFTOVER_FREEZER_DAYS = 90;
+
+// How much of a kitchen item a recipe ingredient uses, in the item's own unit (null when it can't tell)
+function ingredientUseInItemUnit(ing, item, scale) {
+  if (!ing.quantity || item.quantity == null) return null;
+  const qty = ing.quantity * scale;
+  const direct = convertQty(qty, ing.unit || 'each', item.unit || 'each');
+  if (direct != null) return Math.round(direct * 1000) / 1000;
+  if (ing.unit === 'can' && item.unit === 'can') return qty;
+  return null;
+}
+
+async function openCookedThis(recipe, { planEntryId = null, date = null, meal = null } = {}) {
+  const [settings, items] = await Promise.all([getPlanSettings(), dbGetAll('inventoryItems')]);
+  const logDate = date || localDateString(new Date());
+  const logMeal = meal || defaultLogMeal();
+  const made = recipe.servings || 4;
+  const eaten = Math.min(settings.householdSize || 2, made);
+  const index = buildInventoryIndex(items);
+  const scaleFor = (portions) => (recipe.servings ? portions / recipe.servings : 1);
+  const uses = (recipe.ingredients || [])
+    .filter((ing) => !ing.optional && !ing.assumedStaple)
+    .map((ing) => ({ ing, hit: findInventoryMatch(ing, index) }))
+    .filter((u) => u.hit)
+    .map((u) => ({ ing: u.ing, item: u.hit.item }));
+  const macros = recipeMacros(recipe);
+
+  const numField = (id, label, value, hint) => `
+    <div class="field cook-num"><label>${label}</label><input type="number" id="${id}" min="0" step="1" inputmode="numeric" value="${value}">${hint ? `<span class="cook-hint">${hint}</span>` : ''}</div>`;
+
+  openModal(`
+    <div class="modal-title-row"><h2>🍳 I cooked this</h2><button class="close-btn" id="modal-close">×</button></div>
+    <div class="modal-scroll-area">
+      <p class="recipe-muted" style="margin-top:0;">${escapeHtml(recipe.name)}</p>
+      <div class="field-row cook-split">
+        ${numField('ck-made', 'Portions made', made)}
+        ${numField('ck-eaten', 'Eaten now', eaten, 'everyone')}
+      </div>
+      <div class="field-row cook-split">
+        ${numField('ck-fridge', '🧊 Fridge', made - eaten, `eat within ${LEFTOVER_FRIDGE_DAYS} days`)}
+        ${numField('ck-freezer', '❄️ Freezer', 0, 'keeps ~3 months')}
+      </div>
+      <p class="cook-check" id="ck-check"></p>
+
+      <div class="cook-box">
+        <label class="plan-ai-toggle" style="margin:0;"><input type="checkbox" id="ck-log" checked> Add my portion to the food diary</label>
+        <div id="ck-log-fields">
+          <div class="field cook-num" style="margin:8px 0;"><label>My portions · ${escapeHtml(formatDayLabel(logDate))}</label><input type="number" id="ck-mine" min="0" step="0.5" inputmode="decimal" value="1"></div>
+          ${mealSelectHtml(logMeal)}
+          <p class="recipe-muted" id="ck-mine-kcal" style="margin:4px 0 0;"></p>
+        </div>
+      </div>
+
+      <div class="st-group-title">Take out of my kitchen</div>
+      ${uses.length ? uses.map((u, i) => {
+        const has = u.item.quantity != null && u.item.quantity > 0;
+        return `
+        <div class="cook-use" data-i="${i}">
+          <label class="plan-ai-toggle" style="margin:0;"><input type="checkbox" class="ck-use-on" ${has ? 'checked' : ''}>
+            <span><strong>${escapeHtml(u.item.name)}</strong> <span class="recipe-muted">(${escapeHtml(formatItemQuantity(u.item))}${u.ing.quantity ? `; recipe: ${escapeHtml(formatIngredientQuantity(u.ing))}` : ''})</span></span>
+          </label>
+          ${has ? `<div class="cook-use-amt">Use <input type="number" class="ck-use-qty lki-use" min="0" step="any" inputmode="decimal" placeholder="?"> ${escapeHtml(u.item.unit === 'each' ? '' : u.item.unit)}</div>`
+                : '<div class="cook-use-amt recipe-muted">Ticked = used it all up</div>'}
+        </div>`;
+      }).join('') : '<p class="recipe-muted">Nothing from this recipe matched your kitchen.</p>'}
+    </div>
+    <div class="modal-action-bar"><button type="button" class="btn-primary" id="ck-save">Save</button></div>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  attachMealSelect();
+
+  const val = (id) => Math.max(0, parseFloat(document.getElementById(id).value) || 0);
+  const fillUses = () => {
+    const scale = scaleFor(val('ck-made'));
+    document.querySelectorAll('.cook-use').forEach((el) => {
+      const u = uses[parseInt(el.dataset.i, 10)];
+      const input = el.querySelector('.ck-use-qty');
+      if (!input || input.dataset.touched) return;
+      const amt = ingredientUseInItemUnit(u.ing, u.item, scale);
+      input.value = amt == null ? '' : Math.min(amt, u.item.quantity);
+    });
+  };
+  const check = () => {
+    const made = val('ck-made');
+    const total = val('ck-eaten') + val('ck-fridge') + val('ck-freezer');
+    const el = document.getElementById('ck-check');
+    el.className = 'cook-check' + (total === made ? ' ok' : ' warn');
+    el.textContent = total === made
+      ? `✓ ${made} made = ${val('ck-eaten')} eaten + ${val('ck-fridge')} fridge + ${val('ck-freezer')} freezer`
+      : `${made} made, but ${total} accounted for${total < made ? ` (${made - total} not kept)` : ''}`;
+    const mine = val('ck-mine');
+    document.getElementById('ck-mine-kcal').textContent = macros.kcal
+      ? `≈ ${Math.round(macros.kcal * mine)} kcal${macros.protein != null ? ` · ${Math.round(macros.protein * mine)} g protein` : ''}`
+      : 'This recipe has no calories yet; you can edit the diary entry after.';
+  };
+  // Changing what's eaten or made moves the difference into the fridge
+  const rebalance = () => {
+    document.getElementById('ck-fridge').value = Math.max(0, val('ck-made') - val('ck-eaten') - val('ck-freezer'));
+    check();
+  };
+  document.getElementById('ck-made').addEventListener('input', () => { rebalance(); fillUses(); });
+  document.getElementById('ck-eaten').addEventListener('input', rebalance);
+  document.getElementById('ck-freezer').addEventListener('input', rebalance);
+  document.getElementById('ck-fridge').addEventListener('input', check);
+  document.getElementById('ck-mine').addEventListener('input', check);
+  document.getElementById('ck-log').addEventListener('change', (e) => { document.getElementById('ck-log-fields').style.display = e.target.checked ? '' : 'none'; });
+  document.querySelectorAll('.ck-use-qty').forEach((i) => i.addEventListener('input', () => { i.dataset.touched = '1'; }));
+  fillUses();
+  check();
+
+  document.getElementById('ck-save').addEventListener('click', async (ev) => {
+    const btn = ev.currentTarget;
+    btn.disabled = true;
+    const now = new Date().toISOString();
+    const today = localDateString(new Date());
+    const fridge = val('ck-fridge');
+    const freezer = val('ck-freezer');
+    const note = `Cooked ${recipe.name}`;
+
+    // 1. Ingredients out of the kitchen
+    for (const el of document.querySelectorAll('.cook-use')) {
+      if (!el.querySelector('.ck-use-on').checked) continue;
+      const u = uses[parseInt(el.dataset.i, 10)];
+      const fresh = await dbGet('inventoryItems', u.item.id);
+      if (!fresh) continue;
+      const qtyInput = el.querySelector('.ck-use-qty');
+      if (qtyInput) {
+        const use = numOrNull(qtyInput.value);
+        if (!use) continue;
+        const remaining = Math.round((fresh.quantity - use) * 1000) / 1000;
+        if (remaining <= 0) {
+          await dbDelete('inventoryItems', fresh.id);
+          await logHistory(fresh.id, 'used', use, fresh.location, null, `${note}: used up`);
+        } else {
+          fresh.quantity = remaining;
+          fresh.updatedAt = now;
+          await dbPut('inventoryItems', fresh);
+          await logHistory(fresh.id, 'used', use, fresh.location, fresh.location, note);
+        }
+      } else {
+        await dbDelete('inventoryItems', fresh.id);
+        await logHistory(fresh.id, 'used', null, fresh.location, null, `${note}: used up`);
+      }
+    }
+
+    // 2. My portion in the food diary
+    const mine = val('ck-mine');
+    if (document.getElementById('ck-log').checked && mine > 0) {
+      await addLogEntry({
+        date: logDate, meal: selectedMeal(logMeal), name: recipe.name, amount: mine, amountUnit: 'serving',
+        kcal: (macros.kcal || 0) * mine,
+        protein: macros.protein != null ? macros.protein * mine : null,
+        carbs: macros.carbs != null ? macros.carbs * mine : null,
+        fat: macros.fat != null ? macros.fat * mine : null,
+        source: 'cooked', recipeId: recipe.id, planEntryId
+      });
+    }
+
+    // 3. Leftover portions
+    const leftover = async (count, location, states, days) => {
+      if (!count) return;
+      const id = await dbPut('inventoryItems', {
+        name: recipe.name, quantity: null, unit: 'each', portionCount: count, portionSize: null,
+        location, subLocation: null, states, category: 'Ready Meals', isStaple: false,
+        purchaseDate: today, expiryDate: localDateString(addDays(new Date(), days)), useByOverrideDays: null,
+        cost: null, notes: `Cooked ${formatDayLabel(today).replace(/^Today · /, '')}`, freezerFriendlyRating: null,
+        linkedPurchaseEventId: null, recipeId: recipe.id, runningLow: false, createdAt: now, updatedAt: now
+      });
+      await logHistory(id, 'cooked', count, null, location, `${count} portion${count === 1 ? '' : 's'} of ${recipe.name}`);
+    };
+    await leftover(fridge, 'leftovers', ['Cooked', 'Leftover'], LEFTOVER_FRIDGE_DAYS);
+    await leftover(freezer, 'freezer', ['Cooked', 'Frozen'], LEFTOVER_FREEZER_DAYS);
+
+    // 4. A record of the cook, and tick it off the plan
+    await dbPut('batchCookEvents', { recipeId: recipe.id, recipeName: recipe.name, date: today, portionsMade: val('ck-made'), eaten: val('ck-eaten'), fridge, freezer, createdAt: now });
+    if (planEntryId) {
+      const entry = await dbGet('mealPlans', planEntryId);
+      if (entry) { entry.cooked = true; await dbPut('mealPlans', entry); }
+    }
+
+    closeModal();
+    const kept = [fridge ? `${fridge} in the fridge` : '', freezer ? `${freezer} in the freezer` : ''].filter(Boolean).join(', ');
+    showToast(`Cooked ${recipe.name}${kept ? `: ${kept}` : ''}`);
+    renderRoute();
+  });
+}
+
+/* ---- Eating leftover portions ---- */
+async function openLogLeftover(date, meal, item, planEntryId = null) {
+  const recipe = item.recipeId ? await dbGet('recipes', item.recipeId) : null;
+  const macros = recipe ? recipeMacros(recipe) : { kcal: null, protein: null, carbs: null, fat: null };
+  openModal(`
+    <div class="modal-title-row"><h2>🍱 ${escapeHtml(item.name)}</h2><button class="close-btn" id="modal-close">×</button></div>
+    ${mealSelectHtml(meal)}
+    <p class="recipe-muted" style="margin:10px 0 0;">${escapeHtml(LOCATION_LABELS[item.location])}: ${escapeHtml(formatItemQuantity(item))}${item.location === 'freezer' ? '. Defrost it in the fridge first.' : ''}</p>
+    <div class="field" style="margin-top:12px;"><label>Portions</label><input type="number" id="lo-n" min="0" step="0.5" inputmode="decimal" value="1"></div>
+    ${nutrientFieldsHtml('lo', {})}
+    <p class="recipe-muted" style="margin-top:0;">${macros.kcal ? 'From the recipe\'s per-serving figures (approximate).' : 'No calories saved for this recipe: enter them above.'}</p>
+    <label class="plan-ai-toggle"><input type="checkbox" id="lo-takeout" checked> Take the portions out of my kitchen</label>
+    <button type="button" class="btn-primary" id="lo-save">Log it</button>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  attachMealSelect();
+  const recalc = () => {
+    const n = numOrNull(document.getElementById('lo-n').value) || 0;
+    if (!macros.kcal) return;
+    setNutrientFields('lo', {
+      kcal: macros.kcal * n,
+      protein: macros.protein != null ? macros.protein * n : null,
+      carbs: macros.carbs != null ? macros.carbs * n : null,
+      fat: macros.fat != null ? macros.fat * n : null
+    });
+  };
+  document.getElementById('lo-n').addEventListener('input', recalc);
+  recalc();
+  document.getElementById('lo-save').addEventListener('click', async () => {
+    const n = numOrNull(document.getElementById('lo-n').value) || 0;
+    await addLogEntry({ date, meal: selectedMeal(meal), name: item.name, amount: n, amountUnit: 'serving', ...readNutrientFields('lo'), source: 'leftover', itemId: item.id, recipeId: item.recipeId || null, planEntryId });
+    if (document.getElementById('lo-takeout').checked && n > 0) {
+      const fresh = await dbGet('inventoryItems', item.id);
+      if (fresh) {
+        const left = (fresh.portionCount || 0) - n;
+        if (left <= 0) {
+          await dbDelete('inventoryItems', fresh.id);
+          await logHistory(fresh.id, 'used', n, fresh.location, null, 'Eaten (food diary): all gone');
+        } else {
+          fresh.portionCount = left;
+          fresh.updatedAt = new Date().toISOString();
+          await dbPut('inventoryItems', fresh);
+          await logHistory(fresh.id, 'used', n, fresh.location, fresh.location, `Eaten (food diary): ${left} left`);
+        }
+      }
+    }
+    finishLog(item.name);
+  });
+}
+
+/* ============================================================
+   SHOPPING LIST
+   One list: what the meal plan needs that isn't in the kitchen, things
+   marked running low, and anything typed in. Ticked items go into the
+   kitchen in one go.
+   Entry: { id, name, quantity, unit, category, checked, source ('plan'|'low'|'manual'),
+            note, itemId?, createdAt }
+   ============================================================ */
+// Units that convert into each other; anything else only adds up with the same unit
+const UNIT_BASE = { g: ['g', 1], kg: ['g', 1000], ml: ['ml', 1], L: ['ml', 1000] };
+
+function convertQty(qty, from, to) {
+  if (qty == null) return null;
+  if ((from || 'each') === (to || 'each')) return qty;
+  const a = UNIT_BASE[from];
+  const b = UNIT_BASE[to];
+  if (a && b && a[0] === b[0]) return (qty * a[1]) / b[1];
+  return null;
+}
+
+function shoppingQtyText(e) {
+  return e.quantity ? formatIngredientQuantity({ quantity: e.quantity, unit: e.unit || '' }) : '';
+}
+
+// Adds to the list, merging with an unticked entry of the same name
+async function addToShoppingList(entry) {
+  const all = await dbGetAll('shoppingList');
+  const same = all.find((e) => !e.checked && e.name.toLowerCase() === entry.name.toLowerCase());
+  if (same) {
+    const add = convertQty(entry.quantity, entry.unit, same.unit);
+    if (same.quantity != null && add != null) same.quantity = Math.round((same.quantity + add) * 100) / 100;
+    else if (same.quantity == null && entry.quantity != null) { same.quantity = entry.quantity; same.unit = entry.unit; }
+    if (entry.note && !(same.note || '').includes(entry.note)) same.note = [same.note, entry.note].filter(Boolean).join(', ');
+    if (entry.itemId) same.itemId = entry.itemId;
+    return dbPut('shoppingList', same);
+  }
+  return dbPut('shoppingList', {
+    quantity: null, unit: '', category: 'Other', note: '', itemId: null, source: 'manual',
+    ...entry, checked: false, createdAt: new Date().toISOString()
+  });
+}
+
+async function markRunningLow(item) {
+  const fresh = await dbGet('inventoryItems', item.id);
+  if (!fresh) return;
+  if (!fresh.runningLow) {
+    fresh.runningLow = true;
+    fresh.updatedAt = new Date().toISOString();
+    await dbPut('inventoryItems', fresh);
+  }
+  const onList = (await dbGetAll('shoppingList')).some((e) => !e.checked && (e.itemId === fresh.id || e.name.toLowerCase() === fresh.name.toLowerCase()));
+  if (!onList) await addToShoppingList({ name: fresh.name, category: fresh.category || 'Other', source: 'low', note: 'running low', itemId: fresh.id });
+  showToast(`${fresh.name} is on your shopping list`);
+}
+
+// Where something bought probably goes, and the state it starts in
+function guessKitchenPlace(name, category) {
+  const n = name.toLowerCase();
+  if (/frozen|ice cream/.test(n) || category === 'Ready Meals') return { location: 'freezer', states: ['Frozen'] };
+  if (['Protein', 'Vegetables', 'Dairy & Refrigerated'].includes(category) || /milk|yoghurt|yogurt|cheese|butter|cream|egg/.test(n)) {
+    return { location: 'fridge', states: category === 'Protein' ? ['Fresh', 'Raw'] : ['Fresh'] };
+  }
+  if (category === 'Fruit') return { location: 'fridge', states: ['Fresh'] };
+  return { location: 'pantry', states: ['Raw'] };
+}
+
+/* ---- What the meal plan needs ---- */
+async function shoppingNeedsFromPlan() {
+  const today = localDateString(new Date());
+  const dates = Array.from({ length: 7 }, (_, i) => localDateString(addDays(parseLocalDate(today), i)));
+  const [entries, recipes, items, list] = await Promise.all([getPlanEntries(dates), dbGetAll('recipes'), dbGetAll('inventoryItems'), dbGetAll('shoppingList')]);
+  const recipesById = new Map(recipes.map((r) => [r.id, r]));
+  const index = buildInventoryIndex(items);
+  const onList = new Set(list.filter((e) => !e.checked).map((e) => e.name.toLowerCase()));
+  const needs = new Map();
+  // Each planned recipe is cooked once; leftovers come from the same cook
+  for (const e of entries.filter((x) => x.type === 'recipe' && x.recipeId && !x.cooked)) {
+    const recipe = recipesById.get(e.recipeId);
+    if (!recipe) continue;
+    for (const ing of recipe.ingredients || []) {
+      if (ing.optional || ing.assumedStaple || findInventoryMatch(ing, index)) continue;
+      const key = ing.name.toLowerCase();
+      const qty = ing.quantity || null;
+      const unit = qty ? ing.unit : '';
+      const cur = needs.get(key);
+      if (!cur) {
+        needs.set(key, { name: ing.name, quantity: qty, unit, category: ing.category || 'Other', recipes: [recipe.name], onList: onList.has(key) });
+      } else {
+        const add = convertQty(qty, unit, cur.unit);
+        if (cur.quantity != null && add != null) cur.quantity = Math.round((cur.quantity + add) * 100) / 100;
+        else if (qty != null) cur.quantity = null; // different units: leave the amount to the shopper
+        if (!cur.recipes.includes(recipe.name)) cur.recipes.push(recipe.name);
+      }
+    }
+  }
+  return [...needs.values()].sort((a, b) => CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category) || a.name.localeCompare(b.name));
+}
+
+async function openAddFromPlan() {
+  const needs = await shoppingNeedsFromPlan();
+  openModal(`
+    <div class="modal-title-row"><h2>📅 From my meal plan</h2><button class="close-btn" id="modal-close">×</button></div>
+    <p class="recipe-muted" style="margin-top:0;">What the next 7 days of planned meals need that isn't in your kitchen. Untick anything you don't need.</p>
+    <div class="modal-scroll-area" id="sp-list">
+      ${needs.length ? needs.map((n, i) => `
+        <div class="st-row ${n.onList ? 'have' : 'ticked'}" data-i="${i}">
+          <button type="button" class="st-tick" ${n.onList ? 'disabled' : ''}>
+            <span class="st-box">✓</span>
+            <span class="st-name">${escapeHtml(n.name)}${n.quantity ? ` <span class="recipe-muted">${escapeHtml(shoppingQtyText(n))}</span>` : ''}</span>
+            ${n.onList ? '<span class="st-have">On list</span>' : ''}
+          </button>
+          <div class="sp-for">For ${escapeHtml(n.recipes.join(', '))}</div>
+        </div>`).join('') : `
+        <div class="empty-state"><div class="glyph">🛒</div><h3>Nothing to buy</h3>
+        <p>Either nothing is planned for the next 7 days, or your kitchen has everything the planned meals need.</p></div>`}
+    </div>
+    ${needs.some((n) => !n.onList) ? '<div class="modal-action-bar"><button type="button" class="btn-primary" id="sp-add">Add to shopping list</button></div>' : ''}
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  const picked = new Set(needs.map((n, i) => (n.onList ? null : i)).filter((i) => i !== null));
+  const addBtn = document.getElementById('sp-add');
+  const refresh = () => { if (addBtn) { addBtn.textContent = picked.size ? `Add ${picked.size} to shopping list` : 'Tick items to add'; addBtn.disabled = !picked.size; } };
+  document.querySelectorAll('#sp-list .st-row').forEach((row) => {
+    const i = parseInt(row.dataset.i, 10);
+    row.querySelector('.st-tick').addEventListener('click', () => {
+      if (picked.has(i)) picked.delete(i); else picked.add(i);
+      row.classList.toggle('ticked', picked.has(i));
+      row.querySelector('.st-box').textContent = picked.has(i) ? '✓' : '';
+      refresh();
+    });
+  });
+  refresh();
+  if (addBtn) addBtn.addEventListener('click', async () => {
+    for (const i of picked) {
+      const n = needs[i];
+      await addToShoppingList({ name: n.name, quantity: n.quantity, unit: n.unit, category: n.category, source: 'plan', note: `for ${n.recipes.join(', ')}` });
+    }
+    closeModal();
+    showToast(`Added ${picked.size} item${picked.size === 1 ? '' : 's'}`);
+    renderRoute();
+  });
+}
+
+/* ---- Shopping screen ---- */
+async function renderShoppingScreen() {
+  const [list, items] = await Promise.all([dbGetAll('shoppingList'), dbGetAll('inventoryItems')]);
+  const onListIds = new Set(list.filter((e) => !e.checked && e.itemId).map((e) => e.itemId));
+  const onListNames = new Set(list.filter((e) => !e.checked).map((e) => e.name.toLowerCase()));
+  const low = items.filter((i) => i.runningLow && !onListIds.has(i.id) && !onListNames.has(i.name.toLowerCase()));
+  const ticked = list.filter((e) => e.checked).length;
+  const groups = CATEGORIES.map((c) => ({ c, rows: list.filter((e) => (CATEGORIES.includes(e.category) ? e.category : 'Other') === c) }))
+    .filter((g) => g.rows.length);
+
+  const rowHtml = (e) => `
+    <div class="shop-row ${e.checked ? 'done' : ''}" data-id="${e.id}">
+      <button type="button" class="shop-tick" aria-label="${e.checked ? 'Untick' : 'Tick'} ${escapeHtml(e.name)}"><span class="st-box">${e.checked ? '✓' : ''}</span></button>
+      <div class="shop-main">
+        <span class="shop-name">${escapeHtml(e.name)}${e.quantity ? ` <span class="shop-qty">${escapeHtml(shoppingQtyText(e))}</span>` : ''}</span>
+        ${e.note ? `<span class="shop-note">${escapeHtml(e.note)}</span>` : ''}
+      </div>
+      <button type="button" class="shop-del" aria-label="Remove ${escapeHtml(e.name)}">×</button>
+    </div>`;
+
+  return `
+    <div class="recipe-online-row">
+      <button type="button" class="stocktake-btn" id="shop-from-plan">
+        <span class="st-btn-title">📅 From my meal plan</span>
+        <span class="st-btn-desc">What planned meals still need</span>
+      </button>
+      <button type="button" class="stocktake-btn alt" id="shop-share" ${list.length ? '' : 'disabled'}>
+        <span class="st-btn-title">📤 Share list</span>
+        <span class="st-btn-desc">Text it or copy it</span>
+      </button>
+    </div>
+    <div class="st-add shop-add">
+      <input type="text" id="shop-new" placeholder="Add an item, e.g. 1 kg basmati rice" enterkeyhint="done">
+      <button type="button" class="btn-secondary" id="shop-new-add">+ Add</button>
+    </div>
+    ${low.length ? `
+      <div class="st-group-title">Running low in your kitchen</div>
+      <div class="state-chip-grid" style="margin-bottom:10px;">${low.map((i) => `<button type="button" class="state-chip shop-low" data-item-id="${i.id}">+ ${escapeHtml(i.name)}</button>`).join('')}</div>` : ''}
+    ${list.length ? groups.map((g) => `
+      <div class="st-group-title">${escapeHtml(g.c)}</div>
+      <div class="shop-group">${g.rows.sort((a, b) => a.checked - b.checked || a.name.localeCompare(b.name)).map(rowHtml).join('')}</div>`).join('') : `
+      <div class="empty-state">
+        <div class="glyph">🛒</div>
+        <h3>Your shopping list is empty</h3>
+        <p>Tap <strong>From my meal plan</strong> to add what this week's meals need, type items above, or mark kitchen items as <strong>running low</strong>.</p>
+      </div>`}
+    ${list.length ? `
+      <div class="shop-actions">
+        <button type="button" class="btn-primary" id="shop-to-kitchen" ${ticked ? '' : 'disabled'}>${ticked ? `🧺 Put ${ticked} ticked item${ticked === 1 ? '' : 's'} in my kitchen` : 'Tick items as you shop'}</button>
+        <div class="field-row" style="gap:8px;">
+          <button type="button" class="btn-secondary" id="shop-clear-ticked" ${ticked ? '' : 'disabled'}>Remove ticked</button>
+          <button type="button" class="btn-secondary" id="shop-clear-all">Clear list</button>
+        </div>
+      </div>` : ''}
+  `;
+}
+
+function attachShoppingListeners() {
+  document.getElementById('shop-from-plan').addEventListener('click', openAddFromPlan);
+  document.getElementById('shop-share').addEventListener('click', shareShoppingList);
+  const input = document.getElementById('shop-new');
+  const add = async () => {
+    const text = input.value.trim();
+    if (!text) { input.focus(); return; }
+    AppState.recipes = AppState.recipes && AppState.recipes.length ? AppState.recipes : await dbGetAll('recipes');
+    const ing = parseIngredientLine(text, [], buildKnownIngredientLookup(null));
+    if (!ing) return;
+    await addToShoppingList({ name: ing.name.charAt(0).toUpperCase() + ing.name.slice(1), quantity: ing.quantity, unit: ing.unit, category: ing.category, source: 'manual' });
+    await renderRoute();
+    const again = document.getElementById('shop-new');
+    if (again) again.focus();
+  };
+  document.getElementById('shop-new-add').addEventListener('click', add);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') add(); });
+  document.querySelectorAll('.shop-low').forEach((b) => b.addEventListener('click', async () => {
+    const item = await dbGet('inventoryItems', parseInt(b.dataset.itemId, 10));
+    if (item) await markRunningLow(item);
+    renderRoute();
+  }));
+  document.querySelectorAll('.shop-row').forEach((row) => {
+    const id = parseInt(row.dataset.id, 10);
+    row.querySelector('.shop-tick').addEventListener('click', async () => {
+      const e = await dbGet('shoppingList', id);
+      if (!e) return;
+      e.checked = !e.checked;
+      await dbPut('shoppingList', e);
+      renderRoute();
+    });
+    row.querySelector('.shop-del').addEventListener('click', async () => {
+      await dbDelete('shoppingList', id);
+      renderRoute();
+    });
+  });
+  const toKitchen = document.getElementById('shop-to-kitchen');
+  if (toKitchen) toKitchen.addEventListener('click', openShoppingToKitchen);
+  const clearTicked = document.getElementById('shop-clear-ticked');
+  if (clearTicked) clearTicked.addEventListener('click', async () => {
+    for (const e of (await dbGetAll('shoppingList')).filter((x) => x.checked)) await dbDelete('shoppingList', e.id);
+    renderRoute();
+  });
+  const clearAll = document.getElementById('shop-clear-all');
+  if (clearAll) clearAll.addEventListener('click', async () => {
+    if (!confirm('Clear the whole shopping list?')) return;
+    await dbClearAndBulkPut('shoppingList', []);
+    renderRoute();
+  });
+}
+
+async function shareShoppingList() {
+  const list = (await dbGetAll('shoppingList')).filter((e) => !e.checked);
+  if (!list.length) { showToast('Nothing left to buy'); return; }
+  const text = CATEGORIES.map((c) => {
+    const rows = list.filter((e) => (CATEGORIES.includes(e.category) ? e.category : 'Other') === c);
+    return rows.length ? `${c}\n${rows.map((e) => `• ${e.name}${e.quantity ? ` (${shoppingQtyText(e)})` : ''}`).join('\n')}` : '';
+  }).filter(Boolean).join('\n\n');
+  const full = `Shopping list\n\n${text}`;
+  try {
+    if (navigator.share) { await navigator.share({ title: 'Shopping list', text: full }); return; }
+  } catch (err) {
+    if (err && err.name === 'AbortError') return;
+  }
+  try {
+    await navigator.clipboard.writeText(full);
+    showToast('List copied: paste it into a message');
+  } catch (err) {
+    alert(full);
+  }
+}
+
+/* ---- Ticked items into the kitchen ---- */
+async function openShoppingToKitchen() {
+  const [list, items] = await Promise.all([dbGetAll('shoppingList'), dbGetAll('inventoryItems')]);
+  const ticked = list.filter((e) => e.checked);
+  if (!ticked.length) return;
+  const rows = ticked.map((e) => {
+    const existing = (e.itemId && items.find((i) => i.id === e.itemId)) || items.find((i) => i.name.toLowerCase() === e.name.toLowerCase());
+    const place = existing ? { location: existing.location, states: existing.states } : guessKitchenPlace(e.name, e.category);
+    const unit = existing && existing.unit ? existing.unit : ITEM_UNITS.includes(e.unit) ? e.unit : 'each';
+    const qty = existing ? convertQty(e.quantity, e.unit, existing.unit) : (ITEM_UNITS.includes(e.unit) ? e.quantity : null);
+    return { entry: e, existing, location: place.location, states: place.states, unit, quantity: qty };
+  });
+  openModal(`
+    <div class="modal-title-row"><h2>🧺 Into my kitchen</h2><button class="close-btn" id="modal-close">×</button></div>
+    <p class="recipe-muted" style="margin-top:0;">Check where each thing goes and how much you bought. Amounts are optional.</p>
+    <div class="modal-scroll-area" id="sk-list">
+      ${rows.map((r, i) => `
+        <div class="sk-row" data-i="${i}">
+          <div class="sk-name">${escapeHtml(r.entry.name)}${r.existing ? `<span class="sk-adds">adds to the ${escapeHtml(formatItemQuantity(r.existing))} you have</span>` : ''}</div>
+          <div class="sk-fields">
+            <input type="number" class="sk-qty" min="0" step="any" inputmode="decimal" placeholder="Amount" value="${r.quantity ?? ''}">
+            <select class="sk-unit">${ITEM_UNITS.map((u) => `<option value="${u}" ${u === r.unit ? 'selected' : ''}>${u}</option>`).join('')}</select>
+            <select class="sk-loc">${['pantry', 'fridge', 'freezer'].map((l) => `<option value="${l}" ${l === r.location ? 'selected' : ''}>${LOCATION_LABELS[l]}</option>`).join('')}</select>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div class="modal-action-bar"><button type="button" class="btn-primary" id="sk-save">Put ${rows.length} item${rows.length === 1 ? '' : 's'} in my kitchen</button></div>
+  `);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('sk-save').addEventListener('click', async (ev) => {
+    ev.currentTarget.disabled = true;
+    const now = new Date().toISOString();
+    for (const el of document.querySelectorAll('#sk-list .sk-row')) {
+      const r = rows[parseInt(el.dataset.i, 10)];
+      const qty = numOrNull(el.querySelector('.sk-qty').value);
+      const unit = el.querySelector('.sk-unit').value;
+      const location = el.querySelector('.sk-loc').value;
+      const fresh = r.existing ? await dbGet('inventoryItems', r.existing.id) : null;
+      if (fresh && fresh.location === location) {
+        const add = convertQty(qty, unit, fresh.unit);
+        if (fresh.quantity != null && add != null) fresh.quantity = Math.round((fresh.quantity + add) * 1000) / 1000;
+        fresh.runningLow = false;
+        fresh.purchaseDate = localDateString(new Date());
+        fresh.updatedAt = now;
+        await dbPut('inventoryItems', fresh);
+        await logHistory(fresh.id, 'bought', qty ? `${qty}${unit === 'each' ? '' : ' ' + unit}` : null, location, location, 'From the shopping list');
+      } else {
+        if (fresh && fresh.runningLow) { fresh.runningLow = false; await dbPut('inventoryItems', fresh); }
+        const states = location === r.location ? r.states : location === 'freezer' ? ['Frozen'] : location === 'fridge' ? ['Fresh'] : ['Raw'];
+        const suggestion = await getSuggestedUseBy(r.entry.name, states);
+        const newId = await dbPut('inventoryItems', {
+          name: r.entry.name, quantity: qty, unit, portionCount: null, portionSize: null, location, subLocation: null,
+          states, category: r.entry.category || 'Other', isStaple: false, purchaseDate: localDateString(new Date()),
+          expiryDate: suggestion ? localDateString(addDays(new Date(), suggestion.suggestedDaysMax)) : null,
+          useByOverrideDays: null, cost: null, notes: '', freezerFriendlyRating: null, linkedPurchaseEventId: null,
+          runningLow: false, createdAt: now, updatedAt: now
+        });
+        await logHistory(newId, 'created', qty, null, location, 'Bought (shopping list)');
+      }
+      await dbDelete('shoppingList', r.entry.id);
+    }
+    closeModal();
+    showToast(`Put ${rows.length} item${rows.length === 1 ? '' : 's'} in your kitchen`);
+    renderRoute();
+  });
+}
+
+/* ============================================================
    SETTINGS SCREEN
    ============================================================ */
 async function renderSettingsScreen() {
@@ -5972,6 +6993,11 @@ async function renderSettingsScreen() {
         <div class="field"><label>Min kcal per meal</label><input type="number" id="goal-min" min="100" step="10" value="${goals.caloriesMin}"></div>
         <div class="field"><label>Max kcal per meal</label><input type="number" id="goal-max" min="100" step="10" value="${goals.caloriesMax}"></div>
       </div>
+      <label class="goal-subhead">Eating style</label>
+      <div class="state-chip-grid" id="goal-style">
+        ${Object.entries(EATING_STYLES).map(([k, st]) => `<button type="button" data-val="${k}" class="state-chip ${goals.eatingStyle === k ? 'selected' : ''}">${st.label}</button>`).join('')}
+      </div>
+      <p class="recipe-muted" id="goal-style-desc" style="margin:6px 0 12px;">${escapeHtml((EATING_STYLES[goals.eatingStyle] || {}).desc || '')} Picking a style sets your daily macros below; meal suggestions and Fill my week follow it.</p>
       <label class="goal-subhead">Daily targets (food diary)</label>
       <div class="field-row goal-macros">
         <div class="field"><label>kcal</label><input type="number" id="goal-day-kcal" min="500" step="50" inputmode="numeric" value="${goals.dailyCalories}"></div>
@@ -5990,7 +7016,7 @@ async function renderSettingsScreen() {
           </details>`;
         }).join('')}
       </div>
-      <p class="recipe-muted" style="margin:0;">Recipes show ✓ when they're inside this range. AI suggestions also put protein first and keep fat lower.</p>
+      <p class="recipe-muted" style="margin:0;">Recipes show ✓ when they're inside this range. AI suggestions follow your eating style.</p>
     </div>
 
     <div class="section-heading" style="margin-top:22px;"><h2>Meal plan</h2></div>
@@ -6025,6 +7051,15 @@ async function renderSettingsScreen() {
         : '<button type="button" class="btn-secondary" id="starter-add" style="margin-top:0;">Add the 30 starter recipes</button>'}
     </div>
 
+    <div class="section-heading" style="margin-top:22px;"><h2>Help</h2></div>
+    <div class="settings-row" id="report-row">
+      <div>
+        <div class="label">Report a problem</div>
+        <div class="desc">Opens a bug report with your phone and app details filled in. No kitchen data or API key is sent.</div>
+      </div>
+      <span class="chev">›</span>
+    </div>
+
     <div class="section-heading" style="margin-top:22px;"><h2>Start fresh</h2></div>
     <div class="settings-card">
       <p class="recipe-muted" style="margin-top:0;">Clear your kitchen, meal plans and the recipes you added, to set the app up again from scratch. You'll be offered a backup first.</p>
@@ -6054,6 +7089,7 @@ function attachSettingsListeners() {
     const num = (id, fallback) => { const v = parseInt(document.getElementById(id).value, 10); return v >= 0 ? v : fallback; };
     const saved = {
       ...DEFAULT_HEALTH_GOALS, caloriesMin: min, caloriesMax: max, preferredCuisines: cuisines,
+      eatingStyle: document.querySelector('#goal-style button.selected')?.dataset.val || DEFAULT_EATING_STYLE,
       dailyCalories: num('goal-day-kcal', DEFAULT_HEALTH_GOALS.dailyCalories),
       dailyProtein: num('goal-day-protein', DEFAULT_HEALTH_GOALS.dailyProtein),
       dailyCarbs: num('goal-day-carbs', DEFAULT_HEALTH_GOALS.dailyCarbs),
@@ -6068,6 +7104,16 @@ function attachSettingsListeners() {
   document.getElementById('goal-min').addEventListener('change', saveGoals);
   ['goal-day-kcal', 'goal-day-protein', 'goal-day-carbs', 'goal-day-fat'].forEach((id) => document.getElementById(id).addEventListener('change', saveGoals));
   document.getElementById('goal-max').addEventListener('change', saveGoals);
+  document.querySelectorAll('#goal-style button').forEach((btn) => btn.addEventListener('click', () => {
+    btn.parentElement.querySelectorAll('button').forEach((b) => b.classList.toggle('selected', b === btn));
+    const kcal = parseInt(document.getElementById('goal-day-kcal').value, 10) || DEFAULT_HEALTH_GOALS.dailyCalories;
+    const m = eatingStyleMacros(btn.dataset.val, kcal);
+    document.getElementById('goal-day-protein').value = m.dailyProtein;
+    document.getElementById('goal-day-carbs').value = m.dailyCarbs;
+    document.getElementById('goal-day-fat').value = m.dailyFat;
+    document.getElementById('goal-style-desc').textContent = `${EATING_STYLES[btn.dataset.val].desc} Daily macros updated to match.`;
+    saveGoals();
+  }));
   document.querySelectorAll('#goal-cuisines button').forEach((btn) => btn.addEventListener('click', () => {
     btn.classList.toggle('selected');
     saveGoals();
@@ -6087,6 +7133,7 @@ function attachSettingsListeners() {
     savePlanSettings();
   });
   document.getElementById('start-fresh-btn').addEventListener('click', startFresh);
+  document.getElementById('report-row').addEventListener('click', reportProblem);
   const starterRemove = document.getElementById('starter-remove');
   if (starterRemove) starterRemove.addEventListener('click', async () => {
     if (!confirm('Remove the starter recipes from your recipe book? Any you have edited are kept. Your own and saved recipes aren\'t affected.')) return;
@@ -6125,6 +7172,25 @@ function attachSettingsListeners() {
     showToast('Key removed');
     renderRoute();
   });
+}
+
+/* ---- Report a problem ----
+   Opens a new GitHub issue with device details filled in. Nothing from the kitchen,
+   diary or the API key is included. */
+const ISSUES_URL = 'https://github.com/woodk3-hue/kitchen-companion-pwa/issues/new';
+
+function reportProblem() {
+  const details = [
+    `Screen: ${AppState.route}`,
+    `Installed as app: ${isInstalledApp() ? 'yes' : 'no'}`,
+    `Online: ${navigator.onLine ? 'yes' : 'no'}`,
+    `Database version: ${DB_VERSION}`,
+    `Browser: ${navigator.userAgent}`,
+    `Screen size: ${window.innerWidth}×${window.innerHeight}`,
+    `Time: ${new Date().toString()}`
+  ].join('\n');
+  const body = `**What happened?**\n\n\n**What did you expect?**\n\n\n**Steps to make it happen again**\n1. \n\n---\n${details}`;
+  window.open(`${ISSUES_URL}?title=${encodeURIComponent('Problem: ')}&labels=bug&body=${encodeURIComponent(body)}`, '_blank', 'noopener');
 }
 
 /* ---- Import recipes (additive) ----
@@ -6185,7 +7251,7 @@ async function handleImportRecipesFile(e) {
 }
 
 async function exportKitchenData() {
-  const storeNames = ['inventoryItems', 'inventoryHistory', 'freezerRatingsReference', 'useByReference', 'quickAddTemplates', 'recipes', 'mealPlans', 'foodLog', 'batchCookEvents', 'purchaseEvents', 'settings'];
+  const storeNames = ['inventoryItems', 'inventoryHistory', 'freezerRatingsReference', 'useByReference', 'quickAddTemplates', 'recipes', 'mealPlans', 'foodLog', 'shoppingList', 'batchCookEvents', 'purchaseEvents', 'settings'];
   const backup = { exportedAt: new Date().toISOString(), version: DB_VERSION, data: {} };
 
   for (const storeName of storeNames) {

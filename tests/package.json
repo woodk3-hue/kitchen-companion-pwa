@@ -1,0 +1,11 @@
+{
+  "name": "pantryfit-tests",
+  "private": true,
+  "description": "Automatic browser tests for PantryFit. The app itself has no build step; this folder is only for testing.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}

@@ -1,0 +1,54 @@
+# Runs the browser tests on every pull request and every change to main.
+# If a test fails, the pull request shows a red ✗ and the report explains what broke.
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  browser-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+
+      - name: Install test tools
+        run: npm ci
+
+      - name: Install the test browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Check the app's JavaScript parses
+        run: |
+          python3 - <<'PY'
+          import re, pathlib
+          html = pathlib.Path('../index.html').read_text()
+          scripts = re.findall(r'<script(?: type="module")?>(.*?)</script>', html, re.S)
+          pathlib.Path('app-check.mjs').write_text(scripts[-1])
+          PY
+          node --check app-check.mjs
+
+      - name: Run the browser tests
+        run: npx playwright test
+
+      - name: Keep the report when something fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            tests/playwright-report
+            tests/test-results
+          retention-days: 14
