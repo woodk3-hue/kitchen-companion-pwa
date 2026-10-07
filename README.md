@@ -1,12 +1,12 @@
 # PantryFit: Kitchen & Food Tracker
 
-*(Formerly PantryFit.)*
+*(Formerly Kitchen Companion.)*
 
 Personal kitchen inventory PWA. Offline-capable, no backend, all data stored locally in IndexedDB on your device.
 
 ## What's in Phase 1
 
-- Bottom nav shell: Home, Meal Planner, Recipes, Kitchen, Shopping, Settings (Planner and Shopping are placeholders until later phases)
+- Bottom nav shell: Today, Meal Planner, Recipes, Kitchen, Shopping, Settings
 - Full IndexedDB schema (10 stores, database version 2), so later phases won't need migrations
 - **Kitchen Inventory**: add, edit, delete items; filter by location; portion support; expiry flagging
 - **Categories & states** match `PROJECT_VISION.md`: every item has one of 11 fixed categories, and any combination of states (Fresh, Frozen, Defrosting, Raw, Cooked, Leftover, Opened, Prepared)
@@ -66,6 +66,8 @@ recipes-seed.json             — built-in recipes, loaded into the app on first
 icon-192.png, icon-512.png   — app icons, rendered from icon.svg (orange tile, cooking pot with steam and a green leaf inside a green progress ring)
 icon.svg                      — icon source; edit this and re-render the PNGs to change the icon
 fonts/                        — Plus Jakarta Sans (SIL Open Font License), served with the app so it works offline
+tests/                        — automatic browser tests (only for checking the app; not part of the app itself)
+.github/workflows/tests.yml   — runs the tests on GitHub for every pull request
 ```
 
 ## Data upgrades
@@ -76,6 +78,8 @@ The database is at version 2. Opening the app over v1 data converts inventory it
 - Every item gets `isStaple: false` until you flag it.
 
 Not yet converted: quick-add templates saved by a v1 install, and backups exported from v1 (imports are restored as-is).
+
+Later versions only add things: version 3 added the food diary (`foodLog`), version 4 the shopping list (`shoppingList`). Upgrading keeps everything already saved.
 
 ## Data safety
 
@@ -148,10 +152,50 @@ The **Today** tab (formerly Home) is a food diary, like a fitness tracker:
   - **A recipe**: per-serving calories and protein × servings. Also **🍽️ Log a serving** on every recipe page.
   - **Scan barcode**: Open Food Facts calories, protein, carbs and fat; starts at the product's serving size. If that product is in your kitchen, it can take one out.
   - **Photo of my plate**: Claude estimates each food's portion, calories and macros; untick or adjust, then log (uses your API key / an AI credit).
-  - **Quick add**: a name and calories (macros optional).
+  - **Packaged meal, drink or shake** (🏷️): photograph a ready meal, frozen meal, drink, protein shake or protein powder (front, plus the nutrition panel if you can). Claude reads the name, the serve size (e.g. "1 scoop (30 g)") and the calories and macros per serve; set how many serves you had. Tick **Also add to my kitchen** to keep it with its per-100 g values. Also offered when a scanned barcode isn't in Open Food Facts. Uses your API key.
+  - **I cooked a recipe** (🍳): see *I cooked this* below.
+  - **Quick add**: type what you had with the amount, e.g. "12 oz coffee with skim milk", and tap **✨ Estimate calories & macros**: Claude converts the amount to metric and fills in kcal, protein, carbs and fat with a note on what it assumed, for you to check. Or type the numbers in yourself.
 - **Daily targets** (Settings → Health goals): **1,600 kcal, 100 g protein, 175 g carbs, 55 g fat** by default, all editable, with a check that shows the protein/carbs/fat split and whether they add up to the calorie target.
 - Kitchen items now also store **protein, carbs and fat per 100 g/ml**, filled from barcodes, label photos and ✨ Estimate, or typed in the item's More details.
 - Diary entries are stored in a new `foodLog` store (database version 3; the upgrade keeps all existing data) and are included in backups and cleared by Start fresh.
+
+## Eating styles
+
+**Settings → Health goals → Eating style**: Balanced, High protein (the default), Low carb, Keto or Low fat. Picking one sets the daily protein/carbs/fat targets for your calorie goal (e.g. at 1,600 kcal: keto ≈ 100 g protein, 25 g carbs, 125 g fat; low fat ≈ 100 g protein, 220 g carbs, 35 g fat). You can still edit the numbers.
+
+- Recipes are tagged **High protein**, **Low carb** (20 g carbs or less a serve), **Keto** (10 g or less) and **Low fat** (12 g fat or less), with filter chips on the Recipes tab. If rice or bread is only served on the side, the tag says so: "Keto (skip the rice)".
+- The 30 starter recipes now carry carbs and fat per serve (for the dish without the rice or bread served with it). Your own recipes can have them too (Edit recipe → Nutrition & details); without them the app estimates from calories, protein and fat level.
+- ✨ Suggest meals and 🪄 Fill my week follow your style.
+
+## Fast & easy meals
+
+- Recipes tab: **⚡ 15 min** and **≤ 30 min** filters (prep + cooking time). Recipes 15 minutes or under show ⚡ next to their time.
+- ✨ Suggest meals: choose **Time: Any / ≤ 30 min / ⚡ 15 min**.
+- Planner: **⏱️ Quick weeknights** makes Fill my week pick only recipes of 30 minutes or less Monday to Friday.
+
+## Step 4: Shopping list
+
+The **Shopping** tab:
+- **📅 From my meal plan**: everything the next 7 days of planned recipes need that isn't in your kitchen, with amounts added up across recipes (e.g. garlic for three recipes) and which recipe it's for. Untick what you don't want and add the rest. Staples and optional ingredients are left out.
+- **Type to add**: "1 kg basmati rice" or just "milk".
+- **Running low**: on any kitchen item, tap **🛒 Running low: add to shopping list**. The item shows *Running low* until you buy more.
+- Grouped by aisle (category). Tap the box to tick as you shop, × to remove.
+- **🧺 Put ticked items in my kitchen**: check where each thing goes (pantry, fridge or freezer is guessed) and how much you bought. Items you already have get topped up (1 kg rice + the 2 kg you had = 3 kg) and lose the running-low flag; new ones are added with a suggested use-by date. Each is logged in the item's history.
+- **📤 Share list**: sends the unticked items as text (to Messages, WhatsApp, etc.) or copies it.
+
+## Step 5: I cooked this
+
+**🍳 I cooked this** on any recipe page, on a planned meal, from **✓ Ate this** on a planned meal you haven't cooked yet, or from + Add on the Today tab:
+- **Portions made** (the recipe's serves), **Eaten now**, **🧊 Fridge** and **❄️ Freezer**. Change what's eaten and the rest moves to the fridge, with a check that it adds up (e.g. "4 made = 1 eaten + 2 fridge + 1 freezer").
+- **Add my portion to the food diary**: how many portions you had and for which meal (e.g. 1 for today's lunch), with calories, protein, carbs and fat from the recipe.
+- **Take out of my kitchen**: the ingredients you have, with the amount the recipe uses already worked out (800 g chicken thigh → 0.8 of your 1 kg). Untick or change any.
+- The fridge and freezer portions become kitchen items ("Home-Style Chicken Curry, 2 portions" in Leftovers, use within 3 days; 1 portion in the Freezer, about 3 months), linked to the recipe. Logging one later (from my kitchen, or ✓ Ate this on a planned leftover) uses the recipe's nutrition and takes a portion away.
+- The planned meal shows **✓ Cooked**, and the cook is saved in `batchCookEvents`.
+
+## Automatic tests and reporting problems
+
+- **Tests**: `tests/` holds browser tests that open the app on a simulated phone and check the main flows: every tab opens, starter recipes and the quick/low-carb/keto/low-fat filters, eating styles, the shopping list into the kitchen, I cooked this with fridge and freezer portions, and the food diary (Claude is faked in tests, so no API key or cost). GitHub runs them on every pull request (**Actions** tab, workflow *Tests*); a red ✗ on a pull request means something broke and shouldn't be merged yet. To run them on a computer: `cd tests`, `npm ci`, `npx playwright install chromium`, `npm test`.
+- **Settings → Help → Report a problem** opens a new GitHub issue with the screen, app version, browser and phone details filled in; you add what happened. It never includes your kitchen, diary or API key. (While the repository is private, only people with access to it can file reports.)
 
 ## Suggest recipes from my kitchen
 
@@ -164,9 +208,8 @@ Once the kitchen has food in it, **🍳 Suggest recipes from my kitchen** appear
 ## Roadmap
 
 ### Still to build (for personal use)
-- **Step 4**: Shopping list (missing ingredients from the meal plan) and running low.
-- **Step 5**: "I cooked this" (e.g. cooked 4 portions, ate 2, 2 left over), taking ingredients out of the kitchen.
-- **Automatic checks**: run the browser tests on every pull request with GitHub Actions; a "Report a problem" button.
+- Shopping list prices and a weekly budget (the `purchaseEvents` store is ready for it).
+- Reminders for food about to go off.
 
 ### Publishing to app stores (later)
 1. **Own domain** (e.g. kitchencompanion.app, ~A$20–40/year) pointed at GitHub Pages. Android needs it for its verification file.
