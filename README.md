@@ -111,6 +111,7 @@ Each ingredient stores `matchTerms` (inventory names that count as having it, e.
 - **💡 Suggested swaps**: chicken on the bone → chicken breast, lamb or fatty mince → chicken breast or lean mince, cream → light cooking cream or Greek yoghurt, coconut milk → light coconut milk, ghee or butter → half the oil, rice → cauliflower rice, pasta → zucchini noodles, potato → cauliflower, cheese → reduced-fat cheese, sugar → leave it out.
 - **🧂 Packet mix**: when a recipe has 3 or more separate spices, one tap swaps them for a packet spice mix.
 - **Swap** lets you type anything, e.g. "800 g chicken breast".
+- **Packets (curry mix, paste, sauce, stock)**: **▦ Scan a packet** looks up its barcode in Open Food Facts, or **🏷️ Label photo** has Claude read the nutrition panel. Choose how much goes in (whole packet or one serve) and it's added with the packet's own values per 100 g, replacing a generic "packet spice mix" if you'd added one. Those values stay with the ingredient, so the recipe's calories, I cooked this and the diary all use them.
 - **Save as my version** keeps the original and adds "… (my way)"; **Update this recipe** changes it.
 - The new numbers start from the recipe's own figures and move in proportion to the change, using the built-in typical values.
 
