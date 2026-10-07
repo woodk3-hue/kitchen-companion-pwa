@@ -5795,18 +5795,35 @@ const INGREDIENT_FAMILIES = [
 ];
 
 // For an ingredient the kitchen doesn't have, suggest the first in-kitchen alternative from its family
+// Words that mean a kitchen item is a packaged product in a different category — a
+// "butter chicken sauce" is not a swap for butter, "chicken curry pasta" is not a swap for chicken.
+const SWAP_PACKET_WORDS = /\b(sauce|paste|mix|pasta|soup|seasoning|marinade|dressing|stock|broth|flavouring|flavoring|spread|dip|gravy)\b/;
+// Match a family term against a kitchen name only on whole-word boundaries
+function familyWordMatch(familyTerm, kitchenName) {
+  const re = new RegExp(`\\b${familyTerm.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\b`, 'i');
+  return re.test(kitchenName);
+}
 function suggestSwapFor(ing, kitchenNames) {
   const name = (ing.name || '').toLowerCase().trim();
   const terms = [name, ...(ing.matchTerms || []).map((t) => t.toLowerCase())];
-  const family = INGREDIENT_FAMILIES.find((f) => f.some((m) => terms.some((t) => t.includes(m))));
+  const family = INGREDIENT_FAMILIES.find((f) => f.some((m) => terms.some((t) => familyWordMatch(m, t))));
   if (!family) return null;
-  // Something from the kitchen that's in the same family, closest first
-  const pick = family.find((n) => kitchenNames.some((k) => k === n || k.includes(n) || n.includes(k)));
-  if (!pick) return null;
-  const kitchenMatch = kitchenNames.find((k) => k === pick || k.includes(pick) || pick.includes(k)) || pick;
-  // Don't suggest swapping to the same thing
-  if (terms.some((t) => t === kitchenMatch || t.includes(kitchenMatch) || kitchenMatch.includes(t))) return null;
-  return kitchenMatch;
+  // The recipe already asks for a packaged thing (its name mentions sauce/paste/mix…) — in that
+  // case packaged kitchen items are fair swaps. Otherwise reject them.
+  const recipeIsPacket = terms.some((t) => SWAP_PACKET_WORDS.test(t));
+  // Keep the family's order so the first-listed match wins (e.g. olive oil before grapeseed oil)
+  for (const term of family) {
+    const match = kitchenNames.find((k) => {
+      if (!familyWordMatch(term, k)) return false;
+      // Reject packaged-product kitchen items for a non-packet recipe ingredient
+      if (!recipeIsPacket && SWAP_PACKET_WORDS.test(k)) return false;
+      // Don't suggest the same thing the recipe already asks for
+      if (terms.some((t) => t === k)) return false;
+      return true;
+    });
+    if (match) return match;
+  }
+  return null;
 }
 
 // The most specific food whose name appears as whole words in the text: "lean beef mince" beats "mince"
