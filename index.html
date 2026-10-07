@@ -658,6 +658,8 @@ h1, h2, h3 {
 .stocktake-btn .st-btn-title { font-size: 15px; font-weight: 800; }
 .stocktake-btn .st-btn-desc { font-size: 12px; color: var(--color-ink-soft); margin-top: 2px; }
 .modal-sheet.tall { height: 92vh; max-height: 92vh; }
+.modal-sheet.fullscreen { height: 100vh; max-height: 100vh; border-radius: 0; padding: 14px 16px 0; }
+.modal-sheet.fullscreen .modal-handle { display: none; }
 .st-intro { font-size: 13px; color: var(--color-ink-soft); margin: 0 0 10px; }
 .st-body { flex: 1; }
 .st-add { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
@@ -1949,8 +1951,9 @@ function showToast(message) {
 }
 
 function openModal(html) {
-  document.getElementById('modal-sheet').classList.remove('tall');
-  document.getElementById('modal-sheet').innerHTML = `<div class="modal-handle"></div>${html}`;
+  const sheet = document.getElementById('modal-sheet');
+  sheet.classList.remove('tall', 'fullscreen');
+  sheet.innerHTML = `<div class="modal-handle"></div>${html}`;
   document.getElementById('modal-overlay').classList.add('open');
 }
 function closeModal() {
@@ -3753,6 +3756,7 @@ function openRecipeForm(recipe, prefill) {
   `;
 
   openModal(html);
+  document.getElementById('modal-sheet').classList.add('fullscreen');
   document.getElementById('modal-close').addEventListener('click', closeModal);
 
   document.querySelectorAll('#r-difficulty button, #r-proteinLevel button, #r-fatLevel button').forEach((btn) => {
