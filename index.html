@@ -5647,6 +5647,25 @@ function typicalNutritionFor(name) {
 /* Works out calories and macros per serving from a list of ingredients.
    A kitchen item with its own saved values (e.g. from its label) is used before the typical values.
    Returns the per-serving numbers and which ingredients were and weren't counted. */
+// Guards per-100 g values that would otherwise blow a recipe up (a mis-scanned label
+// recorded as 4000 kcal/100 g, a per-serving panel saved as per-100 g, etc.).
+// Nothing eaten is more than ~900 kcal/100 g (pure oil is 884), and no macro exceeds 100 g.
+function plausiblePer100(food, typical) {
+  if (!food) return food;
+  const safe = { ...food };
+  const cap = (v, max) => (Number.isFinite(v) && v >= 0 && v <= max ? v : null);
+  const kcal = cap(safe.kcal, 900);
+  const p = cap(safe.p, 100);
+  const c = cap(safe.c, 100);
+  const f = cap(safe.f, 100);
+  // If any value is implausible, fall back to the built-in typical values when we have them
+  if (kcal == null || p == null || c == null || f == null) {
+    return typical ? { ...safe, kcal: typical.kcal, p: typical.p, c: typical.c, f: typical.f } : null;
+  }
+  safe.kcal = kcal; safe.p = p; safe.c = c; safe.f = f;
+  return safe;
+}
+
 function nutritionFromIngredients(ingredients, servings, kitchenItems = []) {
   const index = buildInventoryIndex(kitchenItems.filter((i) => i.caloriesPer100));
   const total = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
@@ -5657,11 +5676,12 @@ function nutritionFromIngredients(ingredients, servings, kitchenItems = []) {
     const kitchen = index.length ? findInventoryMatch(ing, index) : null;
     const typical = findFood([ing.name, ...(ing.matchTerms || [])].join(' | '));
     // Kitchen item values win; the typical entry still supplies weights like "1 each = 150 g"
-    const food = ing.nutrition
+    const rawFood = ing.nutrition
       ? { ...(typical || {}), kcal: ing.nutrition.kcal, p: ing.nutrition.p || 0, c: ing.nutrition.c || 0, f: ing.nutrition.f || 0, edible: 1, ...(ing.nutrition.tsp ? { tsp: ing.nutrition.tsp } : {}), ...(ing.nutrition.tbsp ? { tbsp: ing.nutrition.tbsp } : {}) }
       : kitchen
       ? { ...(typical || {}), kcal: kitchen.item.caloriesPer100, p: kitchen.item.proteinPer100 ?? (typical ? typical.p : 0), c: kitchen.item.carbsPer100 ?? (typical ? typical.c : 0), f: kitchen.item.fatPer100 ?? (typical ? typical.f : 0) }
       : typical;
+    const food = plausiblePer100(rawFood, typical);
     if (!food) { if (!ing.assumedStaple) missing.push(ing.name); continue; }
     if (ing.quantity == null) { if (food.kcal && !ing.assumedStaple && !/salt|pepper|water/i.test(ing.name)) missing.push(`${ing.name} (no amount)`); continue; }
     const grams = gramsOf(ing.quantity, ing.unit, food);
