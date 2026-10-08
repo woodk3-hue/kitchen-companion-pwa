@@ -1369,6 +1369,9 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 .ask-claude .ai-meal { margin-top: 10px; }
 .ask-switches { gap: 10px; flex-wrap: wrap; margin: 8px 0 0; }
 .ask-switches .plan-ai-toggle { font-size: 13px; margin: 0; }
+.ing-macros { display: block; font-size: 11px; color: var(--color-ink-soft); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.ing-flag.warn { background: #ffe6c7; color: #8a4b00; }
+:root[data-theme="dark"] .ing-flag.warn { background: #4a2d10; color: #ffcf8a; }
 .ing-swap-chip { font-size: 11px; padding: 3px 8px; margin-left: 6px; background: var(--color-accent-tint); color: var(--color-accent-dark); border: none; border-radius: 999px; cursor: pointer; font-weight: 700; }
 .ing-swap-chip:hover { background: var(--color-accent); color: #fff; }
 .ing-swapped { color: var(--color-fridge); font-weight: 600; font-size: 12px; margin-left: 6px; }
@@ -3439,6 +3442,17 @@ async function openRecipeDetail(id) {
   const scaled = (ing) => (baseServes && ing.quantity != null ? { ...ing, quantity: ing.quantity * serves / baseServes } : ing);
   // Lower-case names of what's in the kitchen, used to suggest swaps
   const kitchenNames = kitchenItems.map((i) => (i.name || '').toLowerCase());
+  // Per-ingredient macros from the app's own calculator — same source as the live breakdown
+  const ingCalc = nutritionFromIngredients(recipe.ingredients, baseServes || 1, kitchenItems);
+  const lineTagHtml = (line) => {
+    if (!line) return '';
+    if (line.status === 'ok') return `<span class="ing-macros">${line.kcal} kcal · P ${line.protein} C ${line.carbs} F ${line.fat}</span>`;
+    if (line.status === 'staple' || line.status === 'optional') return '';
+    if (line.status === 'unknown') return '<span class="ing-flag warn">not recognised</span>';
+    if (line.status === 'no-amount') return '<span class="ing-flag warn">no amount</span>';
+    if (line.status === 'unknown-unit') return `<span class="ing-flag warn">unknown unit${line.unit ? ' (' + escapeHtml(line.unit) + ')' : ''}</span>`;
+    return '';
+  };
   const ingredientsListHtml = () => recipe.ingredients.length === 0
     ? '<p class="recipe-muted">No ingredients listed.</p>'
     : `<ul class="ingredient-list">${recipe.ingredients.map((ing, i) => {
@@ -3452,6 +3466,7 @@ async function openRecipeDetail(id) {
             ${swapTo ? `<button type="button" class="ing-swap-chip" data-i="${i}" data-to="${escapeHtml(swapTo)}">💡 Use ${escapeHtml(swapTo)}</button>` : ''}
             ${ing.optional ? '<span class="ing-flag">optional</span>' : ''}
             ${ing.assumedStaple ? '<span class="ing-flag">staple</span>' : ''}
+            ${lineTagHtml(ingCalc.lines[i])}
           </span>
         </li>`;
     }).join('')}</ul>`;
@@ -3462,6 +3477,9 @@ async function openRecipeDetail(id) {
 
   const macros = recipeMacros(recipe);
   const macroTile = (cls, label, v, unit) => `<div class="mt ${cls}"><span class="mt-v">${v == null ? '–' : Math.round(v)}<small>${unit}</small></span><span class="mt-l">${label}</span></div>`;
+  const wholeTotals = ingCalc.totals && ingCalc.counted.length
+    ? `<p class="recipe-muted" style="margin:0 0 10px;font-variant-numeric:tabular-nums;">Whole recipe: ${ingCalc.totals.kcal} kcal · P ${ingCalc.totals.protein} g · C ${ingCalc.totals.carbs} g · F ${ingCalc.totals.fat} g${baseServes ? ` · ${baseServes} serves` : ''}</p>`
+    : '';
   const macroPanelHtml = `
     <div class="macro-tiles">
       ${macroTile('mt-kcal', 'Calories', macros.kcal, '')}
@@ -3469,7 +3487,8 @@ async function openRecipeDetail(id) {
       ${macroTile('mt-carbs', 'Carbs', macros.carbs, 'g')}
       ${macroTile('mt-fat', 'Fat', macros.fat, 'g')}
     </div>
-    <p class="recipe-muted" style="margin:6px 0 14px;">Per serving, approximate${macros.estimated ? '; carbs & fat estimated from calories (add them in Edit recipe)' : ''}${recipeDiet(recipe).skip.length ? `, without the ${escapeHtml(recipeDiet(recipe).skip.map((n) => n.toLowerCase()).join(' & '))}` : ''}.</p>`;
+    <p class="recipe-muted" style="margin:6px 0 4px;">Per serving, approximate${macros.estimated ? '; carbs & fat estimated from calories (add them in Edit recipe)' : ''}${recipeDiet(recipe).skip.length ? `, without the ${escapeHtml(recipeDiet(recipe).skip.map((n) => n.toLowerCase()).join(' & '))}` : ''}.</p>
+    ${wholeTotals}`;
 
   const html = `
     <div class="modal-title-row">
@@ -3548,6 +3567,7 @@ async function openRecipeDetail(id) {
   `;
 
   openModal(html);
+  document.getElementById('modal-sheet').classList.add('fullscreen', 'compact');
   document.getElementById('modal-close').addEventListener('click', closeModal);
 
   // Ratings and favourite save straight away; tapping the current rating again clears it
@@ -4102,7 +4122,8 @@ async function saveRecipeFromForm(existing) {
     const id = await dbPut('recipes', record);
     showToast(existing ? 'Recipe updated' : 'Recipe added');
     renderRoute();
-    openRecipeDetail(existing ? existing.id : id);
+    const prompted = !existing && await maybePromptMakeItFit(id);
+    if (!prompted) openRecipeDetail(existing ? existing.id : id);
   } catch (err) {
     alert('Couldn\'t save this recipe: ' + (err && err.message ? err.message : 'unknown storage error'));
   }
@@ -4402,13 +4423,23 @@ async function pickMakeItFitGoal(goal) {
 }
 
 // Returns per-serve macro targets, prompting (and saving) once if none are set.
+// Derive per-serve macro targets from the already-stored healthGoals (never asks).
+// Used by Suggest meals and the "fits my macros?" check.
+function perServeTargetsFromGoals(goals) {
+  if (!goals || !goals.dailyCalories || !goals.dailyProtein || !goals.dailyCarbs || !goals.dailyFat) return null;
+  const kcal = goals.caloriesMax || Math.round(goals.dailyCalories / 3);
+  return {
+    kcal,
+    protein: Math.round(goals.dailyProtein / 3),
+    carbs: Math.round(goals.dailyCarbs / 3),
+    fat: Math.round(goals.dailyFat / 3)
+  };
+}
+
 async function ensurePerServeTargets() {
   const goals = await getHealthGoals();
-  const haveDaily = goals.dailyCalories && goals.dailyProtein && goals.dailyCarbs && goals.dailyFat;
-  if (haveDaily) {
-    const kcal = goals.caloriesMax || Math.round(goals.dailyCalories / 3);
-    return { kcal, protein: Math.round(goals.dailyProtein / 3), carbs: Math.round(goals.dailyCarbs / 3), fat: Math.round(goals.dailyFat / 3) };
-  }
+  const existing = perServeTargetsFromGoals(goals);
+  if (existing) return existing;
   const asked = prompt('Per-serve macro targets aren\'t set yet. Enter four numbers (kcal, protein g, carbs g, fat g):\ne.g. 500, 30, 40, 15');
   if (!asked) return null;
   const nums = asked.split(/[\s,]+/).map((v) => parseInt(v, 10));
@@ -4416,6 +4447,78 @@ async function ensurePerServeTargets() {
   const t = { kcal: nums[0], protein: nums[1], carbs: nums[2], fat: nums[3] };
   await dbPut('settings', { ...goals, dailyCalories: t.kcal * 3, dailyProtein: t.protein * 3, dailyCarbs: t.carbs * 3, dailyFat: t.fat * 3 });
   return t;
+}
+
+// After saving a new recipe, offer to fit it to the user's per-serve targets.
+// Skips when: the "don't ask again" setting is on, no targets are stored, the
+// recipe was made by Make it fit (title ends with "– Goal"), or the recipe is
+// already within ~10% of targets.
+// Returns true when a prompt was shown (caller should NOT open the detail; the prompt
+// handles navigation itself). Returns false when skipped (caller handles the follow-up).
+async function maybePromptMakeItFit(recipeId) {
+  try {
+    // Tests opt out via a localStorage flag so saving a recipe doesn't block the next step
+    try { if (localStorage.getItem('pantryfit.skipMakeFitPrompt') === '1') return false; } catch (_) {}
+    const settings = (await dbGet('settings', 'makeFitPrompt')) || { key: 'makeFitPrompt', enabled: true };
+    if (!settings.enabled) return false;
+    const recipe = await dbGet('recipes', recipeId);
+    if (!recipe) return false;
+    if (/\s–\s(High protein|Low carb|Low fat|My macros)$/.test(recipe.name)) return false;
+    const goals = await getHealthGoals();
+    const targets = perServeTargetsFromGoals(goals);
+    if (!targets) return false;
+    const kitchenItems = await dbGetAll('inventoryItems');
+    const calc = nutritionFromIngredients(recipe.ingredients, recipe.servings || 1, kitchenItems);
+    if (!calc.counted.length) return false;
+    if (macrosFitTargets(calc.perServing, targets, 0.1)) return false;
+    openModal(`
+      <div class="modal-title-row"><h2>🎯 Make it fit?</h2><button class="close-btn" id="modal-close">×</button></div>
+      <div class="modal-scroll-area">
+        <p class="st-intro"><strong>${escapeHtml(recipe.name)}</strong> is outside your per-serve targets (${targets.kcal} kcal · P ${targets.protein} · C ${targets.carbs} · F ${targets.fat}).</p>
+        <p class="recipe-muted">Right now: ${calc.perServing.kcal} kcal · P ${calc.perServing.protein} · C ${calc.perServing.carbs} · F ${calc.perServing.fat} per serve.</p>
+        <p class="recipe-muted">Open Make it fit (preselected to "Fit my macros") to rewrite it?</p>
+      </div>
+      <div class="modal-action-bar">
+        <button type="button" class="btn-primary" id="mfp-yes">🎯 Yes, open Make it fit</button>
+        <div class="field-row" style="gap:8px;">
+          <button type="button" class="btn-secondary" id="mfp-not-now" style="margin:0;flex:1;">Not now</button>
+          <button type="button" class="btn-secondary" id="mfp-never" style="margin:0;flex:1;">Don't ask again</button>
+        </div>
+      </div>
+    `);
+    document.getElementById('modal-sheet').classList.add('fullscreen', 'compact');
+    const openDetail = () => { closeModal(); openRecipeDetail(recipeId); };
+    document.getElementById('modal-close').addEventListener('click', openDetail);
+    document.getElementById('mfp-not-now').addEventListener('click', openDetail);
+    document.getElementById('mfp-never').addEventListener('click', async () => {
+      await dbPut('settings', { key: 'makeFitPrompt', enabled: false });
+      showToast('OK — turn it back on in Settings → Health goals.');
+      openDetail();
+    });
+    document.getElementById('mfp-yes').addEventListener('click', () => {
+      closeModal();
+      MakeItFit.recipe = recipe;
+      MakeItFit.goal = 'my-macros';
+      MakeItFit.targets = targets;
+      runMakeItFit();
+    });
+    return true;
+  } catch (_) { /* don't break the save flow if the prompt fails */ }
+  return false;
+}
+
+// Does a per-serve macro set fit the targets (within ±pct of each)?
+function macrosFitTargets(perServe, targets, pct = 0.1) {
+  if (!perServe || !targets) return false;
+  const within = (actual, target) => {
+    if (!target) return true;
+    const diff = Math.abs(actual - target) / target;
+    return diff <= pct;
+  };
+  return within(perServe.kcal, targets.kcal)
+    && within(perServe.protein, targets.protein)
+    && within(perServe.carbs, targets.carbs)
+    && within(perServe.fat, targets.fat);
 }
 
 async function runMakeItFit() {
@@ -5426,11 +5529,13 @@ function buildAiPrompt(items, goals, mealType, request, maxMinutes) {
     staple: !!i.isStaple,
     daysUntilUseBy: i.expiryDate ? daysUntil(i.expiryDate) : null
   }));
+  const targets = perServeTargetsFromGoals(goals);
   return [
     'Suggest 3 different meals I can cook, using what is in my kitchen.',
     '',
     `Meal: ${mealType}.`,
     `Calorie target: ${goals.caloriesMin}-${goals.caloriesMax} kcal per serving. Eating style: ${style.label}. ${style.ai}`,
+    targets ? `Fit these per-serve macro targets closely (within ~10%): ${targets.kcal} kcal, ${targets.protein} g protein, ${targets.carbs} g carbs, ${targets.fat} g fat.` : null,
     maxMinutes ? `Fast and easy: each meal must take ${maxMinutes} minutes or less in total (prep plus cooking), with few steps and little washing up.` : null,
     goals.preferredCuisines.length ? `Cuisines I like: ${goals.preferredCuisines.join(', ')}. Mostly suggest these.` : 'Any cuisine is fine; vary them.',
     'Use food with the fewest days until its use-by date first, and say which of those items each meal uses in usesExpiring (exact kitchen item names). Skip anything already past its use-by date (negative days).',
@@ -5467,7 +5572,23 @@ async function requestAiSuggestions(mealType, request, maxMinutes) {
     }
     const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
     const parsed = JSON.parse(text);
-    return { meals: Array.isArray(parsed.meals) ? parsed.meals : [] };
+    const rawMeals = Array.isArray(parsed.meals) ? parsed.meals : [];
+    // Replace Claude's self-reported macros with the app's own calculation, and keep only
+    // the meals that are within ~10% of the user's per-serve targets.
+    const targets = perServeTargetsFromGoals(goals);
+    const checked = rawMeals.map((m) => {
+      const normIngs = (m.ingredients || [])
+        .map((ing) => ({ ...ing, quantity: ing.quantity ? ing.quantity : null }))
+        .map(normalizeRecipeIngredient);
+      const calc = nutritionFromIngredients(normIngs, m.servings || 1, items);
+      if (!calc.counted.length) return m; // nothing recognised: keep Claude's numbers as a fallback
+      const p = calc.perServing;
+      return { ...m, caloriesPerServing: p.kcal, proteinGramsPerServing: p.protein, carbsGramsPerServing: p.carbs, fatGramsPerServing: p.fat, _appMacros: true };
+    });
+    const filtered = targets
+      ? checked.filter((m) => macrosFitTargets({ kcal: m.caloriesPerServing, protein: m.proteinGramsPerServing, carbs: m.carbsGramsPerServing, fat: m.fatGramsPerServing }, targets, 0.1))
+      : checked;
+    return { meals: filtered, allMeals: checked, targets };
   } catch (err) {
     if (err instanceof SyntaxError) return { error: 'Claude\'s reply couldn\'t be read. Please try again.' };
     return { error: describeAiError(err, Anthropic) };
@@ -5599,7 +5720,10 @@ async function runAiSuggest() {
     return;
   }
   if (!outcome.meals.length) {
-    results.innerHTML = '<p class="ai-error">No suggestions came back. Please try again.</p>';
+    const total = outcome.allMeals ? outcome.allMeals.length : 0;
+    results.innerHTML = total
+      ? `<p class="ai-error">All ${total} suggestions came back outside your per-serve macro targets. Try a different request, or widen your targets in Settings → Health goals.</p>`
+      : '<p class="ai-error">No suggestions came back. Please try again.</p>';
     return;
   }
   results.innerHTML = outcome.meals.map((m, i) => aiMealCardHtml(m, i, goals)).join('');
@@ -5612,11 +5736,12 @@ async function runAiSuggest() {
         btn.disabled = true;
         return;
       }
-      await dbPut('recipes', aiMealToRecipe(meal));
+      const newId = await dbPut('recipes', aiMealToRecipe(meal));
       btn.textContent = '✓ Saved';
       btn.disabled = true;
       showToast('Saved to your recipes');
       if (AppState.route === 'recipes') renderRoute();
+      await maybePromptMakeItFit(newId);
     });
   });
 }
@@ -5953,6 +6078,7 @@ async function openOnlineMeal(id) {
     showToast('Saved. Add calories when you can.');
     renderRoute();
     openRecipeForm({ ...recipe, id: newId });
+    await maybePromptMakeItFit(newId);
   });
 }
 
@@ -9893,6 +10019,7 @@ async function renderSettingsScreen() {
   const partnerName = (profiles && profiles.partnerProfile && profiles.partnerProfile.name) || '';
   const starterCount = (await dbGetAll('recipes')).filter((r) => r.source === 'built-in').length;
   const hasKey = !!getAiKey();
+  const makeFitPromptEnabled = ((await dbGet('settings', 'makeFitPrompt')) || { enabled: true }).enabled !== false;
   return `
     ${installCardHtml('settings')}
     <div class="settings-row" id="setup-row">
@@ -9941,6 +10068,10 @@ async function renderSettingsScreen() {
         }).join('')}
       </div>
       <p class="recipe-muted" style="margin:0;">Recipes show ✓ when they're inside this range. AI suggestions follow your eating style.</p>
+      <div class="staple-toggle-row" style="margin:12px 0 0;">
+        <div class="label-group"><span class="label">Ask to Make it fit after saving a recipe</span><span class="desc">Prompts "Make it fit?" when a new recipe is more than ~10% off your per-serve targets</span></div>
+        <button type="button" id="makefit-prompt-toggle" class="toggle-switch ${makeFitPromptEnabled ? 'on' : ''}" data-on="${makeFitPromptEnabled ? 'true' : 'false'}"></button>
+      </div>
     </div>
 
     <div class="section-heading" style="margin-top:22px;"><h2>Meal plan</h2></div>
@@ -10099,6 +10230,15 @@ function attachSettingsListeners() {
     b.dataset.on = on ? 'true' : 'false';
     b.classList.toggle('on', on);
     savePlanSettings();
+  });
+  const mfpToggle = document.getElementById('makefit-prompt-toggle');
+  if (mfpToggle) mfpToggle.addEventListener('click', async (e) => {
+    const b = e.currentTarget;
+    const on = b.dataset.on !== 'true';
+    b.dataset.on = on ? 'true' : 'false';
+    b.classList.toggle('on', on);
+    await dbPut('settings', { key: 'makeFitPrompt', enabled: on });
+    showToast(on ? 'Make it fit prompt enabled' : 'Make it fit prompt turned off');
   });
   document.getElementById('start-fresh-btn').addEventListener('click', startFresh);
   document.getElementById('report-row').addEventListener('click', reportProblem);
