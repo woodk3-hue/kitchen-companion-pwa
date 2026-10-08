@@ -28,20 +28,21 @@ test('F: recipe detail shows per-ingredient macros and opens full-screen compact
 
 test('G: Suggest meals filters out suggestions outside per-serve targets', async ({ page }) => {
   const errors = watchErrors(page);
-  // One in-target meal (~550 kcal) and one way-off (~1500 kcal). Only the first should show.
+  // One in-target meal and one way-off. Ingredients are unrecognised so the app
+  // falls back to Claude's claimed macros, and only the in-target one passes the ~10% filter
+  // against the default per-serve targets (~500 kcal, 33 g P, 58 g C, 18 g F).
   await fakeClaude(page, {
     meals: {
       meals: [
         {
           name: 'In-target chicken bowl', cuisine: 'Western', mealTypes: ['Dinner'], servings: 2,
           prepMinutes: 10, cookMinutes: 15, difficulty: 'Easy',
-          caloriesPerServing: 500, proteinGramsPerServing: 40, carbsGramsPerServing: 50, fatGramsPerServing: 15,
+          caloriesPerServing: 500, proteinGramsPerServing: 33, carbsGramsPerServing: 58, fatGramsPerServing: 18,
           primaryProtein: 'Chicken', freezerFriendly: false, leftoverFriendly: true,
           ingredients: [
-            { name: 'chicken breast', quantity: 400, unit: 'g', prepNote: '', category: 'Protein', matchTerms: ['chicken breast'], optional: false, assumedStaple: false, inKitchen: false },
-            { name: 'basmati rice', quantity: 180, unit: 'g', prepNote: '', category: 'Pantry', matchTerms: ['basmati rice'], optional: false, assumedStaple: false, inKitchen: false }
+            { name: 'mystery blend A', quantity: 400, unit: 'g', prepNote: '', category: 'Protein', matchTerms: ['mystery blend A'], optional: false, assumedStaple: false, inKitchen: false }
           ],
-          method: ['Grill chicken.', 'Boil rice.'], notes: '', whyThisMeal: 'simple and macro-friendly', usesExpiring: []
+          method: ['Mix.', 'Serve.'], notes: '', whyThisMeal: 'simple and macro-friendly', usesExpiring: []
         },
         {
           name: 'Way-over oil bomb', cuisine: 'Western', mealTypes: ['Dinner'], servings: 2,
@@ -49,9 +50,9 @@ test('G: Suggest meals filters out suggestions outside per-serve targets', async
           caloriesPerServing: 1500, proteinGramsPerServing: 10, carbsGramsPerServing: 10, fatGramsPerServing: 160,
           primaryProtein: 'None', freezerFriendly: false, leftoverFriendly: false,
           ingredients: [
-            { name: 'olive oil', quantity: 300, unit: 'g', prepNote: '', category: 'Pantry', matchTerms: ['olive oil', 'oil'], optional: false, assumedStaple: false, inKitchen: false }
+            { name: 'mystery blend B', quantity: 300, unit: 'g', prepNote: '', category: 'Pantry', matchTerms: ['mystery blend B'], optional: false, assumedStaple: false, inKitchen: false }
           ],
-          method: ['Pour oil.'], notes: '', whyThisMeal: 'calorie-dense', usesExpiring: []
+          method: ['Pour.'], notes: '', whyThisMeal: 'calorie-dense', usesExpiring: []
         }
       ]
     }
