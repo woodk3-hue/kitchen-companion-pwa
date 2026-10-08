@@ -6525,7 +6525,9 @@ const SWAP_PACKET_WORDS = /\b(sauce|paste|mix|pasta|soup|seasoning|marinade|dres
 // Words that mean a kitchen item is a prepared meal, not a single raw ingredient —
 // e.g. "high protein chicken biryani" is not a swap for chicken, even though both
 // mention chicken. These are never valid single-ingredient swaps.
-const SWAP_PREPARED_WORDS = /\b(biryani|curry|lasagne|lasagna|risotto|paella|bolognese|casserole|stew|meal|bowl|pie|wrap|burger|burrito|taco|pizza|sushi|dumpling|dumplings|sandwich|salad|soup|frittata|omelette|omelet|quiche|stir\s?fry|stir-fry|roast|roasted|slice|slices|lentil\s+soup|minestrone|chow\s+mein|fried\s+rice|pad\s+thai|ramen|pho|congee|porridge|oatmeal)\b/;
+const SWAP_PREPARED_WORDS = /\b(biryani|curry|lasagne|lasagna|risotto|paella|bolognese|casserole|stew|meal|bowl|pie|wrap|burger|burrito|taco|pizza|sushi|dumpling|dumplings|sandwich|salad|soup|frittata|omelette|omelet|quiche|stir\s?fry|stir-fry|roast|roasted|slice|slices|lentil\s+soup|minestrone|chow\s+mein|fried\s+rice|pad\s+thai|ramen|pho|congee|porridge|oatmeal|pasta\s+bake|bake|bakes|parmigiana|schnitzel|nugget|nuggets|kebab|kebabs|sausage\s+roll|pastie|pasty|pizza\s+bread|hash\s+brown|hash\s+browns|fish\s+finger|fish\s+fingers|fish\s+cake|falafel)\b/i;
+// Marketing / ready-meal brand prefixes that signal a packaged meal rather than a raw ingredient.
+const SWAP_READY_MEAL_PREFIXES = /\b(high\s+protein|low\s+carb|low\s+fat|lean\s+cuisine|healthy\s+choice|ready\s+meal|microwave\s+meal|frozen\s+meal|weight\s+watchers|my\s+muscle\s+chef|youfoodz|lite\s+n\s+easy|fit\s+chef|the\s+fit\s+kitchen|zone\s+perfect|smart\s+ones|hello\s+fresh)\b/i;
 // Match a family term against a kitchen name only on whole-word boundaries
 function familyWordMatch(familyTerm, kitchenName) {
   const re = new RegExp(`\\b${familyTerm.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\b`, 'i');
@@ -6547,10 +6549,14 @@ function suggestSwapFor(ing, kitchenNames) {
       if (!recipeIsPacket && SWAP_PACKET_WORDS.test(k)) return false;
       // Reject prepared meals / dishes — "high protein chicken biryani" isn't a swap for chicken
       if (SWAP_PREPARED_WORDS.test(k)) return false;
-      // The kitchen item must resolve to a known single ingredient, in the same family as the recipe item.
-      // Sharing a word like "chicken" with a prepared meal is not enough.
-      const kitchenFood = findFood(k);
-      if (!kitchenFood) return false;
+      // Reject ready-meal / brand style names ("high protein ...", "my muscle chef ...")
+      if (SWAP_READY_MEAL_PREFIXES.test(k)) return false;
+      // The kitchen item must resolve to a known single ingredient via an EXACT match (not fuzzy),
+      // in the same family as the recipe item. Sharing a word like "chicken" with a prepared meal
+      // or a fuzzy near-miss is not enough.
+      const kitchenMatch = findFoodMatch(k);
+      if (!kitchenMatch || kitchenMatch.approximate) return false;
+      const kitchenFood = kitchenMatch.food;
       const kitchenInFamily = family.some((m) => kitchenFood.names.some((n) => familyWordMatch(m, n)));
       if (!kitchenInFamily) return false;
       // Don't suggest the same text the recipe already asks for
