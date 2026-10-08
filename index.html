@@ -660,6 +660,23 @@ h1, h2, h3 {
 .modal-sheet.tall { height: 92vh; max-height: 92vh; }
 .modal-sheet.fullscreen { height: 100vh; max-height: 100vh; border-radius: 0; padding: 14px 16px 0; }
 .modal-sheet.fullscreen .modal-handle { display: none; }
+/* Compact variant for add / + sheets so the main options fit without scrolling */
+.modal-sheet.fullscreen.compact { padding: 10px 14px 0; }
+.modal-sheet.fullscreen.compact .modal-title-row { margin-bottom: 6px; }
+.modal-sheet.fullscreen.compact .modal-title-row h2 { font-size: 17px; }
+.modal-sheet.fullscreen.compact .modal-scroll-area { padding-bottom: 6px; }
+.modal-sheet.fullscreen.compact .st-intro { font-size: 13px; margin: 0 0 8px; }
+.modal-sheet.fullscreen.compact label { font-size: 11px; margin-bottom: 2px; }
+.modal-sheet.fullscreen.compact input, .modal-sheet.fullscreen.compact select, .modal-sheet.fullscreen.compact textarea { padding: 7px 10px; font-size: 14px; }
+.modal-sheet.fullscreen.compact .field { margin-bottom: 10px; }
+.modal-sheet.fullscreen.compact .field-row { gap: 6px; margin-bottom: 10px; }
+.modal-sheet.fullscreen.compact .btn-primary, .modal-sheet.fullscreen.compact .btn-secondary, .modal-sheet.fullscreen.compact .btn-danger { padding: 8px 12px; min-height: 38px; font-size: 14px; }
+.modal-sheet.fullscreen.compact .add-food-opt { padding: 10px; font-size: 13px; min-height: 70px; }
+.modal-sheet.fullscreen.compact .add-food-opt span { font-size: 22px; }
+.modal-sheet.fullscreen.compact .add-food-opt small { font-size: 10px; }
+.modal-sheet.fullscreen.compact .modal-action-bar { padding: 8px 0; }
+.modal-sheet.fullscreen.compact .st-row { padding: 8px 10px; font-size: 13px; }
+.modal-sheet.fullscreen.compact .state-chip { padding: 6px 10px; font-size: 12px; }
 
 /* Live macro breakdown in the recipe form */
 .r-live { background: var(--color-bg-soft, #f6f6f8); border: 1px solid var(--color-border); border-radius: 14px; padding: 12px 14px; }
@@ -1990,9 +2007,15 @@ function showToast(message) {
 
 function openModal(html) {
   const sheet = document.getElementById('modal-sheet');
-  sheet.classList.remove('tall', 'fullscreen');
+  sheet.classList.remove('tall', 'fullscreen', 'compact');
   sheet.innerHTML = `<div class="modal-handle"></div>${html}`;
   document.getElementById('modal-overlay').classList.add('open');
+}
+// Full-screen + compact variant for add / + sheets so the main options fit without scrolling.
+// Same HTML contract as openModal — layout only.
+function openAddSheet(html) {
+  openModal(html);
+  document.getElementById('modal-sheet').classList.add('fullscreen', 'compact');
 }
 function closeModal() {
   stopBarcodeCamera();
@@ -2270,7 +2293,7 @@ document.getElementById('fab-btn').addEventListener('click', () => {
 });
 
 function openAddToKitchen() {
-  openModal(`
+  openAddSheet(`
     <div class="modal-title-row"><h2>Add to kitchen</h2><button class="close-btn" id="modal-close">×</button></div>
     <div class="modal-scroll-area">
       <p class="st-intro">How would you like to add?</p>
@@ -2426,7 +2449,7 @@ function openItemForm(item, prefill) {
     </form>
   `;
 
-  openModal(html);
+  openAddSheet(html);
 
   document.querySelectorAll('#f-location button').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -2942,7 +2965,7 @@ async function openStocktake() {
   Stocktake.custom = { pantry: [], fridge: [], freezer: [] };
   if (!STOCKTAKE_LIST[Stocktake.location]) Stocktake.location = 'pantry';
 
-  openModal(`
+  openAddSheet(`
     <div class="modal-title-row">
       <h2>Stocktake</h2>
       <button class="close-btn" id="modal-close">×</button>
@@ -2956,7 +2979,6 @@ async function openStocktake() {
       <button type="button" class="btn-primary" id="st-save" disabled>Tick items to add</button>
     </div>
   `);
-  document.getElementById('modal-sheet').classList.add('tall');
 
   document.getElementById('modal-close').addEventListener('click', closeStocktake);
   document.querySelectorAll('#st-location button').forEach((btn) => {
@@ -3244,7 +3266,7 @@ function renderRecipeList() {
             <span class="qty">${total ? `${total <= 15 ? '⚡ ' : ''}${total} min` : ''}</span>
           </div>
           <div class="meta-row">
-            ${sc ? `<span class="tag match-pct ${sc.pct >= 80 ? 'high' : ''}">${sc.pct}% match</span>` : ''}
+            ${sc ? `<span class="tag match-pct ${sc.pct >= 80 ? 'high' : ''}" title="Main ingredients you already have — salt, pepper and optional items not counted.">${sc.pct}% in kitchen</span>` : ''}
             ${r.cuisine ? `<span class="tag">${escapeHtml(r.cuisine)}</span>` : ''}
             ${calorieBadgeHtml(r.caloriesPerServing, AppState.healthGoals)}
             ${dietTagsHtml(r)}
@@ -6955,7 +6977,7 @@ async function openPhotoScan() {
     return;
   }
 
-  openModal(`
+  openAddSheet(`
     <div class="modal-title-row">
       <h2>📸 Scan photo</h2>
       <button class="close-btn" id="modal-close">×</button>
@@ -6968,7 +6990,6 @@ async function openPhotoScan() {
       <button type="button" class="btn-primary" id="ps-action" disabled>Add a photo first</button>
     </div>
   `);
-  document.getElementById('modal-sheet').classList.add('tall');
   document.getElementById('modal-close').addEventListener('click', closePhotoScan);
   document.querySelectorAll('#ps-location button').forEach((btn) => btn.addEventListener('click', async () => {
     PhotoScan.location = btn.dataset.val;
@@ -7414,7 +7435,7 @@ function scanNextBarcode() {
 
 function openBarcodeScan() {
   BarcodeScan.mode = 'kitchen';
-  openModal(`
+  openAddSheet(`
     <div class="modal-title-row">
       <h2>▦ Scan barcode</h2>
       <button class="close-btn" id="modal-close">×</button>
@@ -7428,7 +7449,6 @@ function openBarcodeScan() {
       <button type="button" class="btn-secondary" id="bc-again" style="display:none;">Skip, scan another</button>
     </div>
   `);
-  document.getElementById('modal-sheet').classList.add('tall');
   document.getElementById('modal-close').addEventListener('click', closeModal);
   document.querySelectorAll('#bc-location button').forEach((btn) => btn.addEventListener('click', async () => {
     BarcodeScan.location = btn.dataset.val;
@@ -8236,7 +8256,7 @@ async function openKitchenSuggestions() {
         <button type="button" class="pick-row" data-recipe-id="${r.id}">
           <span class="pick-name">${escapeHtml(r.name)}</span>
           <span class="pick-tags">
-            <span class="tag match-pct ${sc.pct >= 80 ? 'high' : ''}">${sc.pct}% match</span>
+            <span class="tag match-pct ${sc.pct >= 80 ? 'high' : ''}" title="Main ingredients you already have — salt, pepper and optional items not counted.">${sc.pct}% in kitchen</span>
             ${calorieBadgeHtml(r.caloriesPerServing, goals)}
             ${sc.expiring.length ? `<span class="tag kcal-over">Uses ${escapeHtml(sc.expiring[0].name)}</span>` : ''}
           </span>
@@ -8501,7 +8521,7 @@ function setNutrientFields(prefix, v) {
 
 /* ---- Add food: choose how ---- */
 function openAddFood(date, meal) {
-  openModal(`
+  openAddSheet(`
     <div class="modal-title-row"><h2>Add to ${LOG_MEAL_LABELS[meal]}</h2><button class="close-btn" id="modal-close">×</button></div>
     <p class="recipe-muted" style="margin-top:0;">${formatDayLabel(date)}</p>
     <div class="add-food-grid">
@@ -8543,7 +8563,7 @@ async function finishLog(name) {
 
 /* ---- Quick add ---- */
 function openQuickAdd(date, meal, prefill = {}) {
-  openModal(`
+  openAddSheet(`
     <div class="modal-title-row"><h2>⚡ Quick add</h2><button class="close-btn" id="modal-close">×</button></div>
     ${mealSelectHtml(meal)}
     <div class="field" style="margin-top:12px;"><label>What was it? <span style="text-transform:none;font-weight:500;">(say how much)</span></label><input type="text" id="qa-name" placeholder="e.g. 12 oz coffee with skim milk" value="${escapeHtml(prefill.name || '')}"></div>
@@ -8594,7 +8614,7 @@ function openQuickAdd(date, meal, prefill = {}) {
 async function openLogFromKitchen(date, meal, preselectId) {
   const items = (await dbGetAll('inventoryItems')).sort((a, b) => a.name.localeCompare(b.name));
   if (preselectId) { const it = items.find((i) => i.id === preselectId); if (it) return openLogKitchenItem(date, meal, it); }
-  openModal(`
+  openAddSheet(`
     <div class="modal-title-row"><h2>🧺 From my kitchen</h2><button class="close-btn" id="modal-close">×</button></div>
     <div class="field recipe-search" style="margin-bottom:8px;"><input type="search" id="lk-search" placeholder="Search your kitchen"></div>
     <div class="modal-scroll-area" id="lk-list">
@@ -8704,7 +8724,7 @@ function openLogKitchenItem(date, meal, item) {
 async function openLogRecipe(date, meal, preselectId, planEntryId, onPick, servings = 1) {
   const recipes = (await dbGetAll('recipes')).sort((a, b) => a.name.localeCompare(b.name));
   if (preselectId) { const r = recipes.find((x) => x.id === preselectId); if (r) return openLogRecipeServings(date, meal, r, planEntryId, servings); }
-  openModal(`
+  openAddSheet(`
     <div class="modal-title-row"><h2>${onPick ? '🍳 What did you cook?' : '📖 A recipe'}</h2><button class="close-btn" id="modal-close">×</button></div>
     <div class="field recipe-search" style="margin-bottom:8px;"><input type="search" id="lr-search" placeholder="Search recipes"></div>
     <div class="modal-scroll-area" id="lr-list">
@@ -8783,7 +8803,7 @@ async function ateThis(planId) {
 function openDiaryBarcode(date, meal) {
   BarcodeScan.mode = 'diary';
   BarcodeScan.diary = { date, meal };
-  openModal(`
+  openAddSheet(`
     <div class="modal-title-row"><h2>▦ Scan to log</h2><button class="close-btn" id="modal-close">×</button></div>
     <div class="modal-scroll-area st-body" id="bc-body"></div>
     <div class="modal-action-bar">
@@ -8938,7 +8958,7 @@ function openLabelScan(date, meal) {
   if (!getAiKey()) { showToast('Add your API key in Settings → AI suggestions to read labels'); return; }
   LabelScan.photos = [];
   LabelScan.result = null;
-  openModal(`
+  openAddSheet(`
     <div class="modal-title-row"><h2>🏷️ Packaged food or drink</h2><button class="close-btn" id="modal-close">×</button></div>
     ${mealSelectHtml(meal)}
     <div class="modal-scroll-area" id="ls-body" style="margin-top:12px;">
@@ -9092,7 +9112,7 @@ function openPlatePhoto(date, meal) {
   PlatePhoto.photo = null;
   PlatePhoto.rows = [];
   PlatePhoto.note = '';
-  openModal(`
+  openAddSheet(`
     <div class="modal-title-row"><h2>📸 My plate</h2><button class="close-btn" id="modal-close">×</button></div>
     ${mealSelectHtml(meal)}
     <div class="modal-scroll-area" id="pp-body" style="margin-top:12px;">
@@ -9287,7 +9307,7 @@ async function openCookedThis(recipe, { planEntryId = null, date = null, meal = 
       <div class="stepper"><button type="button" class="step-btn" data-for="ck-${key}" data-d="-1" aria-label="One less for ${label}">−</button><input type="number" id="ck-${key}" min="0" step="1" inputmode="numeric" value="${value}"><button type="button" class="step-btn" data-for="ck-${key}" data-d="1" aria-label="One more for ${label}">+</button></div>
     </div>`;
 
-  openModal(`
+  openAddSheet(`
     <div class="modal-title-row"><h2>🍳 I cooked this</h2><button class="close-btn" id="modal-close">×</button></div>
     <div class="modal-scroll-area">
       <p class="recipe-muted" style="margin-top:0;">${escapeHtml(recipe.name)}</p>
@@ -9802,7 +9822,7 @@ async function openShoppingToKitchen() {
     const qty = existing ? convertQty(e.quantity, e.unit, existing.unit) : (ITEM_UNITS.includes(e.unit) ? e.quantity : null);
     return { entry: e, existing, location: place.location, states: place.states, unit, quantity: qty };
   });
-  openModal(`
+  openAddSheet(`
     <div class="modal-title-row"><h2>🧺 Into my kitchen</h2><button class="close-btn" id="modal-close">×</button></div>
     <p class="recipe-muted" style="margin-top:0;">Check where each thing goes and how much you bought. Amounts are optional.</p>
     <div class="modal-scroll-area" id="sk-list">
