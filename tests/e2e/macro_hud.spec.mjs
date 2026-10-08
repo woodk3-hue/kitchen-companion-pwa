@@ -57,9 +57,8 @@ test('G: Suggest meals filters out suggestions outside per-serve targets', async
     }
   });
   await open(page, 'recipes', '#recipe-list');
-  await page.click('.suggest-kitchen-btn, button:has-text("Suggest meals")').catch(() => {});
   // Open the suggestions sheet
-  await page.locator('button', { hasText: /✨.*Suggest meals/i }).first().click();
+  await page.click('#ai-suggest-btn');
   await page.click('#ai-go');
   await page.waitForSelector('.ai-meal', { timeout: 15000 });
   // In-target meal appears, oil-bomb filtered out
