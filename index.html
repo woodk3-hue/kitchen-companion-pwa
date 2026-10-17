@@ -3251,7 +3251,7 @@ function renderRecipeList() {
       <div class="empty-state">
         <div class="glyph">📖</div>
         <h3>${none ? 'No recipes yet' : 'No recipes match'}</h3>
-        <p>${none ? 'Get ideas with <strong>✨ Suggest meals</strong> or <strong>🔎 Search online</strong> above, tap <strong>+</strong> to add your own, or add the 30 starter recipes in Settings.' : 'Try clearing a filter or the search.'}</p>
+        <p>${none ? 'Get ideas with <strong>✨ Suggest meals</strong> or <strong>🔎 Search online</strong> above, tap <strong>+</strong> to add your own, or add the starter recipes in Settings.' : 'Try clearing a filter or the search.'}</p>
       </div>
     `;
   }
@@ -8334,7 +8334,7 @@ async function addStarterRecipes() {
    like new. Keeps built-in reference data and the API key (stored separately).
    ============================================================ */
 async function startFresh() {
-  if (!confirm('Start fresh?\n\nThis deletes everything: your kitchen and its history, meal plans, food diary, shopping list, all recipes (including the 30 starter recipes), ratings, favourites and settings.\n\nYou can add the starter recipes back from Settings. Your API key stays.')) return;
+  if (!confirm('Start fresh?\n\nThis deletes everything: your kitchen and its history, meal plans, food diary, shopping list, all recipes (including the starter recipes), ratings, favourites and settings.\n\nYou can add the starter recipes back from Settings. Your API key stays.')) return;
   if (confirm('Download a backup of your current data first? (Recommended)')) await exportKitchenData();
   if (!confirm('Last check: delete everything now?')) return;
 
@@ -10105,10 +10105,10 @@ async function renderSettingsScreen() {
 
     <div class="section-heading" style="margin-top:22px;"><h2>Starter recipes</h2></div>
     <div class="settings-card">
-      <p class="recipe-muted" style="margin-top:0;">${starterCount ? `${starterCount} starter recipes are in your recipe book.` : 'Your recipe book has no starter recipes. Add the 30 built-in recipes (Indian, Anglo-Indian, Australian, Western) any time.'}</p>
+      <p class="recipe-muted" style="margin-top:0;">${starterCount ? `${starterCount} starter recipes are in your recipe book.` : 'Your recipe book has no starter recipes. Add the built-in recipes (across Indian, Chinese, Thai, Italian, Mexican, Middle Eastern and more) any time.'}</p>
       ${starterCount
         ? '<button type="button" class="btn-secondary" id="starter-remove" style="margin-top:0;">Remove starter recipes</button>'
-        : '<button type="button" class="btn-secondary" id="starter-add" style="margin-top:0;">Add the 30 starter recipes</button>'}
+        : '<button type="button" class="btn-secondary" id="starter-add" style="margin-top:0;">Add the starter recipes</button>'}
     </div>
 
     <div class="section-heading" style="margin-top:22px;"><h2>Help</h2></div>

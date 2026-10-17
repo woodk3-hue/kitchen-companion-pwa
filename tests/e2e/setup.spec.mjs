@@ -36,6 +36,25 @@ test('fresh install opens the setup wizard, picks starter recipes by cuisine', a
   expect(errors).toEqual([]);
 });
 
+test('picking Chinese in the wizard shows Chinese starter recipes', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/index.html#home');
+  await page.waitForSelector('.sw-nav');
+  await page.click('#sw-next'); // welcome → household
+  await page.click('#sw-next'); // → goals
+  await page.click('#sw-next'); // → cuisines
+  while (await page.locator('#sw-cuisines button.selected').count()) {
+    await page.locator('#sw-cuisines button.selected').first().click();
+  }
+  await page.locator('#sw-cuisines button[data-val="Chinese"]').click();
+  await page.click('#sw-next'); // → starters
+  await page.waitForSelector('.sw-starter-list');
+  await expect(page.locator('.sw-starter-list li')).not.toHaveCount(0);
+  const names = await page.locator('.sw-starter-list .sw-starter-row small').allTextContents();
+  for (const n of names) expect(n.toLowerCase()).toContain('chinese');
+  expect(errors).toEqual([]);
+});
+
 test('Settings has Run setup again at the top and backup at the bottom', async ({ page }) => {
   await page.addInitScript(() => { try { localStorage.setItem('pantryfit.skipSetup', '1'); } catch (_) {} });
   await page.goto('/index.html#settings');
