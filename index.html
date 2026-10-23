@@ -1609,9 +1609,24 @@ h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; }
   -webkit-backdrop-filter: blur(18px) saturate(160%);
   backdrop-filter: blur(18px) saturate(160%);
 }
-.nav-btn { border-radius: 999px; }
-.nav-btn.active { background: var(--accent); color: #fff; }
-.nav-btn.active .icon { stroke: #fff; }
+/* The active tab gets a small filled pill behind just the icon, not the
+   whole button, so the label underneath stays readable. */
+.nav-btn { position: relative; overflow: visible; padding: 6px 4px; min-width: 0; z-index: 0; }
+.nav-btn > * { position: relative; z-index: 1; }
+.nav-btn.active::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 46px;
+  height: 30px;
+  margin-left: -23px;
+  background: var(--accent);
+  border-radius: 999px;
+  z-index: 0;
+}
+.nav-btn.active { background: transparent; color: var(--accent); }
+.nav-btn.active .icon { stroke: #fff; color: #fff; }
 
 /* Pill-shaped buttons, chips, tags */
 .btn-primary, .btn-secondary, .btn-danger, .link-btn,
@@ -1655,8 +1670,9 @@ h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; }
 :root[data-theme="dark"] .tag.exp-soon, :root[data-theme="dark"] .expiry-flag.soon { color: #ffecd1; }
 :root[data-theme="dark"] .tag.exp-ok, :root[data-theme="dark"] .expiry-flag.ok { color: #d4f1e5; }
 
-/* Nav labels: 10 px uppercase */
-.nav-btn { font-size: 10px; letter-spacing: 0.16em; font-weight: 700; text-transform: uppercase; }
+/* Nav labels: 10 px uppercase, gentle spacing so names fit their slot */
+.nav-btn { font-size: 10px; letter-spacing: 0.04em; font-weight: 700; text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; }
 
 /* Form fields: translucent fill */
 .field input[type="text"], .field input[type="number"], .field input[type="date"],
