@@ -15,13 +15,19 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="preload" href="./fonts/plus-jakarta-sans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap">
   <script>
-    // Apply the saved appearance before anything draws, so dark mode doesn't flash white
+    // Apply the saved appearance and accent before anything draws, so dark mode doesn't flash white
     (function () {
       var pref = 'auto';
+      var accent = 'violet';
       try { pref = localStorage.getItem('pantryfit.theme') || 'auto'; } catch (e) {}
+      try { accent = localStorage.getItem('pantryfit.accent') || 'violet'; } catch (e) {}
       var dark = pref === 'dark' || (pref === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-accent', accent);
     })();
   </script>
   <style>
@@ -1475,6 +1481,277 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 :root[data-theme="dark"] .m-carbs.macro-track { background: #3A2418; }
 :root[data-theme="dark"] .m-fat.macro-track { background: #15332A; }
 :root[data-theme="dark"] .toggle-switch::after { background: #F2F2F2; }
+
+/* ============================================================
+   GLASS THEME — floating pills, frosted cards, radial glow
+   Layered on top of the earlier tokens so markup, ids and tests
+   stay the same. One set of rules drives both light and dark.
+   ============================================================ */
+:root {
+  --accent: #7C5CFF;
+  --accent-strong: #6947ED;
+  --accent-tint: rgba(124, 92, 255, 0.14);
+  --mint: #3EC8A3;
+  --amber: #E89A3D;
+  --pink: #D96B88;
+  --glass-fill: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.65);
+  --glass-shadow: 0 10px 30px rgba(39, 23, 82, 0.08);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --glass-ink-soft: #5A5774;
+}
+:root[data-theme="dark"] {
+  --glass-fill: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.40);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --glass-ink-soft: #B6B2CC;
+  --mint: #4CD6AE;
+  --amber: #F3B465;
+  --pink: #F28DA6;
+}
+
+/* Accent presets — Violet is the default */
+:root[data-accent="violet"]   { --accent: #7C5CFF; --accent-strong: #6947ED; --accent-tint: rgba(124, 92, 255, 0.14); }
+:root[data-accent="blue"]     { --accent: #3F86D8; --accent-strong: #2E6ABF; --accent-tint: rgba(63, 134, 216, 0.14); }
+:root[data-accent="teal"]     { --accent: #14B8A6; --accent-strong: #0E9484; --accent-tint: rgba(20, 184, 166, 0.14); }
+:root[data-accent="green"]    { --accent: #22A567; --accent-strong: #178752; --accent-tint: rgba(34, 165, 103, 0.14); }
+:root[data-accent="amber"]    { --accent: #D98A2B; --accent-strong: #B06E1E; --accent-tint: rgba(217, 138, 43, 0.14); }
+:root[data-accent="pink"]     { --accent: #D96B88; --accent-strong: #B84F6B; --accent-tint: rgba(217, 107, 136, 0.14); }
+:root[data-accent="mint"]     { --accent: #30B38A; --accent-strong: #1F8E6D; --accent-tint: rgba(48, 179, 138, 0.14); }
+:root[data-accent="graphite"] { --accent: #4F5666; --accent-strong: #343A47; --accent-tint: rgba(79, 86, 102, 0.14); }
+:root[data-theme="dark"][data-accent="graphite"] { --accent: #A4ABBC; --accent-strong: #CDD3E0; --accent-tint: rgba(164, 171, 188, 0.16); }
+
+/* Carry the accent into existing accent-token uses so chips, buttons and tags follow it */
+:root { --color-accent: var(--accent); --color-accent-dark: var(--accent-strong); --color-accent-tint: var(--accent-tint); }
+
+/* Typography */
+html, body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+:root { --font-display: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        --font-body: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+
+/* Soft radial glow background. Keep background-color solid so existing
+   tests that read getComputedStyle(body).backgroundColor still get the
+   theme's base colour; the glow is layered on with background-image. */
+body {
+  background-color: var(--color-bg);
+  background-image:
+    radial-gradient(1100px 720px at 18% -10%, #ddd0ff 0%, rgba(221, 208, 255, 0) 60%),
+    radial-gradient(900px 520px at 110% 0%, #fbe9ef 0%, rgba(251, 233, 239, 0) 55%),
+    linear-gradient(180deg, #f1ecfb 0%, #f8f5fc 55%, #f8f5fc 100%);
+  background-attachment: fixed;
+  color: var(--color-ink);
+}
+:root[data-theme="dark"] body {
+  background-image:
+    radial-gradient(1000px 700px at 15% -12%, #3b2d63 0%, rgba(59, 45, 99, 0) 55%),
+    radial-gradient(900px 600px at 110% 10%, #2a1f52 0%, rgba(42, 31, 82, 0) 55%),
+    linear-gradient(180deg, #1d1830 0%, #16121f 55%, #121019 100%);
+}
+
+/* Big numbers light weight */
+h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; }
+.stat-card .count, .ring-value, .mt-v, .big-number,
+.diary-summary .count, .diary-summary strong, .r-stat strong {
+  font-weight: 300; letter-spacing: -0.03em;
+}
+.modal-title-row h2, .app-header h1 { font-weight: 600; }
+
+/* Section labels: 10 px uppercase, 1.6 px letter-spacing, muted */
+.eyebrow,
+.section-heading h2,
+.st-group-title,
+.goal-subhead,
+.nav-btn,
+.field label {
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  font-weight: 700;
+  color: var(--glass-ink-soft);
+}
+.section-heading h2 { font-size: 11px; }
+
+/* Frosted-glass cards */
+.item-card, .stat-card, .settings-row, .settings-card, .diary-summary, .diary-meal,
+.plan-day, .st-row, .pick-row, .ai-meal, .online-result, .recipe-stat, .stocktake-btn,
+.phase-placeholder, .shop-group, .plan-portions, .cook-dests, .cook-box, .ask-claude,
+.suggest-kitchen-btn, .install-card {
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  box-shadow: var(--glass-shadow), var(--glass-highlight);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+}
+
+/* Floating glass header pill — scrolls with the content, so it only sits
+   at the top of the page instead of covering items when you scroll down. */
+.app-header {
+  position: relative; z-index: 10;
+  margin: 10px 12px 6px;
+  padding: 14px 18px;
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  box-shadow: var(--glass-shadow), var(--glass-highlight);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
+}
+
+/* Floating glass bottom-nav pill */
+.bottom-nav {
+  left: 12px; right: 12px; bottom: calc(10px + var(--safe-bottom));
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: var(--glass-fill);
+  box-shadow: var(--glass-shadow), var(--glass-highlight);
+  padding: 6px;
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
+}
+/* The active tab gets a small filled pill behind just the icon, not the
+   whole button, so the label underneath stays readable. */
+.nav-btn { position: relative; overflow: visible; padding: 6px 4px; min-width: 0; z-index: 0; }
+.nav-btn > * { position: relative; z-index: 1; }
+.nav-btn.active::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 46px;
+  height: 30px;
+  margin-left: -23px;
+  background: var(--accent);
+  border-radius: 999px;
+  z-index: 0;
+}
+.nav-btn.active { background: transparent; color: var(--accent); }
+.nav-btn.active .icon { stroke: #fff; color: #fff; }
+
+/* Pill-shaped buttons, chips, tags */
+.btn-primary, .btn-secondary, .btn-danger, .link-btn,
+.loc-tab, .state-chip, .quick-add-chip, .close-btn, .step-btn,
+.tag, .ing-swap-chip, .state-chip-grid button, .nav-btn,
+.sw-starter-row, .segmented, .segmented button {
+  border-radius: 999px;
+}
+.segmented { padding: 4px; }
+.segmented button { padding: 8px 14px; }
+
+/* Primary button = solid accent, white text, pill */
+.btn-primary {
+  background: var(--accent);
+  background-image: none;
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.10);
+  padding: 14px 18px;
+}
+.btn-primary:active { background: var(--accent-strong); }
+.btn-secondary { background: var(--glass-fill); border: 1px solid var(--glass-border); color: var(--color-ink); }
+
+/* Floating action button → round accent 44 px */
+.fab {
+  width: 44px; height: 44px; border-radius: 999px;
+  background: var(--accent);
+  background-image: none;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
+  display: inline-flex; align-items: center; justify-content: center;
+  bottom: calc(var(--nav-height) + var(--safe-bottom) + 20px);
+}
+.fab svg, .fab .icon { width: 22px; height: 22px; }
+
+/* Status / expiry chips: Today pink · 2 days amber · 3+ mint */
+.tag.exp-today, .expiry-flag.today, .item-card.expires-today .expiry-flag,
+.tag.state-defrosting, .tag.state-opened { background: var(--pink); color: #4a0f22; }
+.tag.exp-soon, .expiry-flag.soon { background: var(--amber); color: #4a2d10; }
+.tag.exp-ok, .expiry-flag.ok { background: var(--mint); color: #0d3327; }
+:root[data-theme="dark"] .tag.exp-today, :root[data-theme="dark"] .expiry-flag.today,
+:root[data-theme="dark"] .tag.state-defrosting, :root[data-theme="dark"] .tag.state-opened { color: #ffe3eb; }
+:root[data-theme="dark"] .tag.exp-soon, :root[data-theme="dark"] .expiry-flag.soon { color: #ffecd1; }
+:root[data-theme="dark"] .tag.exp-ok, :root[data-theme="dark"] .expiry-flag.ok { color: #d4f1e5; }
+
+/* Nav labels: 10 px uppercase, gentle spacing so names fit their slot */
+.nav-btn { font-size: 10px; letter-spacing: 0.04em; font-weight: 700; text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; }
+
+/* Form fields: translucent fill */
+.field input[type="text"], .field input[type="number"], .field input[type="date"],
+.field select, .field textarea, .recipe-search input[type="search"],
+.st-add input, .st-add select, .ps-name, .ps-fields input, .ps-fields select,
+.st-qty input, .st-qty select, .settings-card .field input[type="password"] {
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+}
+
+/* Modal sheet keeps the glass look */
+.modal-sheet {
+  background: var(--glass-fill);
+  border-top: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
+}
+:root[data-theme="dark"] .modal-sheet { background: rgba(30, 25, 48, 0.92); }
+
+/* Accent-picker pills in Settings → Appearance.
+   Two per row so names like "Graphite" always fit inside the card. */
+.accent-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.accent-pill {
+  display: flex; align-items: center; justify-content: flex-start; gap: 8px;
+  padding: 10px 12px; border-radius: 999px;
+  background: var(--glass-fill); border: 1px solid var(--glass-border);
+  font-weight: 600; font-size: 13px; color: var(--color-ink);
+  cursor: pointer; min-width: 0;
+}
+.accent-pill .dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08); }
+.accent-pill.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-tint); }
+.accent-pill[data-val="violet"]   .dot { background: #7C5CFF; }
+.accent-pill[data-val="blue"]     .dot { background: #3F86D8; }
+.accent-pill[data-val="teal"]     .dot { background: #14B8A6; }
+.accent-pill[data-val="green"]    .dot { background: #22A567; }
+.accent-pill[data-val="amber"]    .dot { background: #D98A2B; }
+.accent-pill[data-val="pink"]     .dot { background: #D96B88; }
+.accent-pill[data-val="mint"]     .dot { background: #30B38A; }
+.accent-pill[data-val="graphite"] .dot { background: #4F5666; }
+
+/* Browsers without backdrop-filter fall back to a solid-ish fill */
+@supports not ((backdrop-filter: blur(8px)) or (-webkit-backdrop-filter: blur(8px))) {
+  .item-card, .stat-card, .settings-row, .settings-card, .diary-summary, .diary-meal,
+  .plan-day, .st-row, .pick-row, .ai-meal, .online-result, .recipe-stat, .stocktake-btn,
+  .phase-placeholder, .shop-group, .plan-portions, .cook-dests, .cook-box, .ask-claude,
+  .suggest-kitchen-btn, .app-header, .bottom-nav, .modal-sheet { background: var(--color-paper); }
+}
+
+/* --- Polish fixes --- */
+
+/* Silver brand reads flat on light pastel glass; darken the top stop so it
+   stays silver but has real contrast on the header pill. */
+.app-head-brand {
+  background: linear-gradient(180deg, #4C505A 0%, #777C87 48%, #A4A9B3 52%, #CCD1DA 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+/* Round "+" FAB and "×" close buttons: centre the character cleanly. */
+.fab {
+  line-height: 1; font-size: 26px; font-weight: 500; color: #fff;
+  padding: 0 0 2px 0;
+}
+.close-btn { line-height: 1; padding: 0 0 2px 0; }
+
+/* Modal bottom action bar as frosted glass so it reads with the sheet. */
+.modal-action-bar {
+  background: var(--glass-fill);
+  border-top: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
+}
+
+/* Remove the coloured location bar on item cards. The card itself and the
+   stat-tile dot already signal pantry / fridge / freezer / leftovers. */
+.item-card .edge { display: none; }
+.item-card .body { padding-left: 16px; }
 </style>
  </head>
  <body>
@@ -10032,10 +10309,15 @@ async function renderSettingsScreen() {
 
     <div class="section-heading" style="margin-top:22px;"><h2>Appearance</h2></div>
     <div class="settings-card">
+      <label class="goal-subhead" style="display:block;margin-bottom:6px;">Mode</label>
       <div class="segmented" id="theme-pref">
-        ${[['auto', 'Automatic'], ['light', '☀️ Light'], ['dark', '🌙 Dark']].map(([v, l]) => `<button type="button" data-val="${v}" class="${getThemePref() === v ? 'selected' : ''}">${l}</button>`).join('')}
+        ${[['auto', 'System'], ['light', '☀️ Light'], ['dark', '🌙 Dark']].map(([v, l]) => `<button type="button" data-val="${v}" class="${getThemePref() === v ? 'selected' : ''}">${l}</button>`).join('')}
       </div>
-      <p class="recipe-muted" style="margin:8px 0 0;">Automatic follows your phone's light or dark setting.</p>
+      <p class="recipe-muted" style="margin:8px 0 14px;">System follows your phone's light or dark setting.</p>
+      <label class="goal-subhead" style="display:block;margin-bottom:4px;">Accent colour</label>
+      <div class="accent-grid" id="accent-pref">
+        ${[['violet', 'Violet'], ['blue', 'Blue'], ['teal', 'Teal'], ['green', 'Green'], ['amber', 'Amber'], ['pink', 'Pink'], ['mint', 'Mint'], ['graphite', 'Graphite']].map(([v, l]) => `<button type="button" class="accent-pill ${getAccentPref() === v ? 'selected' : ''}" data-val="${v}"><span class="dot"></span>${l}</button>`).join('')}
+      </div>
     </div>
 
     <div class="section-heading" style="margin-top:22px;"><h2>Health goals</h2></div>
@@ -10246,6 +10528,10 @@ function attachSettingsListeners() {
     btn.parentElement.querySelectorAll('button').forEach((b) => b.classList.toggle('selected', b === btn));
     setThemePref(btn.dataset.val);
   }));
+  document.querySelectorAll('#accent-pref .accent-pill').forEach((btn) => btn.addEventListener('click', () => {
+    btn.parentElement.querySelectorAll('.accent-pill').forEach((b) => b.classList.toggle('selected', b === btn));
+    setAccentPref(btn.dataset.val);
+  }));
   const starterRemove = document.getElementById('starter-remove');
   if (starterRemove) starterRemove.addEventListener('click', async () => {
     if (!confirm('Remove the starter recipes from your recipe book? Any you have edited are kept. Your own and saved recipes aren\'t affected.')) return;
@@ -10313,6 +10599,24 @@ function setThemePref(pref) {
 
 if (darkQuery && darkQuery.addEventListener) darkQuery.addEventListener('change', applyTheme);
 applyTheme();
+
+/* ---- Appearance: accent colour ----
+   Saved on this phone (so it applies before the app has loaded its data) and
+   mirrored into the settings store so it also survives a browser cleanup. */
+const ACCENT_STORAGE = 'pantryfit.accent';
+const ACCENT_VALUES = ['violet', 'blue', 'teal', 'green', 'amber', 'pink', 'mint', 'graphite'];
+function getAccentPref() {
+  try { const v = localStorage.getItem(ACCENT_STORAGE); if (v && ACCENT_VALUES.includes(v)) return v; } catch (err) {}
+  return 'violet';
+}
+function applyAccent() { document.documentElement.setAttribute('data-accent', getAccentPref()); }
+function setAccentPref(name) {
+  const v = ACCENT_VALUES.includes(name) ? name : 'violet';
+  try { localStorage.setItem(ACCENT_STORAGE, v); } catch (err) { /* private browsing */ }
+  applyAccent();
+  dbPut('settings', { key: 'accent', value: v }).catch(() => {});
+}
+applyAccent();
 
 /* ---- Report a problem ----
    Opens a new GitHub issue with device details filled in. Nothing from the kitchen,
