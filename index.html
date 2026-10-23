@@ -1585,9 +1585,10 @@ h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; }
   backdrop-filter: blur(16px) saturate(140%);
 }
 
-/* Floating glass header pill */
+/* Floating glass header pill — scrolls with the content, so it only sits
+   at the top of the page instead of covering items when you scroll down. */
 .app-header {
-  position: sticky; top: 10px; z-index: 10;
+  position: relative; z-index: 10;
   margin: 10px 12px 6px;
   padding: 14px 18px;
   background: var(--glass-fill);
