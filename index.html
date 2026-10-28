@@ -1549,15 +1549,16 @@ body {
     linear-gradient(180deg, #1d1830 0%, #16121f 55%, #121019 100%);
 }
 
-/* Big numbers light weight */
+/* Big numbers at Regular weight (HIG avoids Light/Thin on small text) */
 h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; }
-.stat-card .count, .ring-value, .mt-v, .big-number,
+.stat-card .count, .mt-v, .big-number,
 .diary-summary .count, .diary-summary strong, .r-stat strong {
-  font-weight: 300; letter-spacing: -0.03em;
+  font-weight: 400; letter-spacing: -0.02em;
 }
+.ring-value { font-weight: 500; letter-spacing: -0.02em; }
 .modal-title-row h2, .app-header h1 { font-weight: 600; }
 
-/* Section labels: 10 px uppercase, 1.6 px letter-spacing, muted */
+/* Section labels: 11 px uppercase (iOS/iPadOS minimum type), muted */
 .eyebrow,
 .section-heading h2,
 .st-group-title,
@@ -1565,12 +1566,12 @@ h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; }
 .nav-btn,
 .field label {
   text-transform: uppercase;
-  font-size: 10px;
-  letter-spacing: 0.16em;
+  font-size: 11px;
+  letter-spacing: 0.14em;
   font-weight: 700;
   color: var(--glass-ink-soft);
 }
-.section-heading h2 { font-size: 11px; }
+.section-heading h2 { font-size: 12px; }
 
 /* Frosted-glass cards */
 .item-card, .stat-card, .settings-row, .settings-card, .diary-summary, .diary-meal,
@@ -1671,8 +1672,8 @@ h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; }
 :root[data-theme="dark"] .tag.exp-soon, :root[data-theme="dark"] .expiry-flag.soon { color: #ffecd1; }
 :root[data-theme="dark"] .tag.exp-ok, :root[data-theme="dark"] .expiry-flag.ok { color: #d4f1e5; }
 
-/* Nav labels: 10 px uppercase, gentle spacing so names fit their slot */
-.nav-btn { font-size: 10px; letter-spacing: 0.04em; font-weight: 700; text-transform: uppercase;
+/* Nav labels: 11 px uppercase (iOS mobile minimum), gentle spacing so names fit their slot */
+.nav-btn { font-size: 11px; letter-spacing: 0.04em; font-weight: 700; text-transform: uppercase;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; }
 
 /* Form fields: translucent fill */
