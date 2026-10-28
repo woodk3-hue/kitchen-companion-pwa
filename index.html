@@ -1755,6 +1755,30 @@ h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; }
    stat-tile dot already signal pantry / fridge / freezer / leftovers. */
 .item-card .edge { display: none; }
 .item-card .body { padding-left: 16px; }
+
+/* Grabber on bottom sheets: 36 x 4 px pill at the top edge. HIG
+   `sheets.md` + `modality.md`: "a grabber when resizable, swipe to
+   dismiss, a way out besides Done." Fullscreen variants have their
+   own close affordance so they're excluded. */
+.modal-sheet { position: relative; }
+.modal-sheet::before {
+  content: '';
+  position: absolute;
+  top: 8px; left: 50%;
+  width: 36px; height: 4px;
+  margin-left: -18px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+.modal-sheet.fullscreen::before { display: none; }
+:root[data-theme="dark"] .modal-sheet::before { background: rgba(255, 255, 255, 0.22); }
+
+/* Active tab icon reads as filled, not outlined. HIG `tab-bars.md ›
+   Icons`: "Prefer filled symbols or icons for consistency with the
+   platform." The accent pill behind the icon stays; the icon itself
+   now has a heavier stroke so it carries real visual weight. */
+.nav-btn.active .icon { stroke-width: 2.5; stroke: #fff; fill: none; }
 </style>
  </head>
  <body>
