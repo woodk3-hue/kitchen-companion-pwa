@@ -6,7 +6,9 @@ test('every tab opens without errors', async ({ page }) => {
   const errors = watchErrors(page);
   await open(page, 'home', '.diary-summary');
   for (const [route, title] of [['planner', 'Meal Planner'], ['recipes', 'Recipes'], ['kitchen', 'Kitchen'], ['shopping', 'Shopping'], ['settings', 'Settings'], ['home', 'Today']]) {
-    await page.click(`.nav-btn[data-route="${route}"]`);
+    // Settings lives in the header gear button (#header-settings); everything else is in the bottom nav
+    const selector = route === 'settings' ? '#header-settings' : `.nav-btn[data-route="${route}"]`;
+    await page.click(selector);
     await expect(page.locator('#header-title')).toHaveText(title);
   }
   expect(errors).toEqual([]);

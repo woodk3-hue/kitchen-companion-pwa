@@ -1770,6 +1770,23 @@ h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; }
 .item-card .edge { display: none; }
 .item-card .body { padding-left: 16px; }
 
+/* Header gear button for Settings (now off the bottom nav).
+   44 x 44 pt (HIG `accessibility.md › Offer sufficiently sized controls`).
+   Lives on the right of app-head-row via margin-left: auto. */
+.app-head-row { align-items: center; }
+.header-icon-btn {
+  margin-left: auto;
+  width: 44px; height: 44px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: var(--glass-fill);
+  color: var(--color-ink);
+  cursor: pointer; padding: 0;
+  flex-shrink: 0;
+}
+.header-icon-btn.active { background: var(--accent); color: #fff; border-color: transparent; }
+
 /* Grabber on bottom sheets: 36 x 4 px pill at the top edge. HIG
    `sheets.md` + `modality.md`: "a grabber when resizable, swipe to
    dismiss, a way out besides Done." Fullscreen variants have their
@@ -1803,6 +1820,9 @@ h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; }
      <div class="app-head-brand">PantryFit</div>
      <h1 id="header-title">PantryFit</h1>
     </div>
+    <button id="header-settings" class="header-icon-btn" data-route="settings" aria-label="Settings">
+     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
    </div>
    <div class="subtitle" id="header-subtitle">Know what you've got</div>
   </header>
@@ -1814,7 +1834,6 @@ h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; }
    <button class="nav-btn" data-route="recipes"><svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h10a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h10"/><path d="M9 8h5"/></svg>Recipes</button>
    <button class="nav-btn" data-route="kitchen"><svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="3" width="13" height="18" rx="3"/><path d="M5.5 10h13"/><path d="M9 6.5v1.2M9 13v3"/></svg>Kitchen</button>
    <button class="nav-btn" data-route="shopping"><svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h14l-1.2 10.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg>Shopping</button>
-   <button class="nav-btn" data-route="settings"><svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
   </nav>
   <div class="modal-overlay" id="modal-overlay">
    <div class="modal-sheet" id="modal-sheet"></div>
@@ -2267,7 +2286,7 @@ function handleHashChange() {
 }
 
 async function renderRoute() {
-  document.querySelectorAll('.nav-btn').forEach((btn) => {
+  document.querySelectorAll('.nav-btn, #header-settings').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.route === AppState.route);
   });
 
@@ -10860,7 +10879,7 @@ function registerServiceWorker() {
 /* ============================================================
    INIT
    ============================================================ */
-document.querySelectorAll('.nav-btn').forEach((btn) => {
+document.querySelectorAll('.nav-btn, #header-settings').forEach((btn) => {
   btn.addEventListener('click', () => navigateTo(btn.dataset.route));
 });
 
