@@ -1559,21 +1559,35 @@ h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; }
 .ring-value { font-weight: 500; letter-spacing: -0.02em; }
 .modal-title-row h2, .app-header h1 { font-weight: 600; }
 
-/* Section labels at 11 px — the iOS/iPadOS minimum type size from HIG
-   `typography.md › Font sizes you can read easily`. Section headings at 12 px. */
+/* Section labels in Title Case rather than UPPERCASE. HIG `writing.md`
+   plus the apple-design skill's content lens treat mixed capitalisation
+   on one screen as a finding; the rest of the app is Title/Sentence case
+   so these follow suit. 12 px for secondary labels, 13 px for headings,
+   both still above the iOS 11 pt minimum. */
 .eyebrow,
-.section-heading h2,
 .st-group-title,
 .goal-subhead,
-.nav-btn,
 .field label {
-  text-transform: uppercase;
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  font-weight: 700;
+  text-transform: none;
+  font-size: 12px;
+  letter-spacing: 0;
+  font-weight: 600;
   color: var(--glass-ink-soft);
 }
-.section-heading h2 { font-size: 12px; }
+.section-heading h2 {
+  text-transform: none;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.nav-btn {
+  text-transform: none;
+  font-size: 11px;
+  letter-spacing: 0;
+  font-weight: 600;
+  color: var(--glass-ink-soft);
+}
 
 /* Frosted-glass cards */
 .item-card, .stat-card, .settings-row, .settings-card, .diary-summary, .diary-meal,
@@ -1674,8 +1688,8 @@ h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; }
 :root[data-theme="dark"] .tag.exp-soon, :root[data-theme="dark"] .expiry-flag.soon { color: #ffecd1; }
 :root[data-theme="dark"] .tag.exp-ok, :root[data-theme="dark"] .expiry-flag.ok { color: #d4f1e5; }
 
-/* Nav labels: 11 px uppercase (iOS mobile minimum), gentle spacing so names fit their slot */
-.nav-btn { font-size: 11px; letter-spacing: 0.04em; font-weight: 700; text-transform: uppercase;
+/* Nav labels: Title Case at 11 px, HIG `writing.md` style; names fit their slot. */
+.nav-btn { font-size: 11px; letter-spacing: 0; font-weight: 600; text-transform: none;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; }
 
 /* Form fields: translucent fill */
